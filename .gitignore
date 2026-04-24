@@ -1,3 +1,68 @@
-.github/
-docs/
+# ─────────────────────────────────────────
+# Variables de entorno y secretos
+# ─────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ─────────────────────────────────────────
+# Flutter / Dart  (mobile/)
+# ─────────────────────────────────────────
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/build/
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/key.properties
+mobile/android/app/google-services.json
+mobile/ios/Flutter/flutter_export_environment.sh
+mobile/ios/Pods/
+mobile/.idea/
+mobile/*.iml
+
+# ─────────────────────────────────────────
+# Python / FastAPI  (backend/)
+# ─────────────────────────────────────────
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.py[cod]
+backend/.venv/
+backend/venv/
+backend/.pytest_cache/
+backend/.ruff_cache/
+backend/dist/
+backend/*.egg-info/
+backend/alembic/versions/*.pyc
+
+# ─────────────────────────────────────────
+# Node / React  (web/)
+# ─────────────────────────────────────────
+web/node_modules/
+web/dist/
+web/.vite/
+
+# ─────────────────────────────────────────
+# IDEs y editores
+# ─────────────────────────────────────────
+.idea/
+.vscode/settings.json
+*.iml
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ─────────────────────────────────────────
+# Docker
+# ─────────────────────────────────────────
+.docker/
+
+# ─────────────────────────────────────────
+# Documentación interna y configuración IA
+# ─────────────────────────────────────────
 AGENTS.md
+docs/
+.github/instructions/
+.github/skills/

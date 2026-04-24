@@ -1,0 +1,17 @@
+# Override para desarrollo local: monta código fuente directamente
+services:
+  backend:
+    build:
+      target: builder
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      DEBUG: "true"
+
+  web:
+    build: {}
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0 --port 80
