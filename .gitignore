@@ -35,6 +35,12 @@ backend/.ruff_cache/
 backend/dist/
 backend/*.egg-info/
 backend/alembic/versions/*.pyc
+backend/test.db
+backend/.coverage
+backend/coverage*.json
+backend/coverage_output.txt
+backend/test_output.txt
+backend/test_results.txt
 
 # ─────────────────────────────────────────
 # Node / React  (web/)
@@ -42,6 +48,12 @@ backend/alembic/versions/*.pyc
 web/node_modules/
 web/dist/
 web/.vite/
+web/lint_output.txt
+
+# ─────────────────────────────────────────
+# Archivos generados en raíz
+# ─────────────────────────────────────────
+/package-lock.json
 
 # ─────────────────────────────────────────
 # IDEs y editores

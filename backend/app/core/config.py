@@ -10,7 +10,8 @@ class Settings(BaseSettings):
     # Seguridad JWT
     secret_key: str = "cambia_esto_por_un_secreto_seguro"
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 60
+    access_token_expire_minutes: int = 15
+    refresh_token_expire_days: int = 7
 
     # Servidor
     debug: bool = False

@@ -37,3 +37,6 @@ jobs:
         env:
           DATABASE_URL: sqlite:///./test.db
           SECRET_KEY: ci_secret_key_only
+
+      - name: Build imagen Docker
+        run: docker build -t heatmapper-backend:ci ./backend

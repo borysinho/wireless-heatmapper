@@ -12,3 +12,5 @@ async def test_health_check():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
+    # En CI la BD es SQLite; db puede ser "ok" o "error" según disponibilidad.
+    assert "db" in data
