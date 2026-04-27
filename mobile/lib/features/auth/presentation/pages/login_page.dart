@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../shared/widgets/app_branding_header.dart';
 import '../bloc/auth_cubit.dart';
 import '../bloc/auth_state.dart';
 import '../widgets/login_form.dart';
@@ -28,7 +31,6 @@ class LoginPage extends StatelessWidget {
                 SnackBar(
                   content: Text(state.mensaje),
                   backgroundColor: Theme.of(context).colorScheme.error,
-                  behavior: SnackBarBehavior.floating,
                 ),
               );
           }
@@ -36,38 +38,17 @@ class LoginPage extends StatelessWidget {
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xl,
+                vertical: AppSpacing.xxl,
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Logo / marca
-                  Icon(
-                    Icons.wifi_find_rounded,
-                    size: 72,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Wireless HeatMapper',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    'Bulldog Tech.',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.6),
-                        ),
-                  ),
-                  const SizedBox(height: 48),
-                  const LoginForm(),
+                children: const [
+                  AppBrandingHeader(logoSize: 96),
+                  SizedBox(height: AppSpacing.xxxl),
+                  LoginForm(),
                 ],
               ),
             ),

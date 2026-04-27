@@ -20,6 +20,7 @@ import styles from "./ListadoProyectosOrg.module.css";
 
 const ESTADOS = [
   { value: "", label: "Todos los estados" },
+  { value: "nuevo", label: "Nuevo" },
   { value: "en_progreso", label: "En progreso" },
   { value: "completado", label: "Completado" },
   { value: "archivado", label: "Archivado" },

@@ -104,6 +104,8 @@ void main() {
   // ── getUsuarioActivo ────────────────────────────────────────────────────────
   group('getUsuarioActivo', () {
     test('retorna Usuario cuando hay sesión persistida', () async {
+      when(() => mockSession.obtenerToken())
+          .thenAnswer((_) async => 'token_prueba');
       when(() => mockSession.obtenerUsuario())
           .thenAnswer((_) async => _usuarioModel.toDomain());
 

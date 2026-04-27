@@ -42,6 +42,9 @@ dependencies:
   # Iconos Material
   cupertino_icons: ^1.0.8
 
+  # Tipografía custom (Poppins títulos + Inter cuerpo)
+  google_fonts: ^6.2.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -59,6 +62,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - img/logo.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

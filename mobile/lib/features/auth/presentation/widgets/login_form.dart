@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
+
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../shared/widgets/app_connection_banner.dart';
+import '../../../../shared/widgets/app_loading_button.dart';
 import '../bloc/auth_cubit.dart';
 import '../bloc/auth_state.dart';
 
@@ -39,29 +43,8 @@ class _LoginFormState extends State<LoginForm> {
       children: [
         // Banner de sin conexión (Sp1-20 / CA-5)
         if (sinConexion) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFEBEE),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFEF5350)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.wifi_off, color: Color(0xFFC62828), size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Sin conexión. Verifique su conexión a internet.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: const Color(0xFFC62828),
-                        ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
+          const AppConnectionBanner(),
+          const SizedBox(height: AppSpacing.md),
         ],
         FormBuilder(
           key: _formKey,
@@ -119,35 +102,19 @@ class _LoginFormState extends State<LoginForm> {
                   return null;
                 },
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: AppSpacing.lg),
               if (sinConexion) ...[
-                OutlinedButton(
+                OutlinedButton.icon(
                   onPressed: () =>
                       context.read<AuthCubit>().resetearParaReintentar(),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: const Text('Reintentar'),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reintentar'),
                 ),
               ] else ...[
-                FilledButton(
+                AppLoadingButton(
+                  label: 'Iniciar sesión',
+                  isLoading: estaCargando,
                   onPressed: bloqueado ? null : _submit,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: estaCargando
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'Iniciar Sesión',
-                          style: TextStyle(fontSize: 16),
-                        ),
                 ),
               ],
             ],

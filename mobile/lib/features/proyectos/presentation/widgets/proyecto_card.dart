@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../shared/widgets/app_estado_badge.dart';
 import '../../domain/entities/proyecto.dart';
 
 /// Card de un proyecto en la lista principal.
@@ -20,27 +23,45 @@ class ProyectoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.xs + 2,
+      ),
       child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: const CircleAvatar(child: Icon(Icons.wifi_find_rounded)),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        leading: CircleAvatar(
+          backgroundColor: scheme.primaryContainer,
+          foregroundColor: scheme.onPrimaryContainer,
+          child: const Icon(Icons.wifi_find_rounded),
+        ),
         title: Text(
           proyecto.nombre,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: Theme.of(context).textTheme.titleMedium,
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(proyecto.cliente),
-            const SizedBox(height: 4),
+            Text(
+              proyecto.cliente,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
             Row(
               children: [
-                _EstadoBadge(estado: proyecto.estado),
-                const SizedBox(width: 8),
+                AppEstadoBadge(estado: proyecto.estado),
+                const SizedBox(width: AppSpacing.sm),
                 Text(
                   _formatearFecha(proyecto.updatedAt),
-                  style: Theme.of(context).textTheme.bodySmall,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
                 ),
               ],
             ),
@@ -56,8 +77,8 @@ class ProyectoCard extends StatelessWidget {
                 onEliminar();
             }
           },
-          itemBuilder: (_) => const [
-            PopupMenuItem(
+          itemBuilder: (_) => [
+            const PopupMenuItem(
               value: _AccionProyecto.archivar,
               child: ListTile(
                 leading: Icon(Icons.archive_outlined),
@@ -68,8 +89,11 @@ class ProyectoCard extends StatelessWidget {
             PopupMenuItem(
               value: _AccionProyecto.eliminar,
               child: ListTile(
-                leading: Icon(Icons.delete_outline, color: Colors.red),
-                title: Text('Eliminar', style: TextStyle(color: Colors.red)),
+                leading: Icon(Icons.delete_outline, color: scheme.error),
+                title: Text(
+                  'Eliminar',
+                  style: TextStyle(color: scheme.error),
+                ),
                 contentPadding: EdgeInsets.zero,
               ),
             ),
@@ -88,43 +112,3 @@ class ProyectoCard extends StatelessWidget {
 }
 
 enum _AccionProyecto { archivar, eliminar }
-
-/// Badge de color para indicar el estado del proyecto.
-class _EstadoBadge extends StatelessWidget {
-  final EstadoProyecto estado;
-
-  const _EstadoBadge({required this.estado});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: _color(context).withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _color(context), width: 0.8),
-      ),
-      child: Text(
-        estado.etiqueta,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: _color(context),
-        ),
-      ),
-    );
-  }
-
-  Color _color(BuildContext context) {
-    switch (estado) {
-      case EstadoProyecto.nuevo:
-        return Colors.blue.shade700;
-      case EstadoProyecto.enProgreso:
-        return Colors.orange.shade700;
-      case EstadoProyecto.completado:
-        return Colors.green.shade700;
-      case EstadoProyecto.archivado:
-        return Colors.grey.shade600;
-    }
-  }
-}

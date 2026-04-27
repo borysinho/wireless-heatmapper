@@ -54,13 +54,13 @@ void main() {
   });
 
   // ── Renderizado inicial ──────────────────────────────────────────────────
-  testWidgets('muestra campos correo, contraseña y botón Iniciar Sesión',
+  testWidgets('muestra campos correo, contraseña y botón Iniciar sesión',
       (tester) async {
     await tester.pumpWidget(_buildSujeto(mockCubit));
 
     expect(find.text('Correo electrónico'), findsOneWidget);
     expect(find.text('Contraseña'), findsOneWidget);
-    expect(find.text('Iniciar Sesión'), findsOneWidget);
+    expect(find.text('Iniciar sesión'), findsOneWidget);
     expect(find.byType(FormBuilderTextField), findsNWidgets(2));
   });
 
@@ -91,7 +91,7 @@ void main() {
         findsOneWidget);
     expect(find.text('Reintentar'), findsOneWidget);
     // El botón de login no aparece en este estado
-    expect(find.text('Iniciar Sesión'), findsNothing);
+    expect(find.text('Iniciar sesión'), findsNothing);
   });
 
   testWidgets(
@@ -142,7 +142,7 @@ void main() {
     await tester.pumpWidget(_buildSujeto(mockCubit));
 
     // Pulsar el botón sin completar los campos
-    await tester.tap(find.text('Iniciar Sesión'));
+    await tester.tap(find.text('Iniciar sesión'));
     await tester.pumpAndSettle();
 
     expect(find.text('Ingrese su correo electrónico'), findsOneWidget);
@@ -157,7 +157,7 @@ void main() {
 
     await tester.enterText(
         find.byType(FormBuilderTextField).first, 'no_es_correo');
-    await tester.tap(find.text('Iniciar Sesión'));
+    await tester.tap(find.text('Iniciar sesión'));
     await tester.pumpAndSettle();
 
     expect(find.text('Ingrese un correo electrónico válido'), findsOneWidget);
@@ -170,7 +170,7 @@ void main() {
     final campos = find.byType(FormBuilderTextField);
     await tester.enterText(campos.first, 'tecnico@bulldogtech.bo');
     await tester.enterText(campos.last, 'pass1234');
-    await tester.tap(find.text('Iniciar Sesión'));
+    await tester.tap(find.text('Iniciar sesión'));
     await tester.pumpAndSettle();
 
     verify(() => mockCubit.login('tecnico@bulldogtech.bo', 'pass1234'))

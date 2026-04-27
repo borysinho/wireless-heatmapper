@@ -6,6 +6,7 @@ type Variante =
   | "inactivo"
   | "admin"
   | "tecnico"
+  | "nuevo"
   | "en_progreso"
   | "completado"
   | "archivado"
@@ -16,6 +17,7 @@ const ETIQUETAS: Record<Variante, string> = {
   inactivo: "Inactivo",
   admin: "Admin",
   tecnico: "Técnico",
+  nuevo: "Nuevo",
   en_progreso: "En progreso",
   completado: "Completado",
   archivado: "Archivado",

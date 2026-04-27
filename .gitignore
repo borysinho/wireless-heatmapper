@@ -59,7 +59,7 @@ web/lint_output.txt
 # IDEs y editores
 # ─────────────────────────────────────────
 .idea/
-.vscode/settings.json
+.vscode/
 *.iml
 *.swp
 *.swo

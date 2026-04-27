@@ -5,10 +5,22 @@ Sprint 1 — PB-19: se agrega FK cliente_id (tabla cliente).
 El modelo se expande en Sprint 2 (PB-01/PB-10) con planos y mediciones.
 """
 
+import sqlalchemy as sa
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
+
+# Tipo ENUM PostgreSQL para el campo estado de proyecto.
+# Valores: nuevo | en_progreso | completado | archivado
+# Referencia UML: «enumeration» EstadoProyecto — guia-staruml-modelos-navegables.md
+estado_proyecto_enum = sa.Enum(
+    "nuevo",
+    "en_progreso",
+    "completado",
+    "archivado",
+    name="estado_proyecto",
+)
 
 
 class Proyecto(Base):
@@ -23,8 +35,7 @@ class Proyecto(Base):
         nullable=True,
         index=True,
     )
-    # Estado: en_progreso | completado | archivado
-    estado = Column(String(30), nullable=False, server_default="en_progreso")
+    estado = Column(estado_proyecto_enum, nullable=False, server_default="nuevo")
     tecnico_id = Column(
         Integer,
         ForeignKey("usuario.id"),

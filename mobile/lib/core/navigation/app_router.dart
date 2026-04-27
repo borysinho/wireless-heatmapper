@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/bloc/auth_cubit.dart';
 import '../../features/auth/presentation/bloc/auth_state.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/proyectos/presentation/bloc/proyecto_cubit.dart';
 import '../../features/proyectos/presentation/pages/proyectos_page.dart';
 import '../../features/proyectos/presentation/pages/proyecto_form_page.dart';
@@ -13,7 +14,7 @@ class AppRouter {
   AppRouter._();
 
   static final GoRouter router = GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/splash',
     redirect: (context, routerState) async {
       // CA-3: si ya hay sesión activa, redirigir a /proyectos desde /login.
       // Se evalúa sólo en AuthAuthenticated para evitar loops.
@@ -25,13 +26,24 @@ class AppRouter {
       return null;
     },
     routes: [
+      // Splash: muestra branding mientras se valida sesión persistida (CA-3).
+      GoRoute(
+        path: '/splash',
+        name: 'splash',
+        builder: (context, state) {
+          return BlocProvider<AuthCubit>.value(
+            value: sl<AuthCubit>(),
+            child: const SplashPage(),
+          );
+        },
+      ),
       // Sprint 1: PB-09 — Autenticar Usuario (Sp-05)
       GoRoute(
         path: '/login',
         name: 'login',
         builder: (context, state) {
           return BlocProvider<AuthCubit>.value(
-            value: sl<AuthCubit>()..checkSesionActiva(),
+            value: sl<AuthCubit>(),
             child: const LoginPage(),
           );
         },

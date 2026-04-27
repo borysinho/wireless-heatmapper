@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, Field
 
@@ -30,7 +30,7 @@ class ProyectoTecnicoOut(BaseModel):
     nombre: str
     cliente: ClienteBasicoOut | None
     descripcion: str | None = None
-    estado: str
+    estado: Literal["NUEVO", "EN_PROGRESO", "COMPLETADO", "ARCHIVADO"]
     created_at: datetime
     updated_at: datetime
 
@@ -65,7 +65,7 @@ class ProyectoListOut(BaseModel):
     id: int
     nombre: str
     cliente: ClienteBasicoOut | None
-    estado: str
+    estado: Literal["nuevo", "en_progreso", "completado", "archivado"]
     ultima_actividad: datetime
     cantidad_puntos: int
     tecnico: TecnicoBasicoOut

@@ -36,6 +36,11 @@
   color: var(--color-info);
 }
 
+.nuevo {
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+}
+
 .completado {
   background: var(--color-success-bg);
   color: var(--color-success);

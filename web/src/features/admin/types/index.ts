@@ -55,7 +55,7 @@ export interface ProyectoListOut {
   id: number;
   nombre: string;
   cliente: ClienteBasicoOut | null;
-  estado: "en_progreso" | "completado" | "archivado";
+  estado: "nuevo" | "en_progreso" | "completado" | "archivado";
   ultima_actividad: string;
   cantidad_puntos: number;
   tecnico: TecnicoBasicoOut;

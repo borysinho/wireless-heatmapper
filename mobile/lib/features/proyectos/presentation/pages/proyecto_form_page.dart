@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:get_it/get_it.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../../core/theme/app_tokens.dart';
+import '../../../../shared/widgets/app_loading_button.dart';
 import '../../../clientes/data/datasources/cliente_remote_datasource.dart';
 import '../../domain/entities/proyecto.dart';
 import '../bloc/proyecto_cubit.dart';
@@ -100,7 +103,7 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
           }
         },
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(AppSpacing.lg),
           child: Form(
             key: _formKey,
             child: Column(
@@ -122,7 +125,7 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
                 FutureBuilder<List<ClienteItem>>(
                   future: _clientesFuture,
                   builder: (context, snapshot) {
@@ -155,7 +158,7 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
                     );
                   },
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.md),
                 TextFormField(
                   controller: _descripcionCtrl,
                   textInputAction: TextInputAction.done,
@@ -168,28 +171,14 @@ class _ProyectoFormPageState extends State<ProyectoFormPage> {
                     alignLabelWithHint: true,
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: AppSpacing.xl),
                 BlocBuilder<ProyectoCubit, ProyectoState>(
                   builder: (context, state) {
                     final cargando = state is ProyectoLoading;
-                    return FilledButton(
+                    return AppLoadingButton(
+                      label: _esEdicion ? 'Guardar cambios' : 'Crear proyecto',
+                      isLoading: cargando,
                       onPressed: cargando ? null : _guardar,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: cargando
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Text(
-                              _esEdicion ? 'Guardar cambios' : 'Crear proyecto',
-                              style: const TextStyle(fontSize: 16),
-                            ),
                     );
                   },
                 ),
