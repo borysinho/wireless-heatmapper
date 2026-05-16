@@ -293,8 +293,10 @@ class _ProyectosPageState extends State<ProyectosPage> {
                                 final proyecto = proyectosFiltrados[i];
                                 return ProyectoCard(
                                   proyecto: proyecto,
-                                  onTap: () =>
-                                      context.push('/proyectos/${proyecto.id}'),
+                                  onTap: () => context.push(
+                                    '/proyectos/${proyecto.id}',
+                                    extra: {'proyectoNombre': proyecto.nombre},
+                                  ),
                                   onArchivar: () => _confirmarArchivar(
                                     context,
                                     proyecto.id,

@@ -32,6 +32,13 @@ import 'features/proyectos/presentation/bloc/proyecto_cubit.dart';
 // PB-19: Selector de clientes
 import 'features/clientes/data/datasources/cliente_remote_datasource.dart';
 
+// Sprint 2 — PB-02 / PB-11: Planos y calibración
+import 'features/planos/data/datasources/plano_remote_datasource.dart';
+import 'features/planos/data/repositories/plano_repository_impl.dart';
+import 'features/planos/domain/repositories/plano_repository.dart';
+import 'features/planos/domain/usecases/plano_usecases.dart';
+import 'features/planos/presentation/cubit/planos_cubit.dart';
+
 final GetIt sl = GetIt.instance;
 
 Future<void> main() async {
@@ -129,5 +136,36 @@ void _initDependencias() {
   // PB-19: Selector de clientes ──────────────────────────────────────────────
   sl.registerLazySingleton<ClienteRemoteDatasource>(
     () => ClienteRemoteDatasource(sl<Dio>()),
+  );
+
+  // Sprint 2 — PB-02 / PB-11: Planos y calibración ─────────────────────────
+  sl.registerLazySingleton<PlanoRemoteDatasource>(
+    () => PlanoRemoteDatasource(sl<Dio>()),
+  );
+  sl.registerLazySingleton<PlanoRepository>(
+    () => PlanoRepositoryImpl(sl<PlanoRemoteDatasource>()),
+  );
+  sl.registerFactory<ListarPlanosUseCase>(
+    () => ListarPlanosUseCase(sl<PlanoRepository>()),
+  );
+  sl.registerFactory<ImportarPlanoUseCase>(
+    () => ImportarPlanoUseCase(sl<PlanoRepository>()),
+  );
+  sl.registerFactory<CalibrarPlanoUseCase>(
+    () => CalibrarPlanoUseCase(sl<PlanoRepository>()),
+  );
+  sl.registerFactory<EliminarPlanoUseCase>(
+    () => EliminarPlanoUseCase(sl<PlanoRepository>()),
+  );
+  sl.registerFactory<RenovarUrlFirmadaUseCase>(
+    () => RenovarUrlFirmadaUseCase(sl<PlanoRepository>()),
+  );
+  sl.registerFactory<PlanosCubit>(
+    () => PlanosCubit(
+      listar: sl<ListarPlanosUseCase>(),
+      importar: sl<ImportarPlanoUseCase>(),
+      calibrar: sl<CalibrarPlanoUseCase>(),
+      eliminar: sl<EliminarPlanoUseCase>(),
+    ),
   );
 }
