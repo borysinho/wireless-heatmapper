@@ -55,7 +55,12 @@ def upgrade() -> None:
         )
     )
 
-    # 3. Alterar la columna de VARCHAR(30) al tipo ENUM usando USING
+    # 3. Eliminar el DEFAULT actual para que PostgreSQL permita el cambio de tipo
+    op.execute(
+        sa.text("ALTER TABLE proyecto ALTER COLUMN estado DROP DEFAULT")
+    )
+
+    # 4. Alterar la columna de VARCHAR(30) al tipo ENUM usando USING
     op.execute(
         sa.text(
             """
@@ -66,7 +71,7 @@ def upgrade() -> None:
         )
     )
 
-    # 4. Actualizar el server_default a 'nuevo'
+    # 5. Establecer el nuevo server_default como 'nuevo'
     op.execute(
         sa.text(
             "ALTER TABLE proyecto ALTER COLUMN estado SET DEFAULT 'nuevo'"
