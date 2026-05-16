@@ -39,8 +39,19 @@ class _PlanosListPageState extends State<PlanosListPage> {
     );
     if (result == null || result.files.isEmpty) return;
     final file = result.files.single;
-    if (file.path == null) return;
     if (!mounted) return;
+    if (file.path == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No se pudo acceder al archivo. '
+            'Intenta copiarlo al almacenamiento interno del dispositivo e inténtalo de nuevo.',
+          ),
+          duration: Duration(seconds: 5),
+        ),
+      );
+      return;
+    }
     await context.read<PlanosCubit>().importarPlano(
           rutaArchivo: file.path!,
           nombre: file.name,
