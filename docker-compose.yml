@@ -30,6 +30,12 @@ services:
       SECRET_KEY: ${SECRET_KEY:-cambia_esto_por_un_secreto_seguro}
       ALGORITHM: ${ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      STORAGE_ROOT: ${STORAGE_ROOT:-/var/lib/heatmapper/planos}
+      STORAGE_URL_SECRET: ${STORAGE_URL_SECRET:-cambia_esto_por_un_secreto_de_storage}
+      STORAGE_URL_TTL_SECONDS: ${STORAGE_URL_TTL_SECONDS:-3600}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-}
+    volumes:
+      - planos_data:/var/lib/heatmapper/planos
     depends_on:
       db:
         condition: service_healthy
@@ -70,6 +76,7 @@ services:
 
 volumes:
   postgres_data:
+  planos_data:
 
 networks:
   heatmapper-net:

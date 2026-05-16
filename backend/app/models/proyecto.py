@@ -52,3 +52,8 @@ class Proyecto(Base):
 
     tecnico = relationship("Usuario", back_populates="proyectos")
     cliente = relationship("Cliente", back_populates="proyectos")
+    planos = relationship(
+        "Plano",
+        back_populates="proyecto",
+        cascade="all, delete-orphan",
+    )

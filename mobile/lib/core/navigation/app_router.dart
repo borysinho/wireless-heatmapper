@@ -1,10 +1,13 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/bloc/auth_cubit.dart';
 import '../../features/auth/presentation/bloc/auth_state.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
+import '../../features/planos/domain/entities/plano.dart';
+import '../../features/planos/presentation/cubit/planos_cubit.dart';
+import '../../features/planos/presentation/pages/plano_editor_page.dart';
+import '../../features/planos/presentation/pages/planos_list_page.dart';
 import '../../features/proyectos/presentation/bloc/proyecto_cubit.dart';
 import '../../features/proyectos/presentation/pages/proyectos_page.dart';
 import '../../features/proyectos/presentation/pages/proyecto_form_page.dart';
@@ -87,19 +90,42 @@ class AppRouter {
               );
             },
           ),
-          // Detalle de proyecto (pendiente PB-02 / PB-10 — Sprint 1)
+          // Sprint 2: PB-02 — Importar Planos. Lista de planos del proyecto.
           GoRoute(
             path: ':id',
             name: 'proyecto-detalle',
             builder: (context, routeState) {
-              final id = routeState.pathParameters['id'] ?? '';
-              return Scaffold(
-                appBar: AppBar(title: Text('Proyecto #$id')),
-                body: const Center(
-                  child: Text('Detalle de proyecto — pendiente PB-02'),
+              final id =
+                  int.tryParse(routeState.pathParameters['id'] ?? '') ?? 0;
+              final extra = routeState.extra;
+              String? nombre;
+              if (extra is Map) {
+                nombre = extra['proyectoNombre'] as String?;
+              }
+              return BlocProvider<PlanosCubit>(
+                create: (_) => sl<PlanosCubit>(),
+                child: PlanosListPage(
+                  proyectoId: id,
+                  proyectoNombre: nombre,
                 ),
               );
             },
+            routes: [
+              // Sprint 2: PB-11 — Editor / Calibrar Escala.
+              GoRoute(
+                path: 'planos/:planoId',
+                name: 'plano-editor',
+                builder: (context, routeState) {
+                  final extra = routeState.extra as Map<String, dynamic>;
+                  final cubit = extra['cubit'] as PlanosCubit;
+                  final plano = extra['plano'] as Plano;
+                  return BlocProvider<PlanosCubit>.value(
+                    value: cubit,
+                    child: PlanoEditorPage(plano: plano),
+                  );
+                },
+              ),
+            ],
           ),
         ],
       ),
