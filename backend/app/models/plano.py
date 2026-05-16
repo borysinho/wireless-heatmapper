@@ -24,6 +24,7 @@ formato_plano_enum = sa.Enum(
     "jpg",
     "pdf",
     name="formato_plano",
+    create_type=False,
 )
 
 

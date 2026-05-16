@@ -11,6 +11,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 revision: str = "a1b2c3d4e5f6"
@@ -20,7 +21,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    formato_enum = sa.Enum("png", "jpg", "pdf", name="formato_plano")
+    formato_enum = postgresql.ENUM(
+        "png", "jpg", "pdf", name="formato_plano", create_type=False
+    )
     formato_enum.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
