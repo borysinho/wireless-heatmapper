@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pdfx/pdfx.dart';
 
 import '../../domain/entities/plano.dart';
 import '../cubit/planos_cubit.dart';
@@ -52,6 +53,19 @@ class _PlanosListPageState extends State<PlanosListPage> {
       );
       return;
     }
+
+    // Vista previa PDF antes de subir (Sp2-08 / PB-02).
+    if (file.path!.toLowerCase().endsWith('.pdf')) {
+      final confirmar = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => _PdfPreviewDialog(
+          ruta: file.path!,
+          nombre: file.name,
+        ),
+      );
+      if (confirmar != true || !mounted) return;
+    }
+
     await context.read<PlanosCubit>().importarPlano(
           rutaArchivo: file.path!,
           nombre: file.name,
@@ -268,6 +282,73 @@ class _PlanoCard extends StatelessWidget {
         ),
         onTap: onTap,
       ),
+    );
+  }
+}
+
+/// Diálogo de vista previa de PDF local antes de importarlo al backend.
+/// Usa `pdfx` para renderizar la primera página. Sp2-08 / PB-02.
+class _PdfPreviewDialog extends StatefulWidget {
+  final String ruta;
+  final String nombre;
+
+  const _PdfPreviewDialog({required this.ruta, required this.nombre});
+
+  @override
+  State<_PdfPreviewDialog> createState() => _PdfPreviewDialogState();
+}
+
+class _PdfPreviewDialogState extends State<_PdfPreviewDialog> {
+  late final PdfController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PdfController(
+      document: PdfDocument.openFile(widget.ruta),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Vista previa del PDF'),
+          Text(
+            widget.nombre,
+            style: Theme.of(context).textTheme.bodySmall,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 420,
+        child: PdfView(
+          controller: _controller,
+          scrollDirection: Axis.vertical,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Importar'),
+        ),
+      ],
     );
   }
 }

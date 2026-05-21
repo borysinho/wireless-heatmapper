@@ -34,6 +34,14 @@ import 'features/clientes/data/datasources/cliente_remote_datasource.dart';
 
 // Sprint 2 — PB-02 / PB-11: Planos y calibración
 import 'features/planos/data/datasources/plano_remote_datasource.dart';
+
+// Sprint 3 — PB-03 / PB-04: Captura WiFi y mediciones
+import 'core/wifi/throttling_manager.dart';
+import 'core/wifi/wifi_scanner.dart';
+import 'features/captura/data/datasources/medicion_remote_datasource.dart';
+import 'features/captura/data/repositories/captura_repository_impl.dart';
+import 'features/captura/domain/repositories/captura_repository.dart';
+import 'features/captura/presentation/cubit/captura_cubit.dart';
 import 'features/planos/data/repositories/plano_repository_impl.dart';
 import 'features/planos/domain/repositories/plano_repository.dart';
 import 'features/planos/domain/usecases/plano_usecases.dart';
@@ -166,6 +174,24 @@ void _initDependencias() {
       importar: sl<ImportarPlanoUseCase>(),
       calibrar: sl<CalibrarPlanoUseCase>(),
       eliminar: sl<EliminarPlanoUseCase>(),
+    ),
+  );
+
+  // Sprint 3 — PB-03 / PB-04: Captura WiFi y mediciones ─────────────────────
+  sl.registerLazySingleton<WifiScanner>(() => const WifiScanner());
+  sl.registerLazySingleton<ThrottlingManager>(() => ThrottlingManager());
+  sl.registerLazySingleton<MedicionRemoteDatasource>(
+    () => MedicionRemoteDatasource(sl<Dio>()),
+  );
+  sl.registerLazySingleton<CapturaRepository>(
+    () => CapturaRepositoryImpl(sl<MedicionRemoteDatasource>()),
+  );
+  sl.registerFactory<CapturaCubit>(
+    () => CapturaCubit(
+      repo: sl<CapturaRepository>(),
+      scanner: sl<WifiScanner>(),
+      throttling: sl<ThrottlingManager>(),
+      connectivity: sl<ConnectivityMonitor>(),
     ),
   );
 }

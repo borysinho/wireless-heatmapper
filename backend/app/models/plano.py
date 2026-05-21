@@ -67,6 +67,11 @@ class Plano(Base):
     )
 
     proyecto = relationship("Proyecto", back_populates="planos")
+    puntos_medicion = relationship(
+        "PuntoMedicion",
+        back_populates="plano",
+        cascade="all, delete-orphan",
+    )
 
     @property
     def calibrado(self) -> bool:

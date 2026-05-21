@@ -31,9 +31,52 @@ class DioClient {
           ),
         ) {
     _dio.interceptors.add(_AuthInterceptor(_dio, storage));
+    _dio.interceptors.add(_RetryInterceptor(_dio));
   }
 
   Dio get dio => _dio;
+}
+
+/// Interceptor de reintentos con backoff exponencial para fallos de red.
+/// Sprint 3 (Sp3-10): 3 intentos máx., backoff 1→2→4 s, total ≤ 4 s acumulado.
+/// Solo reintenta errores de conexión/timeout, NO errores HTTP (4xx/5xx).
+class _RetryInterceptor extends Interceptor {
+  static const int _maxReintentos = 3;
+
+  final Dio _dio;
+
+  _RetryInterceptor(this._dio);
+
+  @override
+  Future<void> onError(
+    DioException err,
+    ErrorInterceptorHandler handler,
+  ) async {
+    final tipo = err.type;
+    final intentos = err.requestOptions.extra['_reintentos'] as int? ?? 0;
+
+    final esErrorRed = tipo == DioExceptionType.connectionError ||
+        tipo == DioExceptionType.connectionTimeout ||
+        tipo == DioExceptionType.receiveTimeout;
+
+    if (!esErrorRed || intentos >= _maxReintentos) {
+      handler.next(err);
+      return;
+    }
+
+    final esperaMs = (1 << intentos) * 1000; // 1s, 2s, 4s
+    await Future<void>.delayed(Duration(milliseconds: esperaMs));
+
+    final opciones = err.requestOptions;
+    opciones.extra['_reintentos'] = intentos + 1;
+
+    try {
+      final respuesta = await _dio.fetch<dynamic>(opciones);
+      handler.resolve(respuesta);
+    } on DioException catch (retryErr) {
+      handler.next(retryErr);
+    }
+  }
 }
 
 /// Interceptor que gestiona el ciclo completo de JWT + renovación automática.
