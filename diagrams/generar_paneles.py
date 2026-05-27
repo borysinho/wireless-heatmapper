@@ -28,6 +28,21 @@ OUTPUT = Path(__file__).parent / "Paneles-WHM.mdj"
 FILL   = "#EBF5FB"
 BORDER = "#2980B9"
 
+# ─── Registro de posiciones para rutar aristas ──────────────────────────────
+VIEW_POS: dict[str, tuple[int, int, int, int]] = {}  # vk → (left, top, w, h)
+
+def _reg(vk: str, x: int, y: int, w: int, h: int) -> None:
+    VIEW_POS[vk] = (x, y, w, h)
+
+def _center(vk: str) -> tuple[int, int]:
+    p = VIEW_POS.get(vk, (0, 0, 100, 50))
+    return (p[0] + p[2] // 2, p[1] + p[3] // 2)
+
+def _pts(tail_vk: str, head_vk: str) -> str:
+    tx, ty = _center(tail_vk)
+    hx, hy = _center(head_vk)
+    return f"{tx}:{ty};{hx}:{hy}"
+
 # ─────────────────────────── IDs deterministas ─────────────────────────────
 def sid(key: str) -> str:
     return hashlib.md5(key.encode("utf-8")).hexdigest()
@@ -84,7 +99,8 @@ def _ac(ac_id: str, pvk: str, mk: str, lx: int, ly: int, w: int, h: int,
 
 # ─────────────────────────── Vistas de nodos ───────────────────────────────
 def actor_v(vk: str, dk: str, mk: str, x: int, y: int) -> dict:
-    w, h = 40, 65
+    w, h = 120, 80
+    _reg(vk, x, y, w, h)
     return {
         "_type": "UMLActorView", "_id": sid(vk),
         "_parent": ref(dk), "model": ref(mk),
@@ -98,7 +114,7 @@ def actor_v(vk: str, dk: str, mk: str, x: int, y: int) -> dict:
         "receptionCompartment": ref(f"{vk}_rc"),
         "templateParameterCompartment": ref(f"{vk}_tc"),
         "subViews": [
-            _nc(sid(f"{vk}_nc"), vk, mk, x, y, w, 25),
+            _nc(sid(f"{vk}_nc"), vk, mk, x, y + 55, w, 25),
             _hid("UMLAttributeCompartmentView",  sid(f"{vk}_ac"), vk, mk),
             _hid("UMLOperationCompartmentView",  sid(f"{vk}_oc"), vk, mk),
             _hid("UMLReceptionCompartmentView",  sid(f"{vk}_rc"), vk, mk),
@@ -108,6 +124,7 @@ def actor_v(vk: str, dk: str, mk: str, x: int, y: int) -> dict:
 
 def uc_v(vk: str, dk: str, mk: str, x: int, y: int,
          w: int = 150, h: int = 44) -> dict:
+    _reg(vk, x, y, w, h)
     return {
         "_type": "UMLUseCaseView", "_id": sid(vk),
         "_parent": ref(dk), "model": ref(mk),
@@ -136,6 +153,7 @@ def class_v(vk: str, dk: str, mk: str, x: int, y: int,
             w: int = 165, h: int = 110) -> dict:
     NC_H = 25
     ac_h = max(10, h - NC_H)
+    _reg(vk, x, y, w, h)
     return {
         "_type": "UMLClassView", "_id": sid(vk),
         "_parent": ref(dk), "model": ref(mk),
@@ -161,6 +179,7 @@ def class_v(vk: str, dk: str, mk: str, x: int, y: int,
 
 def pkg_v(vk: str, dk: str, mk: str, x: int, y: int,
           w: int = 210, h: int = 120) -> dict:
+    _reg(vk, x, y, w, h)
     return {
         "_type": "UMLPackageView", "_id": sid(vk),
         "_parent": ref(dk), "model": ref(mk),
@@ -173,6 +192,7 @@ def pkg_v(vk: str, dk: str, mk: str, x: int, y: int,
 
 def node_v(vk: str, dk: str, mk: str, x: int, y: int,
            w: int = 190, h: int = 80) -> dict:
+    _reg(vk, x, y, w, h)
     return {
         "_type": "UMLNodeView", "_id": sid(vk),
         "_parent": ref(dk), "model": ref(mk),
@@ -196,6 +216,7 @@ def node_v(vk: str, dk: str, mk: str, x: int, y: int,
 
 def artifact_v(vk: str, dk: str, mk: str, x: int, y: int,
                w: int = 150, h: int = 38) -> dict:
+    _reg(vk, x, y, w, h)
     return {
         "_type": "UMLArtifactView", "_id": sid(vk),
         "_parent": ref(dk), "model": ref(mk),
@@ -210,6 +231,7 @@ def lifeline_v(vk: str, dk: str, mk: str, x: int,
     BOX_H = 40
     nc_id = sid(f"{vk}_nc")
     lp_id = sid(f"{vk}_lp")
+    _reg(vk, x, y, w, ll_h)
     return {
         "_type": "UMLSeqLifelineView", "_id": sid(vk),
         "_parent": ref(dk), "model": ref(mk),
@@ -234,6 +256,7 @@ def lifeline_v(vk: str, dk: str, mk: str, x: int,
 
 def state_v(vk: str, dk: str, mk: str, x: int, y: int,
             w: int = 140, h: int = 44) -> dict:
+    _reg(vk, x, y, w, h)
     return {
         "_type": "UMLStateView", "_id": sid(vk),
         "_parent": ref(dk), "model": ref(mk),
@@ -245,12 +268,14 @@ def state_v(vk: str, dk: str, mk: str, x: int, y: int,
     }
 
 def pseudo_v(vk: str, dk: str, mk: str, x: int, y: int) -> dict:
+    _reg(vk, x, y, 20, 20)
     return {"_type": "UMLPseudostateView", "_id": sid(vk),
             "_parent": ref(dk), "model": ref(mk),
             "fillColor": BORDER, "lineColor": BORDER,
             "parentStyle": False, "left": x, "top": y, "width": 20, "height": 20}
 
 def final_v(vk: str, dk: str, mk: str, x: int, y: int) -> dict:
+    _reg(vk, x, y, 25, 25)
     return {"_type": "UMLFinalStateView", "_id": sid(vk),
             "_parent": ref(dk), "model": ref(mk),
             "fillColor": BORDER, "lineColor": BORDER,
@@ -281,6 +306,7 @@ def edge_v(tp: str, vk: str, dk: str, mk: str,
         "_parent": ref(dk), "model": ref(mk),
         "lineColor": BORDER, "parentStyle": False,
         "head": ref(head_vk), "tail": ref(tail_vk),
+        "points": _pts(tail_vk, head_vk),
         "nameLabel":       {"$ref": sid(f"{vk}_nl")},
         "stereotypeLabel": {"$ref": sid(f"{vk}_sl")},
         "propertyLabel":   {"$ref": sid(f"{vk}_pl")},
@@ -370,6 +396,7 @@ def trans_v(vk: str, dk: str, mk: str,
         "lineColor": BORDER, "parentStyle": False,
         "head": ref(head_vk), "tail": ref(tail_vk),
         "lineStyle": 1,
+        "points": _pts(tail_vk, head_vk),
         "nameLabel":       {"$ref": sid(f"{vk}_nl")},
         "stereotypeLabel": {"$ref": sid(f"{vk}_sl")},
         "propertyLabel":   {"$ref": sid(f"{vk}_pl")},
