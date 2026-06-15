@@ -5,6 +5,7 @@ Sprint 4 — PB-05 (Generar mapa de calor), PB-06 (Analizar cobertura).
 
 import hashlib
 import json
+import math
 import secrets
 from pathlib import Path
 
@@ -212,7 +213,7 @@ def _resolver_aps_interes(
 
 def _firma_aps_interes(*, firma_base: str, aps_interes: list[dict]) -> str:
     payload = {
-        "modelo": "aps-interes-anclas-v2",
+        "modelo": "aps-interes-compuesto-v3",
         "firma_base": firma_base,
         "aps": [
             {
@@ -248,6 +249,82 @@ def _agregar_anclas_aps(
             )
         )
     return puntos_interpolacion
+
+
+def _agregar_anclas_foco_ap(
+    *,
+    puntos: list[PuntoRSSI],
+    ap: dict,
+    indice_ap: int,
+    rssi_maximos: dict[str, float],
+    ancho_px: int,
+    alto_px: int,
+    escala_m_por_px: float | None,
+) -> list[PuntoRSSI]:
+    puntos_interpolacion = list(puntos)
+    rssi_observado = rssi_maximos.get(
+        ap["bssid"],
+        float(ap["rssi_promedio"]),
+    )
+    rssi_centro = max(rssi_observado, -50.0)
+    pos_x = float(ap["pos_x"])
+    pos_y = float(ap["pos_y"])
+    puntos_interpolacion.append(
+        PuntoRSSI(
+            punto_id=-(indice_ap * 100 + 1),
+            x=pos_x,
+            y=pos_y,
+            rssi=rssi_centro,
+        )
+    )
+
+    radio_px = _radio_foco_ap_px(
+        ancho_px=ancho_px,
+        alto_px=alto_px,
+        escala_m_por_px=escala_m_por_px,
+    )
+    rssi_anillo = max(rssi_centro - 14.0, -68.0)
+    for idx in range(8):
+        angulo = (math.tau * idx) / 8
+        puntos_interpolacion.append(
+            PuntoRSSI(
+                punto_id=-(indice_ap * 100 + idx + 2),
+                x=min(max(pos_x + math.cos(angulo) * radio_px, 0.0), ancho_px),
+                y=min(max(pos_y + math.sin(angulo) * radio_px, 0.0), alto_px),
+                rssi=rssi_anillo,
+            )
+        )
+    return puntos_interpolacion
+
+
+def _radio_foco_ap_px(
+    *,
+    ancho_px: int,
+    alto_px: int,
+    escala_m_por_px: float | None,
+) -> float:
+    dimension_menor = min(ancho_px, alto_px)
+    if escala_m_por_px and escala_m_por_px > 0:
+        radio_px = 1.5 / escala_m_por_px
+    else:
+        radio_px = dimension_menor * 0.06
+    return min(max(radio_px, 10.0), dimension_menor * 0.12)
+
+
+def _combinar_matrices_mejor_senal(
+    matrices: list[list[list[float]]],
+) -> list[list[float]]:
+    if not matrices:
+        return []
+    filas = len(matrices[0])
+    columnas = len(matrices[0][0]) if filas else 0
+    return [
+        [
+            round(max(matriz[fila][columna] for matriz in matrices), 2)
+            for columna in range(columnas)
+        ]
+        for fila in range(filas)
+    ]
 
 
 @router_planos_heatmap.get(
@@ -325,11 +402,16 @@ def generar_heatmap(
         ap_pos_y=ap_pos_y,
     )
 
-    puntos = med_repo.listar_puntos_rssi_heatmap(
+    puntos_por_bssid = med_repo.listar_puntos_rssi_por_bssid_heatmap(
         plano_id=plano_id,
         bssids=bssids_norm,
     )
-    if len(puntos) < 5:
+    puntos_lectura_ids = {
+        punto.punto_id
+        for puntos_ap in puntos_por_bssid.values()
+        for punto in puntos_ap
+    }
+    if len(puntos_lectura_ids) < 5:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Se requieren al menos 5 puntos de los APs seleccionados.",
@@ -359,18 +441,31 @@ def generar_heatmap(
         plano_id=plano_id,
         bssids=bssids_norm,
     )
-    puntos_interpolacion = _agregar_anclas_aps(
-        puntos=puntos,
-        aps_interes=aps_interes,
-        rssi_maximos=rssi_maximos,
-    )
-    matriz = InterpolacionService().interpolar(
-        puntos=puntos_interpolacion,
-        ancho_px=plano.ancho_px,
-        alto_px=plano.alto_px,
-        resolucion=resolucion,
-        algoritmo=algoritmo_norm,
-    )
+    interpolador = InterpolacionService()
+    matrices_ap: list[list[list[float]]] = []
+    puntos_interpolacion_total: list[PuntoRSSI] = []
+    for indice_ap, ap in enumerate(aps_interes):
+        puntos_ap = puntos_por_bssid.get(ap["bssid"], [])
+        puntos_interpolacion_ap = _agregar_anclas_foco_ap(
+            puntos=puntos_ap,
+            ap=ap,
+            indice_ap=indice_ap,
+            rssi_maximos=rssi_maximos,
+            ancho_px=plano.ancho_px,
+            alto_px=plano.alto_px,
+            escala_m_por_px=plano.escala_m_por_px,
+        )
+        puntos_interpolacion_total.extend(puntos_interpolacion_ap)
+        matrices_ap.append(
+            interpolador.interpolar(
+                puntos=puntos_interpolacion_ap,
+                ancho_px=plano.ancho_px,
+                alto_px=plano.alto_px,
+                resolucion=resolucion,
+                algoritmo=algoritmo_norm,
+            )
+        )
+    matriz = _combinar_matrices_mejor_senal(matrices_ap)
     png = HeatmapImageService().render_png(matriz)
     ruta = (
         f"heatmaps/{plano_id}/"
@@ -390,9 +485,9 @@ def generar_heatmap(
         matriz=matriz,
         escala=ESCALA_CWNA,
         ruta_imagen=ruta,
-        cantidad_puntos=len(puntos),
-        rssi_min=min(p.rssi for p in puntos_interpolacion),
-        rssi_max=max(p.rssi for p in puntos_interpolacion),
+        cantidad_puntos=len(puntos_lectura_ids),
+        rssi_min=min(p.rssi for p in puntos_interpolacion_total),
+        rssi_max=max(p.rssi for p in puntos_interpolacion_total),
         firma_mediciones=firma,
     )
     return _mapa_out(mapa, request)

@@ -194,6 +194,62 @@ def test_generar_heatmap_retorna_matriz_y_cache(db_session, tecnico_usuario):
     assert mapa1.matriz[fila_ap2][col_ap2] >= -55
 
 
+def test_generar_heatmap_compone_cobertura_de_cada_ap(db_session, tecnico_usuario):
+    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
+    repo = MedicionRepository(db_session)
+    lecturas = [
+        (70, 80, -52, -92),
+        (100, 80, -55, -90),
+        (320, 220, -91, -53),
+        (340, 230, -92, -56),
+        (200, 150, -78, -78),
+    ]
+    for x, y, rssi_ap1, rssi_ap2 in lecturas:
+        repo.crear_lote(
+            plano_id=plano_id,
+            pos_x=x,
+            pos_y=y,
+            items=[
+                MedicionItemIn(
+                    ssid="Quiroga",
+                    bssid="aa:bb:cc:dd:ee:01",
+                    rssi=rssi_ap1,
+                    canal=6,
+                    frecuencia_mhz=2437,
+                ),
+                MedicionItemIn(
+                    ssid="Patas Sucias",
+                    bssid="aa:bb:cc:dd:ee:02",
+                    rssi=rssi_ap2,
+                    canal=11,
+                    frecuencia_mhz=2462,
+                ),
+            ],
+        )
+
+    mapa = generar_heatmap(
+        plano_id=plano_id,
+        request=None,
+        bssid=["aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"],
+        ap_pos_x=[80, 330],
+        ap_pos_y=[80, 220],
+        algoritmo="IDW",
+        resolucion=64,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    fila_ap1 = int((80 / 300) * 64)
+    col_ap1 = int((80 / 400) * 64)
+    fila_ap2 = int((220 / 300) * 64)
+    col_ap2 = int((330 / 400) * 64)
+
+    assert mapa.matriz[fila_ap1][col_ap1] >= -55
+    assert mapa.matriz[fila_ap2][col_ap2] >= -55
+    assert mapa.matriz[fila_ap1][col_ap1 + 2] >= -68
+    assert mapa.matriz[fila_ap2][col_ap2 - 2] >= -68
+
+
 def test_resolver_aps_interes_rechaza_coordenadas_negativas():
     aps = [
         {

@@ -1006,11 +1006,11 @@ class _HeatmapMatrixPainter extends CustomPainter {
       for (var columna = 0; columna < columnas; columna++) {
         paint.color = _colorParaRssi(valores[columna]);
         canvas.drawRect(
-          Rect.fromLTWH(
+          Rect.fromLTRB(
             columna * celdaW,
             fila * celdaH,
-            celdaW + 0.5,
-            celdaH + 0.5,
+            (columna + 1) * celdaW,
+            (fila + 1) * celdaH,
           ),
           paint,
         );

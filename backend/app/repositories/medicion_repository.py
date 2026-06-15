@@ -219,6 +219,33 @@ class MedicionRepository:
             )
         return resultado
 
+    def listar_puntos_rssi_por_bssid_heatmap(
+        self,
+        *,
+        plano_id: int,
+        bssids: list[str],
+    ) -> dict[str, list[PuntoRSSI]]:
+        """Agrupa lecturas RSSI por AP de interés y punto de medición."""
+        bssids_norm = {bssid.lower() for bssid in bssids}
+        puntos = self.listar_puntos_por_plano(plano_id=plano_id)
+        resultado: dict[str, list[PuntoRSSI]] = {bssid: [] for bssid in bssids_norm}
+        for punto in puntos:
+            rssi_por_bssid: dict[str, list[int]] = defaultdict(list)
+            for medicion in punto.mediciones:
+                if medicion.bssid in bssids_norm:
+                    rssi_por_bssid[medicion.bssid].append(medicion.rssi)
+
+            for bssid, valores in rssi_por_bssid.items():
+                resultado[bssid].append(
+                    PuntoRSSI(
+                        punto_id=punto.id,
+                        x=punto.pos_x,
+                        y=punto.pos_y,
+                        rssi=float(sum(valores) / len(valores)),
+                    )
+                )
+        return resultado
+
     def rssi_maximo_por_bssid(
         self,
         *,
