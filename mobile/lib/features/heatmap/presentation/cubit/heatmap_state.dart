@@ -33,20 +33,23 @@ class HeatmapSeleccionAP extends HeatmapState {
   final String? mensaje;
 
   HeatmapSeleccionAP({
-    required this.aps,
+    required List<APDisponible> aps,
     required Set<String> bssidsSeleccionados,
     required this.bssidActivo,
     required Map<String, double> apPosXPorBssid,
     required Map<String, double> apPosYPorBssid,
     this.mensaje,
-  })  : bssidsSeleccionados = Set.unmodifiable(bssidsSeleccionados),
+  })  : aps = List<APDisponible>.unmodifiable(aps),
+        bssidsSeleccionados = Set.unmodifiable(bssidsSeleccionados),
         apPosXPorBssid = Map.unmodifiable(apPosXPorBssid),
         apPosYPorBssid = Map.unmodifiable(apPosYPorBssid);
 
-  APDisponible get apActivo => aps.firstWhere(
-        (ap) => ap.bssid == bssidActivo,
-        orElse: () => aps.first,
-      );
+  APDisponible get apActivo {
+    for (final ap in aps) {
+      if (ap.bssid == bssidActivo) return ap;
+    }
+    return aps.first;
+  }
 
   List<APDisponible> get apsSeleccionados =>
       aps.where((ap) => bssidsSeleccionados.contains(ap.bssid)).toList();
@@ -102,7 +105,7 @@ class HeatmapReady extends HeatmapState {
 
   HeatmapReady({
     required this.mapa,
-    required this.aps,
+    required List<APDisponible> aps,
     required Set<String> bssidsSeleccionados,
     required this.bssidActivo,
     required Map<String, double> apPosXPorBssid,
@@ -110,7 +113,8 @@ class HeatmapReady extends HeatmapState {
     this.analisis,
     this.analizando = false,
     this.mensaje,
-  })  : bssidsSeleccionados = Set.unmodifiable(bssidsSeleccionados),
+  })  : aps = List<APDisponible>.unmodifiable(aps),
+        bssidsSeleccionados = Set.unmodifiable(bssidsSeleccionados),
         apPosXPorBssid = Map.unmodifiable(apPosXPorBssid),
         apPosYPorBssid = Map.unmodifiable(apPosYPorBssid);
 

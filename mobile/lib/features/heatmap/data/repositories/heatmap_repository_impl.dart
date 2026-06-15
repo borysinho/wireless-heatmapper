@@ -11,8 +11,9 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
   const HeatmapRepositoryImpl(this._datasource);
 
   @override
-  Future<List<APDisponible>> listarAPsDisponibles(int planoId) {
-    return _datasource.listarAPsDisponibles(planoId);
+  Future<List<APDisponible>> listarAPsDisponibles(int planoId) async {
+    final aps = await _datasource.listarAPsDisponibles(planoId);
+    return List<APDisponible>.of(aps);
   }
 
   @override
