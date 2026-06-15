@@ -189,6 +189,9 @@ def test_generar_heatmap_retorna_matriz_y_cache(db_session, tecnico_usuario):
     fila_ap = int((140 / 300) * 64)
     col_ap = int((210 / 400) * 64)
     assert mapa1.matriz[fila_ap][col_ap] >= -55
+    fila_ap2 = int((120 / 300) * 64)
+    col_ap2 = int((300 / 400) * 64)
+    assert mapa1.matriz[fila_ap2][col_ap2] >= -55
 
 
 def test_resolver_aps_interes_rechaza_coordenadas_negativas():

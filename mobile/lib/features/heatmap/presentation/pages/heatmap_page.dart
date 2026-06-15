@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../planos/presentation/utils/url_resolver.dart';
 import '../../domain/entities/analisis_cobertura.dart';
 import '../../domain/entities/ap_disponible.dart';
 import '../../domain/entities/ap_detectado.dart';
@@ -153,7 +152,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
                   Expanded(
                     child: _HeatmapCanvas(
                       planoUrl: widget.imagenUrl,
-                      heatmapUrl: resolverUrlFirmada(listo!.mapa.urlImagen),
+                      heatmapMatriz: listo!.mapa.matriz,
                       tamanoPlano: _tamanoPlano,
                       aps: const [],
                       apsInteres: listo.mapa.apsInteres,
@@ -238,7 +237,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
 
 class _HeatmapCanvas extends StatefulWidget {
   final String planoUrl;
-  final String? heatmapUrl;
+  final List<List<double>>? heatmapMatriz;
   final Size tamanoPlano;
   final List<APDetectado> aps;
   final List<APDisponible> apsInteres;
@@ -252,7 +251,7 @@ class _HeatmapCanvas extends StatefulWidget {
 
   const _HeatmapCanvas({
     required this.planoUrl,
-    this.heatmapUrl,
+    this.heatmapMatriz,
     required this.tamanoPlano,
     required this.aps,
     this.apsInteres = const [],
@@ -324,13 +323,11 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
                         child: Icon(Icons.broken_image, size: 56),
                       ),
                     ),
-                    if (widget.heatmapUrl != null)
-                      Opacity(
-                        opacity: 0.60,
-                        child: Image.network(
-                          widget.heatmapUrl!,
-                          fit: BoxFit.fill,
-                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    if (widget.heatmapMatriz != null)
+                      CustomPaint(
+                        isComplex: true,
+                        painter: _HeatmapMatrixPainter(
+                          matriz: widget.heatmapMatriz!,
                         ),
                       ),
                     CustomPaint(
@@ -983,6 +980,63 @@ class _Metrica extends StatelessWidget {
         Text(label, style: Theme.of(context).textTheme.labelSmall),
       ],
     );
+  }
+}
+
+class _HeatmapMatrixPainter extends CustomPainter {
+  final List<List<double>> matriz;
+
+  const _HeatmapMatrixPainter({required this.matriz});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (matriz.isEmpty || matriz.first.isEmpty) {
+      return;
+    }
+    final filas = matriz.length;
+    final columnas = matriz.first.length;
+    final celdaW = size.width / columnas;
+    final celdaH = size.height / filas;
+    final paint = Paint()
+      ..style = PaintingStyle.fill
+      ..isAntiAlias = false;
+
+    for (var fila = 0; fila < filas; fila++) {
+      final valores = matriz[fila];
+      for (var columna = 0; columna < columnas; columna++) {
+        paint.color = _colorParaRssi(valores[columna]);
+        canvas.drawRect(
+          Rect.fromLTWH(
+            columna * celdaW,
+            fila * celdaH,
+            celdaW + 0.5,
+            celdaH + 0.5,
+          ),
+          paint,
+        );
+      }
+    }
+  }
+
+  Color _colorParaRssi(double rssi) {
+    if (rssi >= -50) {
+      return const Color(0xFF0B7A3B).withValues(alpha: 0.60);
+    }
+    if (rssi >= -70) {
+      return const Color(0xFF57B65A).withValues(alpha: 0.60);
+    }
+    if (rssi >= -80) {
+      return const Color(0xFFF4D35E).withValues(alpha: 0.60);
+    }
+    if (rssi >= -90) {
+      return const Color(0xFFF08A24).withValues(alpha: 0.60);
+    }
+    return const Color(0xFFD7263D).withValues(alpha: 0.60);
+  }
+
+  @override
+  bool shouldRepaint(covariant _HeatmapMatrixPainter oldDelegate) {
+    return oldDelegate.matriz != matriz;
   }
 }
 
