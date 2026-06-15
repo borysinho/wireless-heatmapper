@@ -186,15 +186,15 @@ def test_generar_heatmap_retorna_matriz_y_cache(db_session, tecnico_usuario):
     assert len(mapa1.matriz[0]) == 64
     assert mapa1.url_imagen.startswith("/mapas/archivo/")
     assert mapa1.cantidad_puntos == 5
-    fila_ap = int((140 / 300) * 64)
-    col_ap = int((210 / 400) * 64)
-    assert mapa1.matriz[fila_ap][col_ap] >= -55
-    fila_ap2 = int((120 / 300) * 64)
-    col_ap2 = int((300 / 400) * 64)
-    assert mapa1.matriz[fila_ap2][col_ap2] >= -55
+    fila_lectura_fuerte = int((20 / 300) * 64)
+    col_lectura_fuerte = int((20 / 400) * 64)
+    assert mapa1.matriz[fila_lectura_fuerte][col_lectura_fuerte] >= -55
+    fila_lectura_media = int((20 / 300) * 64)
+    col_lectura_media = int((380 / 400) * 64)
+    assert mapa1.matriz[fila_lectura_media][col_lectura_media] >= -65
 
 
-def test_generar_heatmap_compone_cobertura_de_cada_ap(db_session, tecnico_usuario):
+def test_generar_heatmap_compone_mejor_rssi_por_punto(db_session, tecnico_usuario):
     plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
     repo = MedicionRepository(db_session)
     lecturas = [
@@ -231,27 +231,37 @@ def test_generar_heatmap_compone_cobertura_de_cada_ap(db_session, tecnico_usuari
         plano_id=plano_id,
         request=None,
         bssid=["aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"],
-        ap_pos_x=[80, 330],
-        ap_pos_y=[80, 220],
+        ap_pos_x=[380, 20],
+        ap_pos_y=[20, 280],
         algoritmo="IDW",
         resolucion=64,
         db=db_session,
         current_user=tecnico_usuario,
     )
 
-    fila_ap1 = int((80 / 300) * 64)
-    col_ap1 = int((80 / 400) * 64)
-    fila_ap2 = int((220 / 300) * 64)
-    col_ap2 = int((330 / 400) * 64)
+    fila_lectura_ap1 = int((80 / 300) * 64)
+    col_lectura_ap1 = int((70 / 400) * 64)
+    fila_lectura_ap2 = int((220 / 300) * 64)
+    col_lectura_ap2 = int((320 / 400) * 64)
+    fila_lectura_media = int((150 / 300) * 64)
+    col_lectura_media = int((200 / 400) * 64)
 
-    assert mapa.matriz[fila_ap1][col_ap1] >= -55
-    assert mapa.matriz[fila_ap2][col_ap2] >= -56
-    assert mapa.matriz[fila_ap1][col_ap1 + 2] >= -68
-    assert mapa.matriz[fila_ap2][col_ap2 - 2] >= -68
-    assert mapa.matriz[2][62] < -70
-    celdas_buenas = sum(1 for fila in mapa.matriz for rssi in fila if rssi >= -70)
-    total_celdas = sum(len(fila) for fila in mapa.matriz)
-    assert celdas_buenas < total_celdas
+    assert mapa.matriz[fila_lectura_ap1][col_lectura_ap1] >= -58
+    assert mapa.matriz[fila_lectura_ap2][col_lectura_ap2] >= -58
+    assert mapa.matriz[fila_lectura_media][col_lectura_media] <= -72
+
+    mapa_posiciones_movidas = generar_heatmap(
+        plano_id=plano_id,
+        request=None,
+        bssid=["aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"],
+        ap_pos_x=[10, 390],
+        ap_pos_y=[290, 10],
+        algoritmo="IDW",
+        resolucion=64,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    assert mapa_posiciones_movidas.matriz == mapa.matriz
 
 
 def test_generar_heatmap_refleja_lecturas_asimetricas(db_session, tecnico_usuario):
