@@ -91,17 +91,18 @@ class HeatmapCubit extends Cubit<HeatmapState> {
     }
   }
 
-  void ubicarAP({required double posX, required double posY}) {
+  void ubicarAP({String? bssid, required double posX, required double posY}) {
     final actual = state;
     if (actual is HeatmapSeleccionAP) {
       final posXPorBssid = {...actual.apPosXPorBssid};
       final posYPorBssid = {...actual.apPosYPorBssid};
-      posXPorBssid[actual.bssidActivo] = posX;
-      posYPorBssid[actual.bssidActivo] = posY;
+      final bssidObjetivo = bssid ?? actual.bssidActivo;
+      posXPorBssid[bssidObjetivo] = posX;
+      posYPorBssid[bssidObjetivo] = posY;
       emit(actual.copyWith(
+        bssidActivo: bssidObjetivo,
         apPosXPorBssid: posXPorBssid,
         apPosYPorBssid: posYPorBssid,
-        mensaje: 'Ubicación del AP actualizada.',
       ));
     }
   }

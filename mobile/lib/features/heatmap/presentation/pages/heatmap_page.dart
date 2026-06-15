@@ -129,6 +129,12 @@ class _HeatmapPageState extends State<HeatmapPage> {
                               ),
                       onTapAPInteres: (ap) =>
                           context.read<HeatmapCubit>().activarAP(ap),
+                      onMoverAPInteres: (ap, pos) =>
+                          context.read<HeatmapCubit>().ubicarAP(
+                                bssid: ap.bssid,
+                                posX: pos.dx,
+                                posY: pos.dy,
+                              ),
                       onTapAP: _mostrarDetalleAP,
                     ),
                   ),
@@ -238,6 +244,7 @@ class _HeatmapCanvas extends StatelessWidget {
   final Map<String, double> apPosYPorBssid;
   final void Function(Offset posPlano)? onTapPlano;
   final void Function(APDisponible ap)? onTapAPInteres;
+  final void Function(APDisponible ap, Offset posPlano)? onMoverAPInteres;
   final void Function(APDetectado ap) onTapAP;
 
   const _HeatmapCanvas({
@@ -251,12 +258,14 @@ class _HeatmapCanvas extends StatelessWidget {
     this.apPosYPorBssid = const {},
     this.onTapPlano,
     this.onTapAPInteres,
+    this.onMoverAPInteres,
     required this.onTapAP,
   });
 
   @override
   Widget build(BuildContext context) {
     return InteractiveViewer(
+      panEnabled: onMoverAPInteres == null,
       minScale: 0.5,
       maxScale: 5,
       child: LayoutBuilder(
@@ -314,27 +323,34 @@ class _HeatmapCanvas extends StatelessWidget {
                     final posX = apPosXPorBssid[ap.bssid] ?? ap.posX;
                     final posY = apPosYPorBssid[ap.bssid] ?? ap.posY;
                     final activo = ap.bssid == bssidActivo;
+                    final left = ((posX / tamanoPlano.width) * w - 22)
+                        .clamp(0, w - 44)
+                        .toDouble();
+                    final top = ((posY / tamanoPlano.height) * h - 22)
+                        .clamp(0, h - 44)
+                        .toDouble();
                     return Positioned(
-                      left: ((posX / tamanoPlano.width) * w - 22)
-                          .clamp(0, w - 44)
-                          .toDouble(),
-                      top: ((posY / tamanoPlano.height) * h - 22)
-                          .clamp(0, h - 44)
-                          .toDouble(),
-                      child: Tooltip(
-                        message: ap.ssid.isEmpty ? ap.bssid : ap.ssid,
-                        child: IconButton.filled(
-                          onPressed: onTapAPInteres == null
-                              ? null
-                              : () => onTapAPInteres!(ap),
-                          style: IconButton.styleFrom(
-                            backgroundColor: activo
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.tertiary,
-                          ),
-                          icon: const Icon(Icons.router),
-                          iconSize: 18,
-                        ),
+                      left: left,
+                      top: top,
+                      child: _APInteresMarker(
+                        ap: ap,
+                        activo: activo,
+                        onTap: onTapAPInteres == null
+                            ? null
+                            : () => onTapAPInteres!(ap),
+                        onDragPlano: onMoverAPInteres == null
+                            ? null
+                            : (delta) {
+                                final nuevoX =
+                                    (posX + (delta.dx / w) * tamanoPlano.width)
+                                        .clamp(0.0, tamanoPlano.width)
+                                        .toDouble();
+                                final nuevoY =
+                                    (posY + (delta.dy / h) * tamanoPlano.height)
+                                        .clamp(0.0, tamanoPlano.height)
+                                        .toDouble();
+                                onMoverAPInteres!(ap, Offset(nuevoX, nuevoY));
+                              },
                       ),
                     );
                   }),
@@ -359,6 +375,56 @@ class _HeatmapCanvas extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _APInteresMarker extends StatelessWidget {
+  final APDisponible ap;
+  final bool activo;
+  final VoidCallback? onTap;
+  final ValueChanged<Offset>? onDragPlano;
+
+  const _APInteresMarker({
+    required this.ap,
+    required this.activo,
+    this.onTap,
+    this.onDragPlano,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color =
+        activo ? theme.colorScheme.primary : theme.colorScheme.tertiary;
+    return Tooltip(
+      message: ap.ssid.isEmpty ? ap.bssid : ap.ssid,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        onPanStart: (_) => onTap?.call(),
+        onPanUpdate: onDragPlano == null
+            ? null
+            : (details) => onDragPlano!(details.delta),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            boxShadow: const [
+              BoxShadow(
+                blurRadius: 8,
+                offset: Offset(0, 2),
+                color: Color(0x33000000),
+              ),
+            ],
+          ),
+          child: const SizedBox(
+            width: 44,
+            height: 44,
+            child: Icon(Icons.router, color: Colors.white, size: 20),
+          ),
+        ),
       ),
     );
   }
