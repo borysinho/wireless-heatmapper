@@ -30,12 +30,14 @@ from app.schemas.heatmap import (
     APDisponibleOut,
     ConfirmarAPIn,
     MapaCalorOut,
+    PuntoLecturaHeatmapOut,
 )
 from app.services.analisis_cobertura_service import AnalisisCoberturaService
 from app.services.interpolacion_service import (
     ESCALA_CWNA,
     HeatmapImageService,
     InterpolacionService,
+    PuntoRSSI,
 )
 from app.storage import LocalFilesystemStorage, generar_url_firmada, verificar_firma
 
@@ -102,7 +104,12 @@ def _verificar_ownership_mapa(
     return mapa
 
 
-def _mapa_out(mapa: MapaCalor, request: Request) -> MapaCalorOut:
+def _mapa_out(
+    mapa: MapaCalor,
+    request: Request,
+    *,
+    puntos: list[PuntoRSSI] | None = None,
+) -> MapaCalorOut:
     aps_interes = mapa.aps_interes or [
         {
             "bssid": mapa.bssid,
@@ -115,6 +122,12 @@ def _mapa_out(mapa: MapaCalor, request: Request) -> MapaCalorOut:
             "cantidad_puntos": mapa.cantidad_puntos,
         }
     ]
+    puntos_lectura = puntos or []
+    rssi_promedio = (
+        sum(punto.rssi for punto in puntos_lectura) / len(puntos_lectura)
+        if puntos_lectura
+        else (mapa.rssi_min + mapa.rssi_max) / 2
+    )
     return MapaCalorOut(
         id=mapa.id,
         plano_id=mapa.plano_id,
@@ -131,8 +144,47 @@ def _mapa_out(mapa: MapaCalor, request: Request) -> MapaCalorOut:
         cantidad_puntos=mapa.cantidad_puntos,
         rssi_min=mapa.rssi_min,
         rssi_max=mapa.rssi_max,
+        rssi_promedio=round(rssi_promedio, 2),
+        puntos_lectura=[
+            PuntoLecturaHeatmapOut(
+                punto_id=punto.punto_id,
+                pos_x=punto.x,
+                pos_y=punto.y,
+                rssi=punto.rssi,
+            )
+            for punto in puntos_lectura
+        ],
+        advertencias=_advertencias_heatmap(
+            cantidad_puntos=len(puntos_lectura) or mapa.cantidad_puntos,
+            aps_interes=aps_interes,
+        ),
         created_at=mapa.created_at,
     )
+
+
+def _advertencias_heatmap(
+    *,
+    cantidad_puntos: int,
+    aps_interes: list[dict],
+) -> list[str]:
+    advertencias: list[str] = []
+    if cantidad_puntos < 10:
+        advertencias.append(
+            "Baja densidad de muestras: el heatmap puede verse uniforme. "
+            "Agrega más puntos de lectura distribuidos sobre el plano."
+        )
+    aps_con_pocas_muestras = [
+        ap["ssid"] or ap["bssid"]
+        for ap in aps_interes
+        if int(ap.get("cantidad_puntos") or 0) < 5
+    ]
+    if aps_con_pocas_muestras:
+        advertencias.append(
+            "Uno o más APs seleccionados tienen pocas lecturas: "
+            + ", ".join(aps_con_pocas_muestras)
+            + "."
+        )
+    return advertencias
 
 
 def _normalizar_bssids(bssids: list[str]) -> list[str]:
@@ -328,7 +380,7 @@ def generar_heatmap(
         firma_mediciones=firma,
     )
     if cache is not None:
-        return _mapa_out(cache, request)
+        return _mapa_out(cache, request, puntos=puntos)
 
     ap_principal = aps_interes[0]
     matriz = InterpolacionService().interpolar(
@@ -362,7 +414,7 @@ def generar_heatmap(
         rssi_max=max(p.rssi for p in puntos),
         firma_mediciones=firma,
     )
-    return _mapa_out(mapa, request)
+    return _mapa_out(mapa, request, puntos=puntos)
 
 
 @router_mapas.post(

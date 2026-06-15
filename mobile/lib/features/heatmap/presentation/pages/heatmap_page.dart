@@ -5,6 +5,7 @@ import '../../domain/entities/analisis_cobertura.dart';
 import '../../domain/entities/ap_disponible.dart';
 import '../../domain/entities/ap_detectado.dart';
 import '../../domain/entities/escala_heatmap.dart';
+import '../../domain/entities/mapa_calor.dart';
 import '../cubit/heatmap_cubit.dart';
 import '../cubit/heatmap_state.dart';
 
@@ -30,6 +31,7 @@ class HeatmapPage extends StatefulWidget {
 class _HeatmapPageState extends State<HeatmapPage> {
   String _algoritmo = 'IDW';
   int _resolucion = 128;
+  HeatmapModo _modo = HeatmapModo.conjunto;
 
   Size get _tamanoPlano => Size(widget.anchoPlanoPx, widget.altoPlanoPx);
 
@@ -48,6 +50,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
           planoId: widget.planoId,
           algoritmo: _algoritmo,
           resolucion: _resolucion,
+          modo: _modo,
         );
   }
 
@@ -143,6 +146,8 @@ class _HeatmapPageState extends State<HeatmapPage> {
                         context.read<HeatmapCubit>().alternarAPInteres(ap),
                     onActivar: (ap) =>
                         context.read<HeatmapCubit>().activarAP(ap),
+                    modo: _modo,
+                    onModoChanged: (modo) => setState(() => _modo = modo),
                     onGenerar: _generarHeatmap,
                   ),
                 ],
@@ -153,6 +158,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
                     child: _HeatmapCanvas(
                       planoUrl: widget.imagenUrl,
                       heatmapMatriz: listo!.mapa.matriz,
+                      puntosLectura: listo.mapa.puntosLectura,
                       tamanoPlano: _tamanoPlano,
                       aps: const [],
                       apsInteres: listo.mapa.apsInteres,
@@ -169,14 +175,27 @@ class _HeatmapPageState extends State<HeatmapPage> {
                     ),
                   ),
                   _AnalisisPanel(
+                    mapa: listo.mapa,
                     analisis: listo.analisis,
                     analizando: listo.analizando,
                     escala: listo.mapa.escala,
+                    modo: _modo,
+                    puedeModoIndividual: listo.bssidsSeleccionados.length > 1,
                     bssidsPermitidos: {
                       for (final ap in listo.mapa.apsInteres) ap.bssid,
                     },
+                    onModoChanged: (modo) {
+                      setState(() => _modo = modo);
+                      context.read<HeatmapCubit>().generar(
+                            planoId: widget.planoId,
+                            algoritmo: _algoritmo,
+                            resolucion: _resolucion,
+                            modo: modo,
+                          );
+                    },
                     onRefreshAnalisis: () =>
                         context.read<HeatmapCubit>().regenerarAnalisis(),
+                    onRegenerarHeatmap: _generarHeatmap,
                     onTapAP: _mostrarDetalleAP,
                   ),
                 ],
@@ -238,6 +257,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
 class _HeatmapCanvas extends StatefulWidget {
   final String planoUrl;
   final List<List<double>>? heatmapMatriz;
+  final List<PuntoLecturaHeatmap> puntosLectura;
   final Size tamanoPlano;
   final List<APDetectado> aps;
   final List<APDisponible> apsInteres;
@@ -252,6 +272,7 @@ class _HeatmapCanvas extends StatefulWidget {
   const _HeatmapCanvas({
     required this.planoUrl,
     this.heatmapMatriz,
+    this.puntosLectura = const [],
     required this.tamanoPlano,
     required this.aps,
     this.apsInteres = const [],
@@ -328,6 +349,13 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
                         isComplex: true,
                         painter: _HeatmapMatrixPainter(
                           matriz: widget.heatmapMatriz!,
+                        ),
+                      ),
+                    if (widget.puntosLectura.isNotEmpty)
+                      CustomPaint(
+                        painter: _PuntosLecturaPainter(
+                          puntos: widget.puntosLectura,
+                          tamanoPlano: widget.tamanoPlano,
                         ),
                       ),
                     CustomPaint(
@@ -508,12 +536,16 @@ class _SeleccionAPPanel extends StatelessWidget {
   final HeatmapSeleccionAP state;
   final ValueChanged<APDisponible> onAlternar;
   final ValueChanged<APDisponible> onActivar;
+  final HeatmapModo modo;
+  final ValueChanged<HeatmapModo> onModoChanged;
   final VoidCallback onGenerar;
 
   const _SeleccionAPPanel({
     required this.state,
     required this.onAlternar,
     required this.onActivar,
+    required this.modo,
+    required this.onModoChanged,
     required this.onGenerar,
   });
 
@@ -572,6 +604,12 @@ class _SeleccionAPPanel extends StatelessWidget {
                     );
                   },
                 ),
+              ),
+              const SizedBox(height: 8),
+              _ModoHeatmapControl(
+                modo: modo,
+                enabledIndividual: state.apsSeleccionados.length > 1,
+                onChanged: onModoChanged,
               ),
               const SizedBox(height: 8),
               Text(
@@ -650,6 +688,41 @@ class _APSeleccionadoTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ModoHeatmapControl extends StatelessWidget {
+  final HeatmapModo modo;
+  final bool enabledIndividual;
+  final ValueChanged<HeatmapModo> onChanged;
+
+  const _ModoHeatmapControl({
+    required this.modo,
+    required this.enabledIndividual,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final modoVisible = enabledIndividual ? modo : HeatmapModo.conjunto;
+    return SegmentedButton<HeatmapModo>(
+      showSelectedIcon: false,
+      segments: [
+        const ButtonSegment(
+          value: HeatmapModo.conjunto,
+          icon: Icon(Icons.hub_outlined),
+          label: Text('Conjunto'),
+        ),
+        ButtonSegment(
+          value: HeatmapModo.apActivo,
+          icon: const Icon(Icons.router),
+          label: const Text('AP activo'),
+          enabled: enabledIndividual,
+        ),
+      ],
+      selected: {modoVisible},
+      onSelectionChanged: (value) => onChanged(value.first),
     );
   }
 }
@@ -797,19 +870,29 @@ String _detalleAP(APDisponible ap) {
 }
 
 class _AnalisisPanel extends StatelessWidget {
+  final MapaCalor mapa;
   final AnalisisCobertura? analisis;
   final bool analizando;
   final List<EscalaHeatmap> escala;
+  final HeatmapModo modo;
+  final bool puedeModoIndividual;
   final Set<String> bssidsPermitidos;
+  final ValueChanged<HeatmapModo> onModoChanged;
   final VoidCallback onRefreshAnalisis;
+  final VoidCallback onRegenerarHeatmap;
   final void Function(APDetectado ap) onTapAP;
 
   const _AnalisisPanel({
+    required this.mapa,
     required this.analisis,
     required this.analizando,
     required this.escala,
+    required this.modo,
+    required this.puedeModoIndividual,
     required this.bssidsPermitidos,
+    required this.onModoChanged,
     required this.onRefreshAnalisis,
+    required this.onRegenerarHeatmap,
     required this.onTapAP,
   });
 
@@ -831,7 +914,30 @@ class _AnalisisPanel extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _ModoHeatmapControl(
+                      modo: modo,
+                      enabledIndividual: puedeModoIndividual,
+                      onChanged: onModoChanged,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Regenerar heatmap',
+                    onPressed: onRegenerarHeatmap,
+                    icon: const Icon(Icons.local_fire_department_outlined),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
               _LeyendaHeatmap(escala: escala),
+              const SizedBox(height: 12),
+              _ResumenMapaCalor(mapa: mapa),
+              if (mapa.advertencias.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _AdvertenciasHeatmap(advertencias: mapa.advertencias),
+              ],
               const SizedBox(height: 12),
               if (a == null)
                 Row(
@@ -916,6 +1022,87 @@ class _AnalisisPanel extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ResumenMapaCalor extends StatelessWidget {
+  final MapaCalor mapa;
+
+  const _ResumenMapaCalor({required this.mapa});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _Metrica(
+            icon: Icons.scatter_plot_outlined,
+            valor: mapa.cantidadPuntos.toString(),
+            label: 'Muestras',
+          ),
+        ),
+        Expanded(
+          child: _Metrica(
+            icon: Icons.arrow_downward,
+            valor: '${mapa.rssiMin.toStringAsFixed(0)} dBm',
+            label: 'Mín.',
+          ),
+        ),
+        Expanded(
+          child: _Metrica(
+            icon: Icons.speed,
+            valor: '${mapa.rssiPromedio.toStringAsFixed(0)} dBm',
+            label: 'Prom.',
+          ),
+        ),
+        Expanded(
+          child: _Metrica(
+            icon: Icons.arrow_upward,
+            valor: '${mapa.rssiMax.toStringAsFixed(0)} dBm',
+            label: 'Máx.',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AdvertenciasHeatmap extends StatelessWidget {
+  final List<String> advertencias;
+
+  const _AdvertenciasHeatmap({required this.advertencias});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: theme.colorScheme.tertiary.withValues(alpha: 0.40),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: 18,
+            color: theme.colorScheme.tertiary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              advertencias.join(' '),
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1053,6 +1240,49 @@ class _ColorStop {
   final Color color;
 
   const _ColorStop(this.valor, this.color);
+}
+
+class _PuntosLecturaPainter extends CustomPainter {
+  final List<PuntoLecturaHeatmap> puntos;
+  final Size tamanoPlano;
+
+  const _PuntosLecturaPainter({
+    required this.puntos,
+    required this.tamanoPlano,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final relleno = Paint()..style = PaintingStyle.fill;
+    final borde = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..color = Colors.white.withValues(alpha: 0.85);
+
+    for (final punto in puntos) {
+      final centro = Offset(
+        (punto.posX / tamanoPlano.width) * size.width,
+        (punto.posY / tamanoPlano.height) * size.height,
+      );
+      relleno.color = _colorParaRssi(punto.rssi).withValues(alpha: 0.95);
+      canvas.drawCircle(centro, 4.5, relleno);
+      canvas.drawCircle(centro, 4.5, borde);
+    }
+  }
+
+  Color _colorParaRssi(double rssi) {
+    if (rssi >= -50) return const Color(0xFF0B7A3B);
+    if (rssi >= -70) return const Color(0xFF57B65A);
+    if (rssi >= -80) return const Color(0xFFF4D35E);
+    if (rssi >= -90) return const Color(0xFFF08A24);
+    return const Color(0xFFD7263D);
+  }
+
+  @override
+  bool shouldRepaint(covariant _PuntosLecturaPainter oldDelegate) {
+    return oldDelegate.puntos != puntos ||
+        oldDelegate.tamanoPlano != tamanoPlano;
+  }
 }
 
 class _APPainter extends CustomPainter {

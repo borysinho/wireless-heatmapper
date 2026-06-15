@@ -11,6 +11,8 @@ sealed class HeatmapState extends Equatable {
   List<Object?> get props => [];
 }
 
+enum HeatmapModo { conjunto, apActivo }
+
 class HeatmapInitial extends HeatmapState {
   const HeatmapInitial();
 }

@@ -186,6 +186,12 @@ def test_generar_heatmap_retorna_matriz_y_cache(db_session, tecnico_usuario):
     assert len(mapa1.matriz[0]) == 64
     assert mapa1.url_imagen.startswith("/mapas/archivo/")
     assert mapa1.cantidad_puntos == 5
+    assert len(mapa1.puntos_lectura) == 5
+    assert mapa1.rssi_promedio == pytest.approx(
+        sum(punto.rssi for punto in mapa1.puntos_lectura) / 5,
+        abs=0.01,
+    )
+    assert mapa1.advertencias
     fila_lectura_fuerte = int((20 / 300) * 64)
     col_lectura_fuerte = int((20 / 400) * 64)
     assert mapa1.matriz[fila_lectura_fuerte][col_lectura_fuerte] >= -55

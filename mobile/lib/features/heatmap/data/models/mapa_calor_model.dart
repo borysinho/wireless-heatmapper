@@ -19,6 +19,9 @@ class MapaCalorModel extends MapaCalor {
     required super.cantidadPuntos,
     required super.rssiMin,
     required super.rssiMax,
+    required super.rssiPromedio,
+    required super.puntosLectura,
+    required super.advertencias,
     required super.createdAt,
   });
 
@@ -47,8 +50,34 @@ class MapaCalorModel extends MapaCalor {
       cantidadPuntos: json['cantidad_puntos'] as int,
       rssiMin: (json['rssi_min'] as num).toDouble(),
       rssiMax: (json['rssi_max'] as num).toDouble(),
+      rssiPromedio: (json['rssi_promedio'] as num?)?.toDouble() ??
+          (((json['rssi_min'] as num).toDouble() +
+                  (json['rssi_max'] as num).toDouble()) /
+              2),
+      puntosLectura: _puntosLecturaDesdeJson(json),
+      advertencias: (json['advertencias'] as List<dynamic>? ?? const [])
+          .map((item) => item.toString())
+          .toList(),
       createdAt: DateTime.parse(json['created_at'] as String),
     );
+  }
+
+  static List<PuntoLecturaHeatmap> _puntosLecturaDesdeJson(
+    Map<String, dynamic> json,
+  ) {
+    final puntos = json['puntos_lectura'];
+    if (puntos is! List<dynamic>) return const [];
+    return puntos.map(
+      (item) {
+        final data = item as Map<String, dynamic>;
+        return PuntoLecturaHeatmap(
+          puntoId: data['punto_id'] as int,
+          posX: (data['pos_x'] as num).toDouble(),
+          posY: (data['pos_y'] as num).toDouble(),
+          rssi: (data['rssi'] as num).toDouble(),
+        );
+      },
+    ).toList();
   }
 
   static List<APDisponibleModel> _apsInteresDesdeJson(

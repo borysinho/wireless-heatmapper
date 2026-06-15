@@ -21,6 +21,13 @@ class EscalaHeatmapItem(BaseModel):
     etiqueta: str
 
 
+class PuntoLecturaHeatmapOut(BaseModel):
+    punto_id: int
+    pos_x: float
+    pos_y: float
+    rssi: float
+
+
 class MapaCalorOut(BaseModel):
     id: int
     plano_id: int
@@ -37,6 +44,9 @@ class MapaCalorOut(BaseModel):
     cantidad_puntos: int
     rssi_min: float
     rssi_max: float
+    rssi_promedio: float
+    puntos_lectura: list[PuntoLecturaHeatmapOut]
+    advertencias: list[str]
     created_at: datetime
 
     model_config = {"from_attributes": True}
