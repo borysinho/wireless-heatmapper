@@ -30,11 +30,7 @@ ESCALA_CWNA = [
 
 
 class InterpolacionService:
-    """Genera matrices RSSI mediante IDW.
-
-    Kriging queda expuesto como opción de contrato y usa IDW como baseline
-    determinístico hasta integrar `pykrige` en un sprint técnico posterior.
-    """
+    """Genera matrices RSSI mediante IDW o kriging ordinario determinístico."""
 
     def interpolar(
         self,
@@ -48,6 +44,13 @@ class InterpolacionService:
         algoritmo_normalizado = algoritmo.upper()
         if algoritmo_normalizado not in {"IDW", "KRIGING"}:
             raise ValueError("Algoritmo no soportado.")
+        if algoritmo_normalizado == "KRIGING":
+            return self._kriging_ordinario(
+                puntos=puntos,
+                ancho_px=ancho_px,
+                alto_px=alto_px,
+                resolucion=resolucion,
+            )
         return self._idw(
             puntos=puntos,
             ancho_px=ancho_px,
@@ -91,6 +94,135 @@ class InterpolacionService:
                 valores_fila.append(round(max(-120.0, min(0.0, valor)), 2))
             matriz.append(valores_fila)
         return matriz
+
+    def _kriging_ordinario(
+        self,
+        *,
+        puntos: list[PuntoRSSI],
+        ancho_px: int,
+        alto_px: int,
+        resolucion: int,
+    ) -> list[list[float]]:
+        if len(puntos) < 3:
+            return self._idw(
+                puntos=puntos,
+                ancho_px=ancho_px,
+                alto_px=alto_px,
+                resolucion=resolucion,
+            )
+
+        valores = [p.rssi for p in puntos]
+        media = sum(valores) / len(valores)
+        varianza = sum((valor - media) ** 2 for valor in valores) / len(valores)
+        sill = max(varianza, 1.0)
+        alcance = max(ancho_px, alto_px) * 0.35
+        nugget = sill * 0.02
+
+        try:
+            coeficientes = self._coeficientes_kriging(
+                puntos=puntos,
+                valores=valores,
+                sill=sill,
+                alcance=alcance,
+                nugget=nugget,
+            )
+        except ValueError:
+            return self._idw(
+                puntos=puntos,
+                ancho_px=ancho_px,
+                alto_px=alto_px,
+                resolucion=resolucion,
+            )
+
+        minimo = max(-120.0, min(valores) - 8.0)
+        maximo = min(0.0, max(valores) + 8.0)
+        matriz: list[list[float]] = []
+        for fila in range(resolucion):
+            y = ((fila + 0.5) / resolucion) * alto_px
+            valores_fila: list[float] = []
+            for col in range(resolucion):
+                x = ((col + 0.5) / resolucion) * ancho_px
+                valor = coeficientes[-1]
+                for idx, punto in enumerate(puntos):
+                    distancia = math.hypot(x - punto.x, y - punto.y)
+                    valor += coeficientes[idx] * self._covarianza_exponencial(
+                        distancia=distancia,
+                        sill=sill,
+                        alcance=alcance,
+                    )
+                valores_fila.append(round(max(minimo, min(maximo, valor)), 2))
+            matriz.append(valores_fila)
+        return matriz
+
+    def _coeficientes_kriging(
+        self,
+        *,
+        puntos: list[PuntoRSSI],
+        valores: list[float],
+        sill: float,
+        alcance: float,
+        nugget: float,
+    ) -> list[float]:
+        n = len(puntos)
+        matriz = [[0.0 for _ in range(n + 1)] for _ in range(n + 1)]
+        for i, punto_i in enumerate(puntos):
+            for j, punto_j in enumerate(puntos):
+                distancia = math.hypot(punto_i.x - punto_j.x, punto_i.y - punto_j.y)
+                matriz[i][j] = self._covarianza_exponencial(
+                    distancia=distancia,
+                    sill=sill,
+                    alcance=alcance,
+                )
+                if i == j:
+                    matriz[i][j] += nugget
+            matriz[i][n] = 1.0
+            matriz[n][i] = 1.0
+
+        rhs = [*valores, 0.0]
+        return self._resolver_sistema_lineal(matriz, rhs)
+
+    def _covarianza_exponencial(
+        self,
+        *,
+        distancia: float,
+        sill: float,
+        alcance: float,
+    ) -> float:
+        return sill * math.exp(-distancia / max(alcance, 1e-9))
+
+    def _resolver_sistema_lineal(
+        self,
+        matriz: list[list[float]],
+        rhs: list[float],
+    ) -> list[float]:
+        n = len(rhs)
+        a = [fila[:] for fila in matriz]
+        b = rhs[:]
+        epsilon = 1e-12
+
+        for col in range(n):
+            pivote = max(range(col, n), key=lambda fila: abs(a[fila][col]))
+            if abs(a[pivote][col]) < epsilon:
+                raise ValueError("Sistema singular para kriging.")
+            if pivote != col:
+                a[col], a[pivote] = a[pivote], a[col]
+                b[col], b[pivote] = b[pivote], b[col]
+
+            valor_pivote = a[col][col]
+            for fila in range(col + 1, n):
+                factor = a[fila][col] / valor_pivote
+                if factor == 0:
+                    continue
+                a[fila][col] = 0.0
+                for k in range(col + 1, n):
+                    a[fila][k] -= factor * a[col][k]
+                b[fila] -= factor * b[col]
+
+        x = [0.0 for _ in range(n)]
+        for fila in range(n - 1, -1, -1):
+            suma = sum(a[fila][col] * x[col] for col in range(fila + 1, n))
+            x[fila] = (b[fila] - suma) / a[fila][fila]
+        return x
 
 
 class HeatmapImageService:

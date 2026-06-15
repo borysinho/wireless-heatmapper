@@ -444,3 +444,35 @@ def test_interpolacion_200_puntos_resolucion_128_p95_menor_3s():
 
     p95_aproximado = sorted(duraciones)[-1]
     assert p95_aproximado <= 3.0
+
+
+def test_interpolacion_kriging_es_distinta_de_idw_y_refleja_gradiente():
+    puntos = [
+        PuntoRSSI(punto_id=1, x=40, y=40, rssi=-52),
+        PuntoRSSI(punto_id=2, x=360, y=40, rssi=-82),
+        PuntoRSSI(punto_id=3, x=40, y=260, rssi=-74),
+        PuntoRSSI(punto_id=4, x=360, y=260, rssi=-58),
+        PuntoRSSI(punto_id=5, x=200, y=150, rssi=-68),
+    ]
+    service = InterpolacionService()
+
+    idw = service.interpolar(
+        puntos=puntos,
+        ancho_px=400,
+        alto_px=300,
+        resolucion=32,
+        algoritmo="IDW",
+    )
+    kriging = service.interpolar(
+        puntos=puntos,
+        ancho_px=400,
+        alto_px=300,
+        resolucion=32,
+        algoritmo="KRIGING",
+    )
+
+    assert len(kriging) == 32
+    assert len(kriging[0]) == 32
+    assert kriging != idw
+    assert kriging[4][4] > kriging[4][28]
+    assert kriging[28][28] > kriging[28][4]

@@ -213,7 +213,7 @@ def _resolver_aps_interes(
 
 def _firma_aps_interes(*, firma_base: str, aps_interes: list[dict]) -> str:
     payload = {
-        "modelo": "aps-interes-compuesto-contorno-v5",
+        "modelo": "aps-interes-compuesto-kriging-v6",
         "firma_base": firma_base,
         "aps": [
             {
@@ -337,7 +337,7 @@ def _rssi_centro_ap(*, ap: dict, rssi_maximos: dict[str, float]) -> float:
         ap["bssid"],
         float(ap["rssi_promedio"]),
     )
-    return max(rssi_observado, -55.0)
+    return max(min(rssi_observado, -45.0), -85.0)
 
 
 def _metros_por_px(
