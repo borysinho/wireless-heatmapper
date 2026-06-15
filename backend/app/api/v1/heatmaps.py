@@ -25,6 +25,7 @@ from app.repositories.proyecto_repository import ProyectoRepository
 from app.schemas.heatmap import (
     AnalisisCoberturaOut,
     APDetectadoOut,
+    APDisponibleOut,
     ConfirmarAPIn,
     MapaCalorOut,
 )
@@ -105,6 +106,10 @@ def _mapa_out(mapa: MapaCalor, request: Request) -> MapaCalorOut:
         plano_id=mapa.plano_id,
         algoritmo=mapa.algoritmo,
         resolucion=mapa.resolucion,
+        bssid=mapa.bssid,
+        ssid=mapa.ssid,
+        ap_pos_x=mapa.ap_pos_x,
+        ap_pos_y=mapa.ap_pos_y,
         url_imagen=_firmar(mapa.ruta_imagen, request),
         matriz=mapa.matriz,
         escala=mapa.escala,
@@ -113,6 +118,29 @@ def _mapa_out(mapa: MapaCalor, request: Request) -> MapaCalorOut:
         rssi_max=mapa.rssi_max,
         created_at=mapa.created_at,
     )
+
+
+@router_planos_heatmap.get(
+    "/{plano_id}/aps",
+    response_model=list[APDisponibleOut],
+    summary="Listar APs detectados del plano",
+    description=(
+        "Agrupa las mediciones por BSSID para que el técnico seleccione los APs "
+        "de interés antes de generar mapas de calor."
+    ),
+)
+def listar_aps_disponibles(
+    plano_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> list[APDisponibleOut]:
+    _verificar_ownership_plano(
+        plano_id=plano_id,
+        current_user=current_user,
+        db=db,
+    )
+    aps = MedicionRepository(db).listar_aps_por_plano(plano_id=plano_id)
+    return [APDisponibleOut(**ap) for ap in aps]
 
 
 @router_planos_heatmap.get(
@@ -127,6 +155,17 @@ def _mapa_out(mapa: MapaCalor, request: Request) -> MapaCalorOut:
 def generar_heatmap(
     plano_id: int,
     request: Request,
+    bssid: str = Query(..., description="BSSID del AP de interés"),
+    ap_pos_x: float | None = Query(
+        default=None,
+        ge=0,
+        description="Ubicación X confirmada del AP sobre el plano",
+    ),
+    ap_pos_y: float | None = Query(
+        default=None,
+        ge=0,
+        description="Ubicación Y confirmada del AP sobre el plano",
+    ),
     algoritmo: str = Query(default="IDW", pattern="^(IDW|KRIGING|idw|kriging)$"),
     resolucion: int = Query(default=128, enum=[64, 128, 256]),
     db: Session = Depends(get_db),
@@ -144,15 +183,32 @@ def generar_heatmap(
         )
 
     med_repo = MedicionRepository(db)
-    puntos = med_repo.listar_puntos_rssi_heatmap(plano_id=plano_id)
+    bssid_norm = bssid.lower()
+    ap = med_repo.obtener_ap_por_bssid(plano_id=plano_id, bssid=bssid_norm)
+    if ap is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="AP no encontrado en las mediciones del plano.",
+        )
+
+    puntos = med_repo.listar_puntos_rssi_heatmap(
+        plano_id=plano_id,
+        bssid=bssid_norm,
+    )
     if len(puntos) < 5:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Se requieren al menos 5 puntos para generar el heatmap.",
+            detail="Se requieren al menos 5 puntos del AP seleccionado.",
         )
 
     algoritmo_norm = algoritmo.upper()
-    firma = med_repo.firma_mediciones_plano(plano_id=plano_id)
+    ap_x = ap_pos_x if ap_pos_x is not None else ap["pos_x"]
+    ap_y = ap_pos_y if ap_pos_y is not None else ap["pos_y"]
+    firma_base = med_repo.firma_mediciones_plano(
+        plano_id=plano_id,
+        bssid=bssid_norm,
+    )
+    firma = f"{bssid_norm}:{firma_base}:{ap_x:.2f}:{ap_y:.2f}"
     mapa_repo = MapaCalorRepository(db)
     cache = mapa_repo.obtener_cache(
         plano_id=plano_id,
@@ -181,6 +237,10 @@ def generar_heatmap(
         plano_id=plano_id,
         algoritmo=algoritmo_norm,
         resolucion=resolucion,
+        bssid=bssid_norm,
+        ssid=ap["ssid"],
+        ap_pos_x=ap_x,
+        ap_pos_y=ap_y,
         matriz=matriz,
         escala=ESCALA_CWNA,
         ruta_imagen=ruta,
@@ -217,6 +277,11 @@ def analizar_mapa(
         mediciones=mediciones,
         ancho_px=plano.ancho_px,
         alto_px=plano.alto_px,
+        ap_referencia={
+            "bssid": mapa.bssid,
+            "pos_x": mapa.ap_pos_x,
+            "pos_y": mapa.ap_pos_y,
+        },
     )
     analisis = AnalisisCoberturaRepository(db).reemplazar(
         mapa=mapa,

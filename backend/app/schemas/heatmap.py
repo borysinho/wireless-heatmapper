@@ -26,6 +26,10 @@ class MapaCalorOut(BaseModel):
     plano_id: int
     algoritmo: str
     resolucion: int
+    bssid: str
+    ssid: str
+    ap_pos_x: float
+    ap_pos_y: float
     url_imagen: str
     matriz: list[list[float]]
     escala: list[EscalaHeatmapItem]
@@ -50,6 +54,17 @@ class APDetectadoOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class APDisponibleOut(BaseModel):
+    bssid: str
+    ssid: str
+    canal: int | None
+    frecuencia_mhz: int | None
+    rssi_promedio: float
+    pos_x: float
+    pos_y: float
+    cantidad_puntos: int
 
 
 class AnalisisCoberturaOut(BaseModel):

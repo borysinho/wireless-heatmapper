@@ -3,6 +3,8 @@
 Sprint 3 — PB-03 (Captura WiFi en línea), PB-04 (Marcar puntos de medición).
 """
 
+from collections import Counter, defaultdict
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -134,31 +136,90 @@ class MedicionRepository:
             .all()
         )
 
-    def listar_puntos_rssi_heatmap(self, *, plano_id: int) -> list[PuntoRSSI]:
-        """Agrega cada punto a un RSSI representativo para la interpolación.
+    def listar_aps_por_plano(self, *, plano_id: int) -> list[dict]:
+        """Agrupa mediciones por BSSID para seleccionar APs de interés."""
+        mediciones = self.listar_mediciones_por_plano(plano_id=plano_id)
+        por_bssid: dict[str, list[MedicionWifi]] = defaultdict(list)
+        for medicion in mediciones:
+            por_bssid[medicion.bssid].append(medicion)
 
-        Sprint 4 usa el peor RSSI observado en cada punto, conforme al diseño
-        de PB-05 y a la clasificación conservadora aplicada desde Sprint 3.
-        """
+        aps: list[dict] = []
+        for bssid, items in por_bssid.items():
+            ssid = Counter(item.ssid for item in items).most_common(1)[0][0]
+            canales = [item.canal for item in items if item.canal is not None]
+            frecuencias = [
+                item.frecuencia_mhz for item in items if item.frecuencia_mhz is not None
+            ]
+            peso_total = 0.0
+            suma_x = 0.0
+            suma_y = 0.0
+            puntos_unicos = {item.punto_id for item in items}
+            for item in items:
+                peso = max(1.0, item.rssi + 120.0)
+                peso_total += peso
+                suma_x += item.punto.pos_x * peso
+                suma_y += item.punto.pos_y * peso
+
+            aps.append(
+                {
+                    "bssid": bssid,
+                    "ssid": ssid,
+                    "canal": Counter(canales).most_common(1)[0][0]
+                    if canales
+                    else None,
+                    "frecuencia_mhz": Counter(frecuencias).most_common(1)[0][0]
+                    if frecuencias
+                    else None,
+                    "rssi_promedio": round(
+                        sum(item.rssi for item in items) / len(items),
+                        2,
+                    ),
+                    "pos_x": round(suma_x / peso_total, 2),
+                    "pos_y": round(suma_y / peso_total, 2),
+                    "cantidad_puntos": len(puntos_unicos),
+                }
+            )
+        return sorted(aps, key=lambda ap: ap["rssi_promedio"], reverse=True)
+
+    def obtener_ap_por_bssid(self, *, plano_id: int, bssid: str) -> dict | None:
+        bssid_norm = bssid.lower()
+        for ap in self.listar_aps_por_plano(plano_id=plano_id):
+            if ap["bssid"] == bssid_norm:
+                return ap
+        return None
+
+    def listar_puntos_rssi_heatmap(
+        self,
+        *,
+        plano_id: int,
+        bssid: str,
+    ) -> list[PuntoRSSI]:
+        """Agrega cada punto a un RSSI representativo del AP seleccionado."""
+        bssid_norm = bssid.lower()
         puntos = self.listar_puntos_por_plano(plano_id=plano_id)
         resultado: list[PuntoRSSI] = []
         for punto in puntos:
-            if not punto.mediciones:
+            mediciones_ap = [
+                medicion
+                for medicion in punto.mediciones
+                if medicion.bssid == bssid_norm
+            ]
+            if not mediciones_ap:
                 continue
-            peor_rssi = min(m.rssi for m in punto.mediciones)
+            rssi_promedio = sum(m.rssi for m in mediciones_ap) / len(mediciones_ap)
             resultado.append(
                 PuntoRSSI(
                     punto_id=punto.id,
                     x=punto.pos_x,
                     y=punto.pos_y,
-                    rssi=float(peor_rssi),
+                    rssi=float(rssi_promedio),
                 )
             )
         return resultado
 
-    def firma_mediciones_plano(self, *, plano_id: int) -> str:
+    def firma_mediciones_plano(self, *, plano_id: int, bssid: str | None = None) -> str:
         """Firma liviana del estado de mediciones usada para cache del heatmap."""
-        conteo, max_punto, max_medicion = (
+        query = (
             self._db.query(
                 func.count(MedicionWifi.id),
                 func.max(PuntoMedicion.id),
@@ -166,8 +227,10 @@ class MedicionRepository:
             )
             .join(PuntoMedicion, MedicionWifi.punto_id == PuntoMedicion.id)
             .filter(PuntoMedicion.plano_id == plano_id)
-            .one()
         )
+        if bssid is not None:
+            query = query.filter(MedicionWifi.bssid == bssid.lower())
+        conteo, max_punto, max_medicion = query.one()
         return f"{conteo or 0}:{max_punto or 0}:{max_medicion or 0}"
 
     def obtener_punto_por_id(self, *, punto_id: int) -> PuntoMedicion | None:

@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../config/app_config.dart';
+
 /// Cliente HTTP centralizado con Dio.
 /// Incluye el interceptor completo de autenticación:
 ///   - Adjunta el JWT en cada petición.
@@ -10,11 +12,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// Modalidad 100 % en línea — toda la persistencia de dominio ocurre en el backend.
 /// Sprint 1 (Sp1-19)
 class DioClient {
-  /// URL base de la API. Sobreescribir con `--dart-define=API_BASE_URL=...`.
-  /// Por defecto apunta al emulador Android (10.0.2.2 = localhost del host).
-  static const String _defaultBaseUrl = String.fromEnvironment('API_BASE_URL',
-      defaultValue: 'http://10.0.2.2/api');
-
   /// Callback invocado cuando la sesión expira definitivamente (refresh fallido).
   /// Configurar desde main.dart para navegar a la pantalla de login.
   static VoidCallback? onSessionExpired;
@@ -24,7 +21,7 @@ class DioClient {
   DioClient(FlutterSecureStorage storage)
       : _dio = Dio(
           BaseOptions(
-            baseUrl: _defaultBaseUrl,
+            baseUrl: AppConfig.apiBaseUrl,
             connectTimeout: const Duration(seconds: 10),
             receiveTimeout: const Duration(seconds: 30),
             headers: const {'Content-Type': 'application/json'},

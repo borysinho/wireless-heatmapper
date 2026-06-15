@@ -210,6 +210,9 @@ void _initDependencias() {
   sl.registerFactory<GenerarHeatmapUseCase>(
     () => GenerarHeatmapUseCase(sl<HeatmapRepository>()),
   );
+  sl.registerFactory<ListarAPsDisponiblesUseCase>(
+    () => ListarAPsDisponiblesUseCase(sl<HeatmapRepository>()),
+  );
   sl.registerFactory<AnalizarMapaUseCase>(
     () => AnalizarMapaUseCase(sl<HeatmapRepository>()),
   );
@@ -218,6 +221,7 @@ void _initDependencias() {
   );
   sl.registerFactory<HeatmapCubit>(
     () => HeatmapCubit(
+      listarAPs: sl<ListarAPsDisponiblesUseCase>(),
       generarHeatmap: sl<GenerarHeatmapUseCase>(),
       analizarMapa: sl<AnalizarMapaUseCase>(),
       confirmarAP: sl<ConfirmarAPUseCase>(),

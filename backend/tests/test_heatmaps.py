@@ -6,7 +6,12 @@ import time
 import pytest
 from fastapi import HTTPException
 
-from app.api.v1.heatmaps import analizar_mapa, confirmar_ap, generar_heatmap
+from app.api.v1.heatmaps import (
+    analizar_mapa,
+    confirmar_ap,
+    generar_heatmap,
+    listar_aps_disponibles,
+)
 from app.core.config import settings
 from app.models.plano import Plano
 from app.models.proyecto import Proyecto
@@ -109,6 +114,9 @@ def test_heatmap_requiere_minimo_cinco_puntos(db_session, tecnico_usuario):
         generar_heatmap(
             plano_id=plano_id,
             request=None,
+            bssid="aa:bb:cc:dd:ee:01",
+            ap_pos_x=100,
+            ap_pos_y=100,
             algoritmo="IDW",
             resolucion=64,
             db=db_session,
@@ -116,7 +124,22 @@ def test_heatmap_requiere_minimo_cinco_puntos(db_session, tecnico_usuario):
         )
 
     assert exc.value.status_code == 422
-    assert "Se requieren al menos 5 puntos" in exc.value.detail
+    assert "Se requieren al menos 5 puntos del AP seleccionado" in exc.value.detail
+
+
+def test_listar_aps_disponibles_para_seleccion(db_session, tecnico_usuario):
+    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
+    _insertar_puntos_sinteticos(db_session, plano_id, cantidad=5)
+
+    aps = listar_aps_disponibles(
+        plano_id=plano_id,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    assert len(aps) == 3
+    assert aps[0].bssid == "aa:bb:cc:dd:ee:03"
+    assert aps[0].cantidad_puntos == 5
 
 
 def test_generar_heatmap_retorna_matriz_y_cache(db_session, tecnico_usuario):
@@ -126,6 +149,9 @@ def test_generar_heatmap_retorna_matriz_y_cache(db_session, tecnico_usuario):
     mapa1 = generar_heatmap(
         plano_id=plano_id,
         request=None,
+        bssid="aa:bb:cc:dd:ee:01",
+        ap_pos_x=210,
+        ap_pos_y=140,
         algoritmo="IDW",
         resolucion=64,
         db=db_session,
@@ -134,6 +160,9 @@ def test_generar_heatmap_retorna_matriz_y_cache(db_session, tecnico_usuario):
     mapa2 = generar_heatmap(
         plano_id=plano_id,
         request=None,
+        bssid="aa:bb:cc:dd:ee:01",
+        ap_pos_x=210,
+        ap_pos_y=140,
         algoritmo="IDW",
         resolucion=64,
         db=db_session,
@@ -141,6 +170,10 @@ def test_generar_heatmap_retorna_matriz_y_cache(db_session, tecnico_usuario):
     )
 
     assert mapa1.id == mapa2.id
+    assert mapa1.bssid == "aa:bb:cc:dd:ee:01"
+    assert mapa1.ssid == "BulldogCorp"
+    assert mapa1.ap_pos_x == 210
+    assert mapa1.ap_pos_y == 140
     assert mapa1.resolucion == 64
     assert len(mapa1.matriz) == 64
     assert len(mapa1.matriz[0]) == 64
@@ -155,6 +188,9 @@ def test_insertar_punto_invalida_cache_heatmap(db_session, tecnico_usuario):
     mapa1 = generar_heatmap(
         plano_id=plano_id,
         request=None,
+        bssid="aa:bb:cc:dd:ee:01",
+        ap_pos_x=210,
+        ap_pos_y=140,
         algoritmo="IDW",
         resolucion=64,
         db=db_session,
@@ -164,6 +200,9 @@ def test_insertar_punto_invalida_cache_heatmap(db_session, tecnico_usuario):
     mapa2 = generar_heatmap(
         plano_id=plano_id,
         request=None,
+        bssid="aa:bb:cc:dd:ee:01",
+        ap_pos_x=210,
+        ap_pos_y=140,
         algoritmo="IDW",
         resolucion=64,
         db=db_session,
@@ -179,6 +218,9 @@ def test_analisis_detecta_metricas_aps_e_interferencias(db_session, tecnico_usua
     mapa = generar_heatmap(
         plano_id=plano_id,
         request=None,
+        bssid="aa:bb:cc:dd:ee:01",
+        ap_pos_x=210,
+        ap_pos_y=140,
         algoritmo="IDW",
         resolucion=64,
         db=db_session,
@@ -201,6 +243,12 @@ def test_analisis_detecta_metricas_aps_e_interferencias(db_session, tecnico_usua
     }
     assert {"CCI", "ACI"}.issubset(tipos)
     assert len(analisis.aps_detectados) == 3
+    ap_principal = next(
+        ap for ap in analisis.aps_detectados if ap.bssid == "aa:bb:cc:dd:ee:01"
+    )
+    assert ap_principal.confirmado is True
+    assert ap_principal.pos_x == 210
+    assert ap_principal.pos_y == 140
 
     ap = analisis.aps_detectados[0]
     actualizado = confirmar_ap(

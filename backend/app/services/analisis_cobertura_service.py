@@ -37,6 +37,7 @@ class AnalisisCoberturaService:
         mediciones: list[MedicionWifi],
         ancho_px: int,
         alto_px: int,
+        ap_referencia: dict | None = None,
     ) -> dict:
         total_celdas = sum(len(fila) for fila in matriz)
         celdas_cobertura = sum(1 for fila in matriz for rssi in fila if rssi >= -70)
@@ -81,8 +82,23 @@ class AnalisisCoberturaService:
                     "canal": ap.canal,
                     "frecuencia_mhz": ap.frecuencia_mhz,
                     "rssi_promedio": round(ap.rssi_promedio, 2),
-                    "pos_x": round(ap.pos_x, 2),
-                    "pos_y": round(ap.pos_y, 2),
+                    "pos_x": round(
+                        ap_referencia["pos_x"]
+                        if ap_referencia
+                        and ap.bssid == ap_referencia["bssid"]
+                        else ap.pos_x,
+                        2,
+                    ),
+                    "pos_y": round(
+                        ap_referencia["pos_y"]
+                        if ap_referencia
+                        and ap.bssid == ap_referencia["bssid"]
+                        else ap.pos_y,
+                        2,
+                    ),
+                    "confirmado": bool(
+                        ap_referencia and ap.bssid == ap_referencia["bssid"]
+                    ),
                 }
                 for ap in aps
             ],

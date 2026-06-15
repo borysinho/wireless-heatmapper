@@ -1,4 +1,5 @@
 import '../../domain/entities/analisis_cobertura.dart';
+import '../../domain/entities/ap_disponible.dart';
 import '../../domain/entities/ap_detectado.dart';
 import '../../domain/entities/mapa_calor.dart';
 import '../../domain/repositories/heatmap_repository.dart';
@@ -10,15 +11,26 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
   const HeatmapRepositoryImpl(this._datasource);
 
   @override
+  Future<List<APDisponible>> listarAPsDisponibles(int planoId) {
+    return _datasource.listarAPsDisponibles(planoId);
+  }
+
+  @override
   Future<MapaCalor> generarHeatmap({
     required int planoId,
     required String algoritmo,
     required int resolucion,
+    required String bssid,
+    required double apPosX,
+    required double apPosY,
   }) {
     return _datasource.generarHeatmap(
       planoId: planoId,
       algoritmo: algoritmo,
       resolucion: resolucion,
+      bssid: bssid,
+      apPosX: apPosX,
+      apPosY: apPosY,
     );
   }
 

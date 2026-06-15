@@ -8,6 +8,10 @@ class MapaCalor extends Equatable {
   final int planoId;
   final String algoritmo;
   final int resolucion;
+  final String bssid;
+  final String ssid;
+  final double apPosX;
+  final double apPosY;
   final String urlImagen;
   final List<List<double>> matriz;
   final List<EscalaHeatmap> escala;
@@ -21,6 +25,10 @@ class MapaCalor extends Equatable {
     required this.planoId,
     required this.algoritmo,
     required this.resolucion,
+    required this.bssid,
+    required this.ssid,
+    required this.apPosX,
+    required this.apPosY,
     required this.urlImagen,
     required this.matriz,
     required this.escala,
@@ -36,6 +44,10 @@ class MapaCalor extends Equatable {
         planoId,
         algoritmo,
         resolucion,
+        bssid,
+        ssid,
+        apPosX,
+        apPosY,
         urlImagen,
         cantidadPuntos,
         rssiMin,

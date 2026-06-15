@@ -21,10 +21,10 @@ flutter analyze
 # Ejecutar pruebas unitarias
 flutter test
 
-# Ejecutar en emulador (apunta a http://10.0.2.2/api por defecto)
-flutter run
+# Ejecutar en desarrollo (usa dart-defines/default.json)
+flutter run --dart-define-from-file=dart-defines/default.json
 
-# Ejecutar en dispositivo físico con URL personalizada
+# Ejecutar con URL personalizada
 flutter run --dart-define=API_BASE_URL=http://<IP_LOCAL>/api
 ```
 
@@ -48,6 +48,7 @@ Estructura por capas: `presentation` → `domain` → `data` (Dio → backend RE
 
 | Variable       | Por defecto           | Descripción               |
 | -------------- | --------------------- | ------------------------- |
-| `API_BASE_URL` | `http://10.0.2.2/api` | URL base del backend REST |
+| `API_BASE_URL` | `http://10.29.23.250/api` | URL base del backend REST |
 
-Inyectar con `--dart-define=API_BASE_URL=...` al compilar o ejecutar.
+La app lee este valor desde `AppConfig.apiBaseUrl`. Para cambiar de ambiente,
+usar `--dart-define=API_BASE_URL=...` o actualizar `dart-defines/default.json`.

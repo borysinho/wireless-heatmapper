@@ -7,6 +7,10 @@ class MapaCalorModel extends MapaCalor {
     required super.planoId,
     required super.algoritmo,
     required super.resolucion,
+    required super.bssid,
+    required super.ssid,
+    required super.apPosX,
+    required super.apPosY,
     required super.urlImagen,
     required super.matriz,
     required super.escala,
@@ -22,6 +26,10 @@ class MapaCalorModel extends MapaCalor {
       planoId: json['plano_id'] as int,
       algoritmo: json['algoritmo'] as String,
       resolucion: json['resolucion'] as int,
+      bssid: json['bssid'] as String,
+      ssid: json['ssid'] as String,
+      apPosX: (json['ap_pos_x'] as num).toDouble(),
+      apPosY: (json['ap_pos_y'] as num).toDouble(),
       urlImagen: json['url_imagen'] as String,
       matriz: (json['matriz'] as List<dynamic>)
           .map(
