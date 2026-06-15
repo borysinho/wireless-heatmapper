@@ -271,7 +271,7 @@ class _HeatmapCanvas extends StatefulWidget {
 
 class _HeatmapCanvasState extends State<_HeatmapCanvas> {
   static const double _hitRadioPx = 24.0;
-  static const double _apMarkerSize = 35.0;
+  static const double _apMarkerSize = 32.0;
   static const double _apMarkerHalf = _apMarkerSize / 2;
 
   Offset? _ultimoTapDown;
@@ -477,10 +477,10 @@ class _APInteresMarker extends StatelessWidget {
     final theme = Theme.of(context);
     final color = theme.colorScheme.surfaceContainerHighest;
     final borde = activo
-        ? Border.all(color: Colors.amberAccent, width: 4)
+        ? Border.all(color: Colors.amberAccent, width: 2.5)
         : Border.all(
             color: theme.colorScheme.outline.withValues(alpha: 0.55),
-            width: 1.5,
+            width: 1,
           );
     return Tooltip(
       message: ap.ssid.isEmpty ? ap.bssid : ap.ssid,
@@ -498,9 +498,9 @@ class _APInteresMarker extends StatelessWidget {
           ],
         ),
         child: const SizedBox(
-          width: 35,
-          height: 35,
-          child: Icon(Icons.router, color: Colors.white, size: 16),
+          width: 32,
+          height: 32,
+          child: Icon(Icons.router, color: Colors.white, size: 15),
         ),
       ),
     );
