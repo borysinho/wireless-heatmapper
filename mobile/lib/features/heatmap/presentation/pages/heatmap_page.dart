@@ -233,7 +233,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
   }
 }
 
-class _HeatmapCanvas extends StatelessWidget {
+class _HeatmapCanvas extends StatefulWidget {
   final String planoUrl;
   final String? heatmapUrl;
   final Size tamanoPlano;
@@ -263,15 +263,27 @@ class _HeatmapCanvas extends StatelessWidget {
   });
 
   @override
+  State<_HeatmapCanvas> createState() => _HeatmapCanvasState();
+}
+
+class _HeatmapCanvasState extends State<_HeatmapCanvas> {
+  static const double _hitRadioPx = 28.0;
+
+  Offset? _ultimoTapDown;
+  String? _bssidArrastrado;
+
+  @override
   Widget build(BuildContext context) {
     return InteractiveViewer(
-      panEnabled: onMoverAPInteres == null,
+      panEnabled: widget.onMoverAPInteres == null,
+      scaleEnabled: widget.onMoverAPInteres == null,
       minScale: 0.5,
       maxScale: 5,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final stackKey = GlobalKey();
-          final aspect = tamanoPlano.width / tamanoPlano.height;
+          final puedeTocar =
+              widget.onTapPlano != null || widget.onTapAPInteres != null;
+          final aspect = widget.tamanoPlano.width / widget.tamanoPlano.height;
           double w = constraints.maxWidth;
           double h = w / aspect;
           if (h > constraints.maxHeight) {
@@ -280,104 +292,85 @@ class _HeatmapCanvas extends StatelessWidget {
           }
           return Center(
             child: SizedBox(
-              key: stackKey,
               width: w,
               height: h,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  GestureDetector(
-                    onTapUp: onTapPlano == null
-                        ? null
-                        : (details) {
-                            final pos = Offset(
-                              (details.localPosition.dx / w) *
-                                  tamanoPlano.width,
-                              (details.localPosition.dy / h) *
-                                  tamanoPlano.height,
-                            );
-                            onTapPlano!(pos);
-                          },
-                    child: Image.network(
-                      planoUrl,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTapDown: puedeTocar
+                    ? (details) => _ultimoTapDown = details.localPosition
+                    : null,
+                onTap: puedeTocar ? () => _onTap(w: w, h: h) : null,
+                onPanStart: widget.onMoverAPInteres == null
+                    ? null
+                    : (details) => _onPanStart(details, w: w, h: h),
+                onPanUpdate: widget.onMoverAPInteres == null
+                    ? null
+                    : (details) => _onPanUpdate(details, w: w, h: h),
+                onPanEnd: widget.onMoverAPInteres == null
+                    ? null
+                    : (_) => setState(() => _bssidArrastrado = null),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.network(
+                      widget.planoUrl,
                       fit: BoxFit.fill,
                       errorBuilder: (_, __, ___) => const Center(
                         child: Icon(Icons.broken_image, size: 56),
                       ),
                     ),
-                  ),
-                  if (heatmapUrl != null)
-                    Opacity(
-                      opacity: 0.60,
-                      child: Image.network(
-                        heatmapUrl!,
-                        fit: BoxFit.fill,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    if (widget.heatmapUrl != null)
+                      Opacity(
+                        opacity: 0.60,
+                        child: Image.network(
+                          widget.heatmapUrl!,
+                          fit: BoxFit.fill,
+                          errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                        ),
+                      ),
+                    CustomPaint(
+                      painter: _APPainter(
+                        aps: widget.aps,
+                        tamanoPlano: widget.tamanoPlano,
                       ),
                     ),
-                  CustomPaint(
-                    painter: _APPainter(
-                      aps: aps,
-                      tamanoPlano: tamanoPlano,
-                    ),
-                  ),
-                  ...apsInteres.map((ap) {
-                    final posX = apPosXPorBssid[ap.bssid] ?? ap.posX;
-                    final posY = apPosYPorBssid[ap.bssid] ?? ap.posY;
-                    final activo = ap.bssid == bssidActivo;
-                    final left = ((posX / tamanoPlano.width) * w - 22)
-                        .clamp(0, w - 44)
-                        .toDouble();
-                    final top = ((posY / tamanoPlano.height) * h - 22)
-                        .clamp(0, h - 44)
-                        .toDouble();
-                    return Positioned(
-                      left: left,
-                      top: top,
-                      child: _APInteresMarker(
-                        ap: ap,
-                        activo: activo,
-                        onTap: onTapAPInteres == null
-                            ? null
-                            : () => onTapAPInteres!(ap),
-                        onDragPlano: onMoverAPInteres == null
-                            ? null
-                            : (globalPosition) {
-                                final renderBox =
-                                    stackKey.currentContext?.findRenderObject();
-                                if (renderBox is! RenderBox) return;
-                                final local =
-                                    renderBox.globalToLocal(globalPosition);
-                                final nuevoX =
-                                    ((local.dx / w) * tamanoPlano.width)
-                                        .clamp(0.0, tamanoPlano.width)
-                                        .toDouble();
-                                final nuevoY =
-                                    ((local.dy / h) * tamanoPlano.height)
-                                        .clamp(0.0, tamanoPlano.height)
-                                        .toDouble();
-                                onMoverAPInteres!(ap, Offset(nuevoX, nuevoY));
-                              },
-                      ),
-                    );
-                  }),
-                  ...aps.map((ap) {
-                    final left = (ap.posX / tamanoPlano.width) * w - 22;
-                    final top = (ap.posY / tamanoPlano.height) * h - 22;
-                    return Positioned(
-                      left: left.clamp(0, w - 44).toDouble(),
-                      top: top.clamp(0, h - 44).toDouble(),
-                      child: IconButton.filledTonal(
-                        tooltip: 'AP ${ap.ssid}',
-                        iconSize: 18,
-                        onPressed: () => onTapAP(ap),
-                        icon: Icon(ap.confirmado
-                            ? Icons.router
-                            : Icons.router_outlined),
-                      ),
-                    );
-                  }),
-                ],
+                    ...widget.apsInteres.map((ap) {
+                      final posX = widget.apPosXPorBssid[ap.bssid] ?? ap.posX;
+                      final posY = widget.apPosYPorBssid[ap.bssid] ?? ap.posY;
+                      final activo = ap.bssid == widget.bssidActivo ||
+                          ap.bssid == _bssidArrastrado;
+                      final left = ((posX / widget.tamanoPlano.width) * w - 22)
+                          .clamp(0, w - 44)
+                          .toDouble();
+                      final top = ((posY / widget.tamanoPlano.height) * h - 22)
+                          .clamp(0, h - 44)
+                          .toDouble();
+                      return Positioned(
+                        left: left,
+                        top: top,
+                        child: _APInteresMarker(ap: ap, activo: activo),
+                      );
+                    }),
+                    ...widget.aps.map((ap) {
+                      final left =
+                          (ap.posX / widget.tamanoPlano.width) * w - 22;
+                      final top =
+                          (ap.posY / widget.tamanoPlano.height) * h - 22;
+                      return Positioned(
+                        left: left.clamp(0, w - 44).toDouble(),
+                        top: top.clamp(0, h - 44).toDouble(),
+                        child: IconButton.filledTonal(
+                          tooltip: 'AP ${ap.ssid}',
+                          iconSize: 18,
+                          onPressed: () => widget.onTapAP(ap),
+                          icon: Icon(ap.confirmado
+                              ? Icons.router
+                              : Icons.router_outlined),
+                        ),
+                      );
+                    }),
+                  ],
+                ),
               ),
             ),
           );
@@ -385,19 +378,91 @@ class _HeatmapCanvas extends StatelessWidget {
       ),
     );
   }
+
+  void _onTap({required double w, required double h}) {
+    final pos = _ultimoTapDown;
+    if (pos == null) return;
+    final ap = _apEnPosicion(pos, w: w, h: h);
+    if (ap != null) {
+      widget.onTapAPInteres?.call(ap);
+      return;
+    }
+    widget.onTapPlano?.call(_tapAPlano(pos, w: w, h: h));
+  }
+
+  void _onPanStart(
+    DragStartDetails details, {
+    required double w,
+    required double h,
+  }) {
+    final ap = _apEnPosicion(details.localPosition, w: w, h: h);
+    if (ap == null) return;
+    setState(() => _bssidArrastrado = ap.bssid);
+    widget.onTapAPInteres?.call(ap);
+  }
+
+  void _onPanUpdate(
+    DragUpdateDetails details, {
+    required double w,
+    required double h,
+  }) {
+    final bssid = _bssidArrastrado;
+    if (bssid == null) return;
+    final ap = _apPorBssid(bssid);
+    if (ap == null) return;
+    widget.onMoverAPInteres?.call(
+      ap,
+      _tapAPlano(details.localPosition, w: w, h: h),
+    );
+  }
+
+  APDisponible? _apEnPosicion(
+    Offset local, {
+    required double w,
+    required double h,
+  }) {
+    for (final ap in widget.apsInteres.reversed) {
+      final posX = widget.apPosXPorBssid[ap.bssid] ?? ap.posX;
+      final posY = widget.apPosYPorBssid[ap.bssid] ?? ap.posY;
+      final pantalla = Offset(
+        (posX / widget.tamanoPlano.width) * w,
+        (posY / widget.tamanoPlano.height) * h,
+      );
+      if ((local - pantalla).distance <= _hitRadioPx) return ap;
+    }
+    return null;
+  }
+
+  APDisponible? _apPorBssid(String bssid) {
+    for (final ap in widget.apsInteres) {
+      if (ap.bssid == bssid) return ap;
+    }
+    return null;
+  }
+
+  Offset _tapAPlano(
+    Offset tap, {
+    required double w,
+    required double h,
+  }) {
+    return Offset(
+      ((tap.dx / w) * widget.tamanoPlano.width)
+          .clamp(0.0, widget.tamanoPlano.width)
+          .toDouble(),
+      ((tap.dy / h) * widget.tamanoPlano.height)
+          .clamp(0.0, widget.tamanoPlano.height)
+          .toDouble(),
+    );
+  }
 }
 
 class _APInteresMarker extends StatelessWidget {
   final APDisponible ap;
   final bool activo;
-  final VoidCallback? onTap;
-  final ValueChanged<Offset>? onDragPlano;
 
   const _APInteresMarker({
     required this.ap,
     required this.activo,
-    this.onTap,
-    this.onDragPlano,
   });
 
   @override
@@ -407,30 +472,22 @@ class _APInteresMarker extends StatelessWidget {
         activo ? theme.colorScheme.primary : theme.colorScheme.tertiary;
     return Tooltip(
       message: ap.ssid.isEmpty ? ap.bssid : ap.ssid,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        onPanStart: (_) => onTap?.call(),
-        onPanUpdate: onDragPlano == null
-            ? null
-            : (details) => onDragPlano!(details.globalPosition),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            boxShadow: const [
-              BoxShadow(
-                blurRadius: 8,
-                offset: Offset(0, 2),
-                color: Color(0x33000000),
-              ),
-            ],
-          ),
-          child: const SizedBox(
-            width: 44,
-            height: 44,
-            child: Icon(Icons.router, color: Colors.white, size: 20),
-          ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: color,
+          shape: BoxShape.circle,
+          boxShadow: const [
+            BoxShadow(
+              blurRadius: 8,
+              offset: Offset(0, 2),
+              color: Color(0x33000000),
+            ),
+          ],
+        ),
+        child: const SizedBox(
+          width: 44,
+          height: 44,
+          child: Icon(Icons.router, color: Colors.white, size: 20),
         ),
       ),
     );
