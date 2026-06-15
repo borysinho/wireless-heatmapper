@@ -1,0 +1,157 @@
+{
+  "data": [
+    {
+      "TaskID": 1,
+      "TaskName": "Sp0-01..05 Roles y backlog",
+      "StartDate": "2026-04-13",
+      "EndDate": "2026-04-13",
+      "Duration": 1,
+      "DurationUnit": "day",
+      "Progress": 100,
+      "Predecessor": "",
+      "resources": [],
+      "color": "412",
+      "info": "<p><br></p>"
+    },
+    {
+      "TaskID": 2,
+      "TaskName": "Sp0-06 Modelos UML",
+      "StartDate": "2026-04-14",
+      "EndDate": "2026-04-15",
+      "Duration": 2,
+      "DurationUnit": "day",
+      "Progress": 100,
+      "Predecessor": "1FS",
+      "resources": [],
+      "color": "412",
+      "info": "<p><br></p>"
+    },
+    {
+      "TaskID": 3,
+      "TaskName": "Sp0-07..08 Repo + Docker",
+      "StartDate": "2026-04-16",
+      "EndDate": "2026-04-16",
+      "Duration": 1,
+      "DurationUnit": "day",
+      "Progress": 100,
+      "Predecessor": "2FS",
+      "resources": [],
+      "color": "301",
+      "info": "<p><br></p>"
+    },
+    {
+      "TaskID": 4,
+      "TaskName": "Sp0-09..11 Backend + Alembic",
+      "StartDate": "2026-04-17",
+      "EndDate": "2026-04-17",
+      "Duration": 1,
+      "DurationUnit": "day",
+      "Progress": 100,
+      "Predecessor": "3FS",
+      "resources": [],
+      "color": "301",
+      "info": "<p><br></p>"
+    },
+    {
+      "TaskID": 5,
+      "TaskName": "Sp0-12 Init Flutter",
+      "StartDate": "2026-04-20",
+      "EndDate": "2026-04-20",
+      "Duration": 1,
+      "DurationUnit": "day",
+      "Progress": 100,
+      "Predecessor": "4FS",
+      "resources": [],
+      "color": "211",
+      "info": "<p><br></p>"
+    },
+    {
+      "TaskID": 6,
+      "TaskName": "Sp0-13 Init Web (Vite)",
+      "StartDate": "2026-04-20",
+      "EndDate": "2026-04-20",
+      "Duration": 1,
+      "DurationUnit": "day",
+      "Progress": 100,
+      "Predecessor": "4FS",
+      "resources": [],
+      "color": "211",
+      "info": "<p><br></p>"
+    },
+    {
+      "TaskID": 7,
+      "TaskName": "Sp0-14 Nginx",
+      "StartDate": "2026-04-21",
+      "EndDate": "2026-04-21",
+      "Duration": 1,
+      "DurationUnit": "day",
+      "Progress": 100,
+      "Predecessor": "6FS",
+      "resources": [],
+      "color": "121",
+      "info": "<p><br></p>"
+    },
+    {
+      "TaskID": 8,
+      "TaskName": "Sp0-15 CI/CD",
+      "StartDate": "2026-04-22",
+      "EndDate": "2026-04-22",
+      "Duration": 1,
+      "DurationUnit": "day",
+      "Progress": 100,
+      "Predecessor": "7FS",
+      "resources": [],
+      "color": "121",
+      "info": "<p><br></p>"
+    },
+    {
+      "TaskID": 9,
+      "TaskName": "Sp0-16 Pre-commit",
+      "StartDate": "2026-04-23",
+      "EndDate": "2026-04-23",
+      "Duration": 1,
+      "DurationUnit": "day",
+      "Progress": 100,
+      "Predecessor": "8FS",
+      "resources": [],
+      "color": "121",
+      "info": "<p><br></p>"
+    },
+    {
+      "TaskID": 10,
+      "TaskName": "Sp0-17 READMEs",
+      "StartDate": "2026-04-24",
+      "EndDate": "2026-04-24",
+      "Duration": 1,
+      "DurationUnit": "day",
+      "Progress": 100,
+      "Predecessor": "9FS",
+      "resources": [],
+      "color": "121",
+      "info": "<p><br></p>"
+    }
+  ],
+  "resources": [],
+  "projectStartDate": null,
+  "projectEndDate": null,
+  "advanced": {
+    "workWeek": [
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday"
+    ],
+    "workTime": [
+      {
+        "from": 8,
+        "to": 12
+      },
+      {
+        "from": 13,
+        "to": 17
+      }
+    ],
+    "holidays": []
+  }
+}
