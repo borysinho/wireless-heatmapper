@@ -254,6 +254,53 @@ def test_generar_heatmap_compone_cobertura_de_cada_ap(db_session, tecnico_usuari
     assert celdas_buenas < total_celdas
 
 
+def test_generar_heatmap_refleja_lecturas_asimetricas(db_session, tecnico_usuario):
+    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
+    repo = MedicionRepository(db_session)
+    lecturas = [
+        (280, 150, -52),
+        (320, 150, -54),
+        (120, 150, -88),
+        (80, 150, -90),
+        (200, 230, -76),
+    ]
+    for x, y, rssi in lecturas:
+        repo.crear_lote(
+            plano_id=plano_id,
+            pos_x=x,
+            pos_y=y,
+            items=[
+                MedicionItemIn(
+                    ssid="Quiroga",
+                    bssid="aa:bb:cc:dd:ee:01",
+                    rssi=rssi,
+                    canal=6,
+                    frecuencia_mhz=2437,
+                ),
+            ],
+        )
+
+    mapa = generar_heatmap(
+        plano_id=plano_id,
+        request=None,
+        bssid=["aa:bb:cc:dd:ee:01"],
+        ap_pos_x=[200],
+        ap_pos_y=[150],
+        algoritmo="IDW",
+        resolucion=64,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    fila = int((150 / 300) * 64)
+    col_este = int((270 / 400) * 64)
+    col_oeste = int((130 / 400) * 64)
+
+    assert mapa.matriz[fila][col_este] >= -62
+    assert mapa.matriz[fila][col_oeste] <= -78
+    assert mapa.matriz[fila][col_este] - mapa.matriz[fila][col_oeste] >= 16
+
+
 def test_resolver_aps_interes_rechaza_coordenadas_negativas():
     aps = [
         {
