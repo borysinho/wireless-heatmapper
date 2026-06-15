@@ -243,12 +243,24 @@ class HeatmapImageService:
         return buffer.getvalue()
 
     def _color_para_rssi(self, rssi: float) -> tuple[int, int, int]:
-        if rssi >= -50:
-            return (11, 122, 59)
-        if rssi >= -70:
-            return (87, 182, 90)
-        if rssi >= -80:
-            return (244, 211, 94)
-        if rssi >= -90:
-            return (240, 138, 36)
-        return (215, 38, 61)
+        paradas = [
+            (-120.0, (215, 38, 61)),
+            (-91.0, (215, 38, 61)),
+            (-90.0, (240, 138, 36)),
+            (-80.0, (244, 211, 94)),
+            (-70.0, (87, 182, 90)),
+            (-50.0, (11, 122, 59)),
+            (0.0, (11, 122, 59)),
+        ]
+        if rssi <= paradas[0][0]:
+            return paradas[0][1]
+        for idx in range(1, len(paradas)):
+            valor_ini, color_ini = paradas[idx - 1]
+            valor_fin, color_fin = paradas[idx]
+            if rssi <= valor_fin:
+                t = (rssi - valor_ini) / (valor_fin - valor_ini)
+                return tuple(
+                    round(color_ini[canal] + (color_fin[canal] - color_ini[canal]) * t)
+                    for canal in range(3)
+                )
+        return paradas[-1][1]

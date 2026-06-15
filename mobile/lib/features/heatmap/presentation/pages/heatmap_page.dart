@@ -1019,25 +1019,40 @@ class _HeatmapMatrixPainter extends CustomPainter {
   }
 
   Color _colorParaRssi(double rssi) {
-    if (rssi >= -50) {
-      return const Color(0xFF0B7A3B).withValues(alpha: 0.60);
+    const paradas = [
+      _ColorStop(-120, Color(0xFFD7263D)),
+      _ColorStop(-91, Color(0xFFD7263D)),
+      _ColorStop(-90, Color(0xFFF08A24)),
+      _ColorStop(-80, Color(0xFFF4D35E)),
+      _ColorStop(-70, Color(0xFF57B65A)),
+      _ColorStop(-50, Color(0xFF0B7A3B)),
+      _ColorStop(0, Color(0xFF0B7A3B)),
+    ];
+    if (rssi <= paradas.first.valor) {
+      return paradas.first.color.withValues(alpha: 0.60);
     }
-    if (rssi >= -70) {
-      return const Color(0xFF57B65A).withValues(alpha: 0.60);
+    for (var i = 1; i < paradas.length; i++) {
+      final inicio = paradas[i - 1];
+      final fin = paradas[i];
+      if (rssi <= fin.valor) {
+        final t = (rssi - inicio.valor) / (fin.valor - inicio.valor);
+        return Color.lerp(inicio.color, fin.color, t)!.withValues(alpha: 0.60);
+      }
     }
-    if (rssi >= -80) {
-      return const Color(0xFFF4D35E).withValues(alpha: 0.60);
-    }
-    if (rssi >= -90) {
-      return const Color(0xFFF08A24).withValues(alpha: 0.60);
-    }
-    return const Color(0xFFD7263D).withValues(alpha: 0.60);
+    return paradas.last.color.withValues(alpha: 0.60);
   }
 
   @override
   bool shouldRepaint(covariant _HeatmapMatrixPainter oldDelegate) {
     return oldDelegate.matriz != matriz;
   }
+}
+
+class _ColorStop {
+  final double valor;
+  final Color color;
+
+  const _ColorStop(this.valor, this.color);
 }
 
 class _APPainter extends CustomPainter {
