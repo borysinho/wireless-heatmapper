@@ -28,9 +28,9 @@ class HeatmapRemoteDatasource {
     required int planoId,
     required String algoritmo,
     required int resolucion,
-    required String bssid,
-    required double apPosX,
-    required double apPosY,
+    required List<String> bssids,
+    required List<double> apPosX,
+    required List<double> apPosY,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
@@ -38,7 +38,7 @@ class HeatmapRemoteDatasource {
         queryParameters: {
           'algoritmo': algoritmo,
           'resolucion': resolucion,
-          'bssid': bssid,
+          'bssid': bssids,
           'ap_pos_x': apPosX,
           'ap_pos_y': apPosY,
         },

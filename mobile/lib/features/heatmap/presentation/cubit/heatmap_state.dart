@@ -26,59 +26,101 @@ class HeatmapLoading extends HeatmapState {
 
 class HeatmapSeleccionAP extends HeatmapState {
   final List<APDisponible> aps;
-  final APDisponible apSeleccionado;
-  final double apPosX;
-  final double apPosY;
+  final Set<String> bssidsSeleccionados;
+  final String bssidActivo;
+  final Map<String, double> apPosXPorBssid;
+  final Map<String, double> apPosYPorBssid;
   final String? mensaje;
 
-  const HeatmapSeleccionAP({
+  HeatmapSeleccionAP({
     required this.aps,
-    required this.apSeleccionado,
-    required this.apPosX,
-    required this.apPosY,
+    required Set<String> bssidsSeleccionados,
+    required this.bssidActivo,
+    required Map<String, double> apPosXPorBssid,
+    required Map<String, double> apPosYPorBssid,
     this.mensaje,
-  });
+  })  : bssidsSeleccionados = Set.unmodifiable(bssidsSeleccionados),
+        apPosXPorBssid = Map.unmodifiable(apPosXPorBssid),
+        apPosYPorBssid = Map.unmodifiable(apPosYPorBssid);
+
+  APDisponible get apActivo => aps.firstWhere(
+        (ap) => ap.bssid == bssidActivo,
+        orElse: () => aps.first,
+      );
+
+  List<APDisponible> get apsSeleccionados =>
+      aps.where((ap) => bssidsSeleccionados.contains(ap.bssid)).toList();
+
+  double posXDe(APDisponible ap) => apPosXPorBssid[ap.bssid] ?? ap.posX;
+
+  double posYDe(APDisponible ap) => apPosYPorBssid[ap.bssid] ?? ap.posY;
 
   HeatmapSeleccionAP copyWith({
-    APDisponible? apSeleccionado,
-    double? apPosX,
-    double? apPosY,
+    Set<String>? bssidsSeleccionados,
+    String? bssidActivo,
+    Map<String, double>? apPosXPorBssid,
+    Map<String, double>? apPosYPorBssid,
     String? mensaje,
   }) {
     return HeatmapSeleccionAP(
       aps: aps,
-      apSeleccionado: apSeleccionado ?? this.apSeleccionado,
-      apPosX: apPosX ?? this.apPosX,
-      apPosY: apPosY ?? this.apPosY,
+      bssidsSeleccionados: bssidsSeleccionados ?? this.bssidsSeleccionados,
+      bssidActivo: bssidActivo ?? this.bssidActivo,
+      apPosXPorBssid: apPosXPorBssid ?? this.apPosXPorBssid,
+      apPosYPorBssid: apPosYPorBssid ?? this.apPosYPorBssid,
       mensaje: mensaje,
     );
   }
 
   @override
-  List<Object?> get props => [aps, apSeleccionado, apPosX, apPosY, mensaje];
+  List<Object?> get props => [
+        aps,
+        bssidsSeleccionados.toList()..sort(),
+        bssidActivo,
+        apPosXPorBssid.entries
+            .map((entry) => '${entry.key}:${entry.value}')
+            .toList()
+          ..sort(),
+        apPosYPorBssid.entries
+            .map((entry) => '${entry.key}:${entry.value}')
+            .toList()
+          ..sort(),
+        mensaje,
+      ];
 }
 
 class HeatmapReady extends HeatmapState {
   final MapaCalor mapa;
   final List<APDisponible> aps;
-  final APDisponible apSeleccionado;
+  final Set<String> bssidsSeleccionados;
+  final String bssidActivo;
+  final Map<String, double> apPosXPorBssid;
+  final Map<String, double> apPosYPorBssid;
   final AnalisisCobertura? analisis;
   final bool analizando;
   final String? mensaje;
 
-  const HeatmapReady({
+  HeatmapReady({
     required this.mapa,
     required this.aps,
-    required this.apSeleccionado,
+    required Set<String> bssidsSeleccionados,
+    required this.bssidActivo,
+    required Map<String, double> apPosXPorBssid,
+    required Map<String, double> apPosYPorBssid,
     this.analisis,
     this.analizando = false,
     this.mensaje,
-  });
+  })  : bssidsSeleccionados = Set.unmodifiable(bssidsSeleccionados),
+        apPosXPorBssid = Map.unmodifiable(apPosXPorBssid),
+        apPosYPorBssid = Map.unmodifiable(apPosYPorBssid);
 
   HeatmapReady copyWith({
     MapaCalor? mapa,
     List<APDisponible>? aps,
-    APDisponible? apSeleccionado,
+    Set<String>? bssidsSeleccionados,
+    String? bssidActivo,
+    Map<String, double>? apPosXPorBssid,
+    Map<String, double>? apPosYPorBssid,
     AnalisisCobertura? analisis,
     bool? analizando,
     String? mensaje,
@@ -86,7 +128,10 @@ class HeatmapReady extends HeatmapState {
     return HeatmapReady(
       mapa: mapa ?? this.mapa,
       aps: aps ?? this.aps,
-      apSeleccionado: apSeleccionado ?? this.apSeleccionado,
+      bssidsSeleccionados: bssidsSeleccionados ?? this.bssidsSeleccionados,
+      bssidActivo: bssidActivo ?? this.bssidActivo,
+      apPosXPorBssid: apPosXPorBssid ?? this.apPosXPorBssid,
+      apPosYPorBssid: apPosYPorBssid ?? this.apPosYPorBssid,
       analisis: analisis ?? this.analisis,
       analizando: analizando ?? this.analizando,
       mensaje: mensaje,
@@ -97,7 +142,16 @@ class HeatmapReady extends HeatmapState {
   List<Object?> get props => [
         mapa,
         aps,
-        apSeleccionado,
+        bssidsSeleccionados.toList()..sort(),
+        bssidActivo,
+        apPosXPorBssid.entries
+            .map((entry) => '${entry.key}:${entry.value}')
+            .toList()
+          ..sort(),
+        apPosYPorBssid.entries
+            .map((entry) => '${entry.key}:${entry.value}')
+            .toList()
+          ..sort(),
         analisis,
         analizando,
         mensaje,

@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 
+import 'ap_disponible.dart';
 import 'escala_heatmap.dart';
 
 /// Mapa de calor generado por el backend. Sprint 4 — PB-05.
@@ -12,6 +13,7 @@ class MapaCalor extends Equatable {
   final String ssid;
   final double apPosX;
   final double apPosY;
+  final List<APDisponible> apsInteres;
   final String urlImagen;
   final List<List<double>> matriz;
   final List<EscalaHeatmap> escala;
@@ -29,6 +31,7 @@ class MapaCalor extends Equatable {
     required this.ssid,
     required this.apPosX,
     required this.apPosY,
+    required this.apsInteres,
     required this.urlImagen,
     required this.matriz,
     required this.escala,
@@ -48,6 +51,7 @@ class MapaCalor extends Equatable {
         ssid,
         apPosX,
         apPosY,
+        apsInteres,
         urlImagen,
         cantidadPuntos,
         rssiMin,

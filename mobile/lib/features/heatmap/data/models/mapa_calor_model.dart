@@ -1,4 +1,5 @@
 import '../../domain/entities/mapa_calor.dart';
+import 'ap_disponible_model.dart';
 import 'escala_heatmap_model.dart';
 
 class MapaCalorModel extends MapaCalor {
@@ -11,6 +12,7 @@ class MapaCalorModel extends MapaCalor {
     required super.ssid,
     required super.apPosX,
     required super.apPosY,
+    required super.apsInteres,
     required super.urlImagen,
     required super.matriz,
     required super.escala,
@@ -30,6 +32,7 @@ class MapaCalorModel extends MapaCalor {
       ssid: json['ssid'] as String,
       apPosX: (json['ap_pos_x'] as num).toDouble(),
       apPosY: (json['ap_pos_y'] as num).toDouble(),
+      apsInteres: _apsInteresDesdeJson(json),
       urlImagen: json['url_imagen'] as String,
       matriz: (json['matriz'] as List<dynamic>)
           .map(
@@ -46,5 +49,28 @@ class MapaCalorModel extends MapaCalor {
       rssiMax: (json['rssi_max'] as num).toDouble(),
       createdAt: DateTime.parse(json['created_at'] as String),
     );
+  }
+
+  static List<APDisponibleModel> _apsInteresDesdeJson(
+    Map<String, dynamic> json,
+  ) {
+    final aps = json['aps_interes'];
+    if (aps is List<dynamic>) {
+      return aps
+          .map((e) => APDisponibleModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+    }
+    return [
+      APDisponibleModel(
+        bssid: json['bssid'] as String,
+        ssid: json['ssid'] as String,
+        canal: null,
+        frecuenciaMhz: null,
+        rssiPromedio: 0,
+        posX: (json['ap_pos_x'] as num).toDouble(),
+        posY: (json['ap_pos_y'] as num).toDouble(),
+        cantidadPuntos: json['cantidad_puntos'] as int,
+      ),
+    ];
   }
 }

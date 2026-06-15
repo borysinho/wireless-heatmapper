@@ -39,6 +39,7 @@ class MapaCalor(Base):
     ssid = Column(String(255), nullable=False)
     ap_pos_x = Column(Float, nullable=False)
     ap_pos_y = Column(Float, nullable=False)
+    aps_interes = Column(sa.JSON().with_variant(sa.JSON, "sqlite"), nullable=True)
     matriz = Column(sa.JSON().with_variant(sa.JSON, "sqlite"), nullable=False)
     escala = Column(sa.JSON().with_variant(sa.JSON, "sqlite"), nullable=False)
     ruta_imagen = Column(String(500), nullable=False, unique=True)

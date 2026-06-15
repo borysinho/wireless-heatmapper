@@ -30,6 +30,7 @@ class MapaCalorOut(BaseModel):
     ssid: str
     ap_pos_x: float
     ap_pos_y: float
+    aps_interes: list[APDisponibleOut]
     url_imagen: str
     matriz: list[list[float]]
     escala: list[EscalaHeatmapItem]

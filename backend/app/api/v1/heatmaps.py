@@ -3,6 +3,8 @@
 Sprint 4 — PB-05 (Generar mapa de calor), PB-06 (Analizar cobertura).
 """
 
+import hashlib
+import json
 import secrets
 from pathlib import Path
 
@@ -101,6 +103,18 @@ def _verificar_ownership_mapa(
 
 
 def _mapa_out(mapa: MapaCalor, request: Request) -> MapaCalorOut:
+    aps_interes = mapa.aps_interes or [
+        {
+            "bssid": mapa.bssid,
+            "ssid": mapa.ssid,
+            "canal": None,
+            "frecuencia_mhz": None,
+            "rssi_promedio": 0,
+            "pos_x": mapa.ap_pos_x,
+            "pos_y": mapa.ap_pos_y,
+            "cantidad_puntos": mapa.cantidad_puntos,
+        }
+    ]
     return MapaCalorOut(
         id=mapa.id,
         plano_id=mapa.plano_id,
@@ -110,6 +124,7 @@ def _mapa_out(mapa: MapaCalor, request: Request) -> MapaCalorOut:
         ssid=mapa.ssid,
         ap_pos_x=mapa.ap_pos_x,
         ap_pos_y=mapa.ap_pos_y,
+        aps_interes=aps_interes,
         url_imagen=_firmar(mapa.ruta_imagen, request),
         matriz=mapa.matriz,
         escala=mapa.escala,
@@ -118,6 +133,86 @@ def _mapa_out(mapa: MapaCalor, request: Request) -> MapaCalorOut:
         rssi_max=mapa.rssi_max,
         created_at=mapa.created_at,
     )
+
+
+def _normalizar_bssids(bssids: list[str]) -> list[str]:
+    normalizados: list[str] = []
+    for bssid in bssids:
+        valor = bssid.strip().lower()
+        if valor and valor not in normalizados:
+            normalizados.append(valor)
+    return normalizados
+
+
+def _resolver_aps_interes(
+    *,
+    aps: list[dict],
+    bssids: list[str],
+    ap_pos_x: list[float] | None,
+    ap_pos_y: list[float] | None,
+) -> list[dict]:
+    if (ap_pos_x is None) != (ap_pos_y is None):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Las coordenadas X/Y de los APs de interés deben enviarse juntas.",
+        )
+    if ap_pos_x is not None and len(ap_pos_x) != len(bssids):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "La cantidad de coordenadas X no coincide con los APs seleccionados."
+            ),
+        )
+    if ap_pos_y is not None and len(ap_pos_y) != len(bssids):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "La cantidad de coordenadas Y no coincide con los APs seleccionados."
+            ),
+        )
+
+    por_bssid = {ap["bssid"]: ap for ap in aps}
+    faltantes = [bssid for bssid in bssids if bssid not in por_bssid]
+    if faltantes:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                "Uno o más APs seleccionados no existen en las mediciones del plano."
+            ),
+        )
+
+    seleccionados: list[dict] = []
+    for idx, bssid in enumerate(bssids):
+        ap = por_bssid[bssid]
+        seleccionados.append(
+            {
+                "bssid": bssid,
+                "ssid": ap["ssid"],
+                "canal": ap["canal"],
+                "frecuencia_mhz": ap["frecuencia_mhz"],
+                "rssi_promedio": ap["rssi_promedio"],
+                "pos_x": ap_pos_x[idx] if ap_pos_x is not None else ap["pos_x"],
+                "pos_y": ap_pos_y[idx] if ap_pos_y is not None else ap["pos_y"],
+                "cantidad_puntos": ap["cantidad_puntos"],
+            }
+        )
+    return seleccionados
+
+
+def _firma_aps_interes(*, firma_base: str, aps_interes: list[dict]) -> str:
+    payload = {
+        "firma_base": firma_base,
+        "aps": [
+            {
+                "bssid": ap["bssid"],
+                "pos_x": round(float(ap["pos_x"]), 2),
+                "pos_y": round(float(ap["pos_y"]), 2),
+            }
+            for ap in aps_interes
+        ],
+    }
+    serializado = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return f"aps:{hashlib.sha256(serializado.encode()).hexdigest()}"
 
 
 @router_planos_heatmap.get(
@@ -155,16 +250,16 @@ def listar_aps_disponibles(
 def generar_heatmap(
     plano_id: int,
     request: Request,
-    bssid: str = Query(..., description="BSSID del AP de interés"),
-    ap_pos_x: float | None = Query(
+    bssid: list[str] = Query(..., description="BSSID de cada AP de interés"),
+    ap_pos_x: list[float] | None = Query(
         default=None,
         ge=0,
-        description="Ubicación X confirmada del AP sobre el plano",
+        description="Ubicación X confirmada de cada AP sobre el plano",
     ),
-    ap_pos_y: float | None = Query(
+    ap_pos_y: list[float] | None = Query(
         default=None,
         ge=0,
-        description="Ubicación Y confirmada del AP sobre el plano",
+        description="Ubicación Y confirmada de cada AP sobre el plano",
     ),
     algoritmo: str = Query(default="IDW", pattern="^(IDW|KRIGING|idw|kriging)$"),
     resolucion: int = Query(default=128, enum=[64, 128, 256]),
@@ -183,32 +278,39 @@ def generar_heatmap(
         )
 
     med_repo = MedicionRepository(db)
-    bssid_norm = bssid.lower()
-    ap = med_repo.obtener_ap_por_bssid(plano_id=plano_id, bssid=bssid_norm)
-    if ap is None:
+    bssids_norm = _normalizar_bssids(bssid)
+    if not bssids_norm:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="AP no encontrado en las mediciones del plano.",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Debe seleccionar al menos un AP de interés.",
         )
+    aps_disponibles = med_repo.listar_aps_por_plano(plano_id=plano_id)
+    aps_interes = _resolver_aps_interes(
+        aps=aps_disponibles,
+        bssids=bssids_norm,
+        ap_pos_x=ap_pos_x,
+        ap_pos_y=ap_pos_y,
+    )
 
     puntos = med_repo.listar_puntos_rssi_heatmap(
         plano_id=plano_id,
-        bssid=bssid_norm,
+        bssids=bssids_norm,
     )
     if len(puntos) < 5:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Se requieren al menos 5 puntos del AP seleccionado.",
+            detail="Se requieren al menos 5 puntos de los APs seleccionados.",
         )
 
     algoritmo_norm = algoritmo.upper()
-    ap_x = ap_pos_x if ap_pos_x is not None else ap["pos_x"]
-    ap_y = ap_pos_y if ap_pos_y is not None else ap["pos_y"]
     firma_base = med_repo.firma_mediciones_plano(
         plano_id=plano_id,
-        bssid=bssid_norm,
+        bssids=bssids_norm,
     )
-    firma = f"{bssid_norm}:{firma_base}:{ap_x:.2f}:{ap_y:.2f}"
+    firma = _firma_aps_interes(
+        firma_base=firma_base,
+        aps_interes=aps_interes,
+    )
     mapa_repo = MapaCalorRepository(db)
     cache = mapa_repo.obtener_cache(
         plano_id=plano_id,
@@ -219,6 +321,7 @@ def generar_heatmap(
     if cache is not None:
         return _mapa_out(cache, request)
 
+    ap_principal = aps_interes[0]
     matriz = InterpolacionService().interpolar(
         puntos=puntos,
         ancho_px=plano.ancho_px,
@@ -237,10 +340,11 @@ def generar_heatmap(
         plano_id=plano_id,
         algoritmo=algoritmo_norm,
         resolucion=resolucion,
-        bssid=bssid_norm,
-        ssid=ap["ssid"],
-        ap_pos_x=ap_x,
-        ap_pos_y=ap_y,
+        bssid=ap_principal["bssid"],
+        ssid=ap_principal["ssid"],
+        ap_pos_x=ap_principal["pos_x"],
+        ap_pos_y=ap_principal["pos_y"],
+        aps_interes=aps_interes,
         matriz=matriz,
         escala=ESCALA_CWNA,
         ruta_imagen=ruta,
@@ -277,11 +381,14 @@ def analizar_mapa(
         mediciones=mediciones,
         ancho_px=plano.ancho_px,
         alto_px=plano.alto_px,
-        ap_referencia={
-            "bssid": mapa.bssid,
-            "pos_x": mapa.ap_pos_x,
-            "pos_y": mapa.ap_pos_y,
-        },
+        aps_referencia=mapa.aps_interes
+        or [
+            {
+                "bssid": mapa.bssid,
+                "pos_x": mapa.ap_pos_x,
+                "pos_y": mapa.ap_pos_y,
+            }
+        ],
     )
     analisis = AnalisisCoberturaRepository(db).reemplazar(
         mapa=mapa,

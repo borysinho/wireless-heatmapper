@@ -44,12 +44,9 @@ class _HeatmapPageState extends State<HeatmapPage> {
     context.read<HeatmapCubit>().iniciar(widget.planoId);
   }
 
-  void _generarHeatmap(HeatmapSeleccionAP state) {
+  void _generarHeatmap() {
     context.read<HeatmapCubit>().generar(
           planoId: widget.planoId,
-          ap: state.apSeleccionado,
-          apPosX: state.apPosX,
-          apPosY: state.apPosY,
           algoritmo: _algoritmo,
           resolucion: _resolucion,
         );
@@ -121,22 +118,27 @@ class _HeatmapPageState extends State<HeatmapPage> {
                       planoUrl: widget.imagenUrl,
                       tamanoPlano: _tamanoPlano,
                       aps: const [],
-                      apPosX: state.apPosX,
-                      apPosY: state.apPosY,
-                      apLabel: state.apSeleccionado.ssid,
+                      apsInteres: state.apsSeleccionados,
+                      bssidActivo: state.bssidActivo,
+                      apPosXPorBssid: state.apPosXPorBssid,
+                      apPosYPorBssid: state.apPosYPorBssid,
                       onTapPlano: (pos) =>
                           context.read<HeatmapCubit>().ubicarAP(
                                 posX: pos.dx,
                                 posY: pos.dy,
                               ),
+                      onTapAPInteres: (ap) =>
+                          context.read<HeatmapCubit>().activarAP(ap),
                       onTapAP: _mostrarDetalleAP,
                     ),
                   ),
                   _SeleccionAPPanel(
                     state: state,
-                    onSeleccionar: (ap) =>
-                        context.read<HeatmapCubit>().seleccionarAP(ap),
-                    onGenerar: () => _generarHeatmap(state),
+                    onAlternar: (ap) =>
+                        context.read<HeatmapCubit>().alternarAPInteres(ap),
+                    onActivar: (ap) =>
+                        context.read<HeatmapCubit>().activarAP(ap),
+                    onGenerar: _generarHeatmap,
                   ),
                 ],
               ),
@@ -148,9 +150,16 @@ class _HeatmapPageState extends State<HeatmapPage> {
                       heatmapUrl: resolverUrlFirmada(listo!.mapa.urlImagen),
                       tamanoPlano: _tamanoPlano,
                       aps: listo.analisis?.apsDetectados ?? const [],
-                      apPosX: listo.mapa.apPosX,
-                      apPosY: listo.mapa.apPosY,
-                      apLabel: listo.mapa.ssid,
+                      apsInteres: listo.mapa.apsInteres,
+                      bssidActivo: listo.bssidActivo,
+                      apPosXPorBssid: {
+                        for (final ap in listo.mapa.apsInteres)
+                          ap.bssid: ap.posX,
+                      },
+                      apPosYPorBssid: {
+                        for (final ap in listo.mapa.apsInteres)
+                          ap.bssid: ap.posY,
+                      },
                       onTapAP: _mostrarDetalleAP,
                     ),
                   ),
@@ -223,10 +232,12 @@ class _HeatmapCanvas extends StatelessWidget {
   final String? heatmapUrl;
   final Size tamanoPlano;
   final List<APDetectado> aps;
-  final double? apPosX;
-  final double? apPosY;
-  final String? apLabel;
+  final List<APDisponible> apsInteres;
+  final String? bssidActivo;
+  final Map<String, double> apPosXPorBssid;
+  final Map<String, double> apPosYPorBssid;
   final void Function(Offset posPlano)? onTapPlano;
+  final void Function(APDisponible ap)? onTapAPInteres;
   final void Function(APDetectado ap) onTapAP;
 
   const _HeatmapCanvas({
@@ -234,10 +245,12 @@ class _HeatmapCanvas extends StatelessWidget {
     this.heatmapUrl,
     required this.tamanoPlano,
     required this.aps,
-    this.apPosX,
-    this.apPosY,
-    this.apLabel,
+    this.apsInteres = const [],
+    this.bssidActivo,
+    this.apPosXPorBssid = const {},
+    this.apPosYPorBssid = const {},
     this.onTapPlano,
+    this.onTapAPInteres,
     required this.onTapAP,
   });
 
@@ -297,23 +310,34 @@ class _HeatmapCanvas extends StatelessWidget {
                       tamanoPlano: tamanoPlano,
                     ),
                   ),
-                  if (apPosX != null && apPosY != null)
-                    Positioned(
-                      left: ((apPosX! / tamanoPlano.width) * w - 22)
+                  ...apsInteres.map((ap) {
+                    final posX = apPosXPorBssid[ap.bssid] ?? ap.posX;
+                    final posY = apPosYPorBssid[ap.bssid] ?? ap.posY;
+                    final activo = ap.bssid == bssidActivo;
+                    return Positioned(
+                      left: ((posX / tamanoPlano.width) * w - 22)
                           .clamp(0, w - 44)
                           .toDouble(),
-                      top: ((apPosY! / tamanoPlano.height) * h - 22)
+                      top: ((posY / tamanoPlano.height) * h - 22)
                           .clamp(0, h - 44)
                           .toDouble(),
                       child: Tooltip(
-                        message: apLabel == null ? 'AP seleccionado' : apLabel!,
+                        message: ap.ssid.isEmpty ? ap.bssid : ap.ssid,
                         child: IconButton.filled(
-                          onPressed: null,
+                          onPressed: onTapAPInteres == null
+                              ? null
+                              : () => onTapAPInteres!(ap),
+                          style: IconButton.styleFrom(
+                            backgroundColor: activo
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.tertiary,
+                          ),
                           icon: const Icon(Icons.router),
                           iconSize: 18,
                         ),
                       ),
-                    ),
+                    );
+                  }),
                   ...aps.map((ap) {
                     final left = (ap.posX / tamanoPlano.width) * w - 22;
                     final top = (ap.posY / tamanoPlano.height) * h - 22;
@@ -342,18 +366,20 @@ class _HeatmapCanvas extends StatelessWidget {
 
 class _SeleccionAPPanel extends StatelessWidget {
   final HeatmapSeleccionAP state;
-  final ValueChanged<APDisponible> onSeleccionar;
+  final ValueChanged<APDisponible> onAlternar;
+  final ValueChanged<APDisponible> onActivar;
   final VoidCallback onGenerar;
 
   const _SeleccionAPPanel({
     required this.state,
-    required this.onSeleccionar,
+    required this.onAlternar,
+    required this.onActivar,
     required this.onGenerar,
   });
 
   @override
   Widget build(BuildContext context) {
-    final ap = state.apSeleccionado;
+    final ap = state.apActivo;
     final theme = Theme.of(context);
     return Material(
       elevation: 8,
@@ -366,14 +392,46 @@ class _SeleccionAPPanel extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'AP de interés',
-                style: theme.textTheme.labelLarge,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'APs de interés (${state.apsSeleccionados.length})',
+                      style: theme.textTheme.labelLarge,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _mostrarSelectorAP(context),
+                    icon: const Icon(Icons.playlist_add_check),
+                    label: const Text('Cambiar'),
+                  ),
+                ],
               ),
               const SizedBox(height: 6),
               _APSeleccionadoTile(
                 ap: ap,
                 onTap: () => _mostrarSelectorAP(context),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 40,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: state.apsSeleccionados.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final item = state.apsSeleccionados[index];
+                    return ChoiceChip(
+                      selected: item.bssid == state.bssidActivo,
+                      label: Text(
+                        item.ssid.isEmpty ? item.bssid : item.ssid,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      avatar: const Icon(Icons.router, size: 16),
+                      onSelected: (_) => onActivar(item),
+                    );
+                  },
+                ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -384,8 +442,8 @@ class _SeleccionAPPanel extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Ubicación AP: x ${state.apPosX.toStringAsFixed(1)} · '
-                'y ${state.apPosY.toStringAsFixed(1)}',
+                'Ubicación AP activo: x ${state.posXDe(ap).toStringAsFixed(1)} · '
+                'y ${state.posYDe(ap).toStringAsFixed(1)}',
                 style: theme.textTheme.bodySmall,
               ),
               const SizedBox(height: 12),
@@ -394,7 +452,7 @@ class _SeleccionAPPanel extends StatelessWidget {
                 child: FilledButton.icon(
                   onPressed: onGenerar,
                   icon: const Icon(Icons.local_fire_department_outlined),
-                  label: const Text('Generar heatmap del AP'),
+                  label: const Text('Generar heatmap'),
                 ),
               ),
             ],
@@ -411,11 +469,9 @@ class _SeleccionAPPanel extends StatelessWidget {
       isScrollControlled: true,
       builder: (ctx) => _SelectorAPSheet(
         aps: state.aps,
-        seleccionado: state.apSeleccionado,
-        onSeleccionar: (ap) {
-          Navigator.of(ctx).pop();
-          onSeleccionar(ap);
-        },
+        bssidsSeleccionados: state.bssidsSeleccionados,
+        bssidActivo: state.bssidActivo,
+        onAlternar: onAlternar,
       ),
     );
   }
@@ -460,13 +516,15 @@ class _APSeleccionadoTile extends StatelessWidget {
 
 class _SelectorAPSheet extends StatelessWidget {
   final List<APDisponible> aps;
-  final APDisponible seleccionado;
-  final ValueChanged<APDisponible> onSeleccionar;
+  final Set<String> bssidsSeleccionados;
+  final String bssidActivo;
+  final ValueChanged<APDisponible> onAlternar;
 
   const _SelectorAPSheet({
     required this.aps,
-    required this.seleccionado,
-    required this.onSeleccionar,
+    required this.bssidsSeleccionados,
+    required this.bssidActivo,
+    required this.onAlternar,
   });
 
   @override
@@ -494,37 +552,71 @@ class _SelectorAPSheet extends StatelessWidget {
                 controller: scrollController,
                 itemCount: aps.length,
                 separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final ap = aps[index];
-                  final activo = ap.bssid == seleccionado.bssid;
-                  return ListTile(
-                    leading: Icon(
-                      activo ? Icons.check_circle : Icons.router_outlined,
-                      color: activo ? theme.colorScheme.primary : null,
-                    ),
-                    title: Text(
-                      ap.ssid.isEmpty ? 'SSID oculto' : ap.ssid,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      _detalleAP(ap),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: Text(
-                      '${ap.rssiPromedio.toStringAsFixed(0)} dBm',
-                      style: theme.textTheme.labelMedium,
-                    ),
-                    selected: activo,
-                    onTap: () => onSeleccionar(ap),
-                  );
-                },
+                itemBuilder: (context, index) => _APSelectorItem(
+                  ap: aps[index],
+                  seleccionado: bssidsSeleccionados.contains(aps[index].bssid),
+                  activo: aps[index].bssid == bssidActivo,
+                  onAlternar: onAlternar,
+                ),
               ),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _APSelectorItem extends StatefulWidget {
+  final APDisponible ap;
+  final bool seleccionado;
+  final bool activo;
+  final ValueChanged<APDisponible> onAlternar;
+
+  const _APSelectorItem({
+    required this.ap,
+    required this.seleccionado,
+    required this.activo,
+    required this.onAlternar,
+  });
+
+  @override
+  State<_APSelectorItem> createState() => _APSelectorItemState();
+}
+
+class _APSelectorItemState extends State<_APSelectorItem> {
+  late bool _seleccionado = widget.seleccionado;
+  late bool _activo = widget.activo;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return CheckboxListTile(
+      value: _seleccionado,
+      secondary: Icon(
+        _activo ? Icons.my_location : Icons.router_outlined,
+        color: _activo ? theme.colorScheme.primary : null,
+      ),
+      title: Text(
+        widget.ap.ssid.isEmpty ? 'SSID oculto' : widget.ap.ssid,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        '${_detalleAP(widget.ap)} · '
+        '${widget.ap.rssiPromedio.toStringAsFixed(0)} dBm',
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      controlAffinity: ListTileControlAffinity.trailing,
+      onChanged: (_) {
+        setState(() {
+          _seleccionado = !_seleccionado;
+          _activo = true;
+        });
+        widget.onAlternar(widget.ap);
+      },
+      selected: _activo,
     );
   }
 }

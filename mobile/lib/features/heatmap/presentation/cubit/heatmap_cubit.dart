@@ -36,9 +36,10 @@ class HeatmapCubit extends Cubit<HeatmapState> {
       final ap = aps.first;
       emit(HeatmapSeleccionAP(
         aps: aps,
-        apSeleccionado: ap,
-        apPosX: ap.posX,
-        apPosY: ap.posY,
+        bssidsSeleccionados: {ap.bssid},
+        bssidActivo: ap.bssid,
+        apPosXPorBssid: {for (final item in aps) item.bssid: item.posX},
+        apPosYPorBssid: {for (final item in aps) item.bssid: item.posY},
       ));
     } on HeatmapApiException catch (e) {
       emit(HeatmapError(e.mensaje));
@@ -47,30 +48,59 @@ class HeatmapCubit extends Cubit<HeatmapState> {
     }
   }
 
-  void seleccionarAP(APDisponible ap) {
+  void alternarAPInteres(APDisponible ap) {
     final actual = state;
     if (actual is HeatmapSeleccionAP) {
+      final seleccionados = {...actual.bssidsSeleccionados};
+      if (seleccionados.contains(ap.bssid)) {
+        if (seleccionados.length == 1) {
+          emit(actual.copyWith(
+            bssidActivo: ap.bssid,
+            mensaje: 'Debe quedar al menos un AP de interés seleccionado.',
+          ));
+          return;
+        }
+        seleccionados.remove(ap.bssid);
+      } else {
+        seleccionados.add(ap.bssid);
+      }
+      final activo =
+          seleccionados.contains(ap.bssid) ? ap.bssid : seleccionados.first;
       emit(actual.copyWith(
-        apSeleccionado: ap,
-        apPosX: ap.posX,
-        apPosY: ap.posY,
+        bssidsSeleccionados: seleccionados,
+        bssidActivo: activo,
+        mensaje: seleccionados.contains(ap.bssid)
+            ? 'AP agregado a los APs de interés.'
+            : 'AP quitado de los APs de interés.',
       ));
     } else if (actual is HeatmapReady) {
       emit(HeatmapSeleccionAP(
         aps: actual.aps,
-        apSeleccionado: ap,
-        apPosX: ap.posX,
-        apPosY: ap.posY,
+        bssidsSeleccionados: actual.bssidsSeleccionados,
+        bssidActivo: ap.bssid,
+        apPosXPorBssid: actual.apPosXPorBssid,
+        apPosYPorBssid: actual.apPosYPorBssid,
       ));
+    }
+  }
+
+  void activarAP(APDisponible ap) {
+    final actual = state;
+    if (actual is HeatmapSeleccionAP) {
+      emit(actual.copyWith(bssidActivo: ap.bssid));
     }
   }
 
   void ubicarAP({required double posX, required double posY}) {
     final actual = state;
     if (actual is HeatmapSeleccionAP) {
+      final posXPorBssid = {...actual.apPosXPorBssid};
+      final posYPorBssid = {...actual.apPosYPorBssid};
+      posXPorBssid[actual.bssidActivo] = posX;
+      posYPorBssid[actual.bssidActivo] = posY;
       emit(actual.copyWith(
-        apPosX: posX,
-        apPosY: posY,
+        apPosXPorBssid: posXPorBssid,
+        apPosYPorBssid: posYPorBssid,
         mensaje: 'Ubicación del AP actualizada.',
       ));
     }
@@ -78,38 +108,43 @@ class HeatmapCubit extends Cubit<HeatmapState> {
 
   Future<void> generar({
     required int planoId,
-    required APDisponible ap,
-    required double apPosX,
-    required double apPosY,
     String algoritmo = 'IDW',
     int resolucion = 128,
   }) async {
-    final aps = switch (state) {
-      HeatmapSeleccionAP(:final aps) => aps,
-      HeatmapReady(:final aps) => aps,
-      _ => <APDisponible>[],
-    };
-    emit(const HeatmapLoading(mensaje: 'Generando heatmap del AP…'));
+    final actual = state;
+    if (actual is! HeatmapSeleccionAP) return;
+    final seleccionados = actual.apsSeleccionados;
+    if (seleccionados.isEmpty) {
+      emit(actual.copyWith(mensaje: 'Selecciona al menos un AP de interés.'));
+      return;
+    }
+    emit(const HeatmapLoading(mensaje: 'Generando heatmap de APs…'));
     try {
       final mapa = await _generarHeatmap(
         planoId: planoId,
         algoritmo: algoritmo,
         resolucion: resolucion,
-        bssid: ap.bssid,
-        apPosX: apPosX,
-        apPosY: apPosY,
+        bssids: seleccionados.map((ap) => ap.bssid).toList(),
+        apPosX: seleccionados.map(actual.posXDe).toList(),
+        apPosY: seleccionados.map(actual.posYDe).toList(),
       );
       emit(HeatmapReady(
         mapa: mapa,
-        aps: aps,
-        apSeleccionado: ap,
+        aps: actual.aps,
+        bssidsSeleccionados: actual.bssidsSeleccionados,
+        bssidActivo: actual.bssidActivo,
+        apPosXPorBssid: actual.apPosXPorBssid,
+        apPosYPorBssid: actual.apPosYPorBssid,
         analizando: true,
       ));
       final analisis = await _analizarMapa(mapa.id);
       emit(HeatmapReady(
         mapa: mapa,
-        aps: aps,
-        apSeleccionado: ap,
+        aps: actual.aps,
+        bssidsSeleccionados: actual.bssidsSeleccionados,
+        bssidActivo: actual.bssidActivo,
+        apPosXPorBssid: actual.apPosXPorBssid,
+        apPosYPorBssid: actual.apPosYPorBssid,
         analisis: analisis,
       ));
     } on HeatmapApiException catch (e) {

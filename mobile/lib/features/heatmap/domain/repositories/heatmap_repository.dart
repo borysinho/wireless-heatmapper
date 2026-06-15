@@ -10,9 +10,9 @@ abstract class HeatmapRepository {
     required int planoId,
     required String algoritmo,
     required int resolucion,
-    required String bssid,
-    required double apPosX,
-    required double apPosY,
+    required List<String> bssids,
+    required List<double> apPosX,
+    required List<double> apPosY,
   });
 
   Future<AnalisisCobertura> analizarMapa(int mapaId);

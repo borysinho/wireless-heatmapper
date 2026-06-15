@@ -37,7 +37,7 @@ class AnalisisCoberturaService:
         mediciones: list[MedicionWifi],
         ancho_px: int,
         alto_px: int,
-        ap_referencia: dict | None = None,
+        aps_referencia: list[dict] | None = None,
     ) -> dict:
         total_celdas = sum(len(fila) for fila in matriz)
         celdas_cobertura = sum(1 for fila in matriz for rssi in fila if rssi >= -70)
@@ -52,6 +52,9 @@ class AnalisisCoberturaService:
             resolucion=len(matriz),
         )
         solapamientos, interferencias = self._calcular_hallazgos_aps(aps)
+        referencias_por_bssid = {
+            ap["bssid"]: ap for ap in aps_referencia or []
+        }
 
         hallazgos = {
             "zonas_muertas": {
@@ -83,22 +86,18 @@ class AnalisisCoberturaService:
                     "frecuencia_mhz": ap.frecuencia_mhz,
                     "rssi_promedio": round(ap.rssi_promedio, 2),
                     "pos_x": round(
-                        ap_referencia["pos_x"]
-                        if ap_referencia
-                        and ap.bssid == ap_referencia["bssid"]
+                        referencias_por_bssid[ap.bssid]["pos_x"]
+                        if ap.bssid in referencias_por_bssid
                         else ap.pos_x,
                         2,
                     ),
                     "pos_y": round(
-                        ap_referencia["pos_y"]
-                        if ap_referencia
-                        and ap.bssid == ap_referencia["bssid"]
+                        referencias_por_bssid[ap.bssid]["pos_y"]
+                        if ap.bssid in referencias_por_bssid
                         else ap.pos_y,
                         2,
                     ),
-                    "confirmado": bool(
-                        ap_referencia and ap.bssid == ap_referencia["bssid"]
-                    ),
+                    "confirmado": ap.bssid in referencias_por_bssid,
                 }
                 for ap in aps
             ],

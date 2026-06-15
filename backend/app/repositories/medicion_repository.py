@@ -192,32 +192,39 @@ class MedicionRepository:
         self,
         *,
         plano_id: int,
-        bssid: str,
+        bssids: list[str],
     ) -> list[PuntoRSSI]:
-        """Agrega cada punto a un RSSI representativo del AP seleccionado."""
-        bssid_norm = bssid.lower()
+        """Agrega cada punto al mejor RSSI de los APs de interés seleccionados."""
+        bssids_norm = {bssid.lower() for bssid in bssids}
         puntos = self.listar_puntos_por_plano(plano_id=plano_id)
         resultado: list[PuntoRSSI] = []
         for punto in puntos:
-            mediciones_ap = [
-                medicion
-                for medicion in punto.mediciones
-                if medicion.bssid == bssid_norm
-            ]
-            if not mediciones_ap:
+            rssi_por_bssid: dict[str, list[int]] = defaultdict(list)
+            for medicion in punto.mediciones:
+                if medicion.bssid in bssids_norm:
+                    rssi_por_bssid[medicion.bssid].append(medicion.rssi)
+            if not rssi_por_bssid:
                 continue
-            rssi_promedio = sum(m.rssi for m in mediciones_ap) / len(mediciones_ap)
+            mejor_rssi = max(
+                sum(valores) / len(valores)
+                for valores in rssi_por_bssid.values()
+            )
             resultado.append(
                 PuntoRSSI(
                     punto_id=punto.id,
                     x=punto.pos_x,
                     y=punto.pos_y,
-                    rssi=float(rssi_promedio),
+                    rssi=float(mejor_rssi),
                 )
             )
         return resultado
 
-    def firma_mediciones_plano(self, *, plano_id: int, bssid: str | None = None) -> str:
+    def firma_mediciones_plano(
+        self,
+        *,
+        plano_id: int,
+        bssids: list[str] | None = None,
+    ) -> str:
         """Firma liviana del estado de mediciones usada para cache del heatmap."""
         query = (
             self._db.query(
@@ -228,8 +235,10 @@ class MedicionRepository:
             .join(PuntoMedicion, MedicionWifi.punto_id == PuntoMedicion.id)
             .filter(PuntoMedicion.plano_id == plano_id)
         )
-        if bssid is not None:
-            query = query.filter(MedicionWifi.bssid == bssid.lower())
+        if bssids is not None:
+            query = query.filter(
+                MedicionWifi.bssid.in_([bssid.lower() for bssid in bssids])
+            )
         conteo, max_punto, max_medicion = query.one()
         return f"{conteo or 0}:{max_punto or 0}:{max_medicion or 0}"
 

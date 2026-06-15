@@ -114,9 +114,9 @@ def test_heatmap_requiere_minimo_cinco_puntos(db_session, tecnico_usuario):
         generar_heatmap(
             plano_id=plano_id,
             request=None,
-            bssid="aa:bb:cc:dd:ee:01",
-            ap_pos_x=100,
-            ap_pos_y=100,
+            bssid=["aa:bb:cc:dd:ee:01"],
+            ap_pos_x=[100],
+            ap_pos_y=[100],
             algoritmo="IDW",
             resolucion=64,
             db=db_session,
@@ -124,7 +124,7 @@ def test_heatmap_requiere_minimo_cinco_puntos(db_session, tecnico_usuario):
         )
 
     assert exc.value.status_code == 422
-    assert "Se requieren al menos 5 puntos del AP seleccionado" in exc.value.detail
+    assert "Se requieren al menos 5 puntos de los APs seleccionados" in exc.value.detail
 
 
 def test_listar_aps_disponibles_para_seleccion(db_session, tecnico_usuario):
@@ -149,9 +149,9 @@ def test_generar_heatmap_retorna_matriz_y_cache(db_session, tecnico_usuario):
     mapa1 = generar_heatmap(
         plano_id=plano_id,
         request=None,
-        bssid="aa:bb:cc:dd:ee:01",
-        ap_pos_x=210,
-        ap_pos_y=140,
+        bssid=["aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"],
+        ap_pos_x=[210, 300],
+        ap_pos_y=[140, 120],
         algoritmo="IDW",
         resolucion=64,
         db=db_session,
@@ -160,9 +160,9 @@ def test_generar_heatmap_retorna_matriz_y_cache(db_session, tecnico_usuario):
     mapa2 = generar_heatmap(
         plano_id=plano_id,
         request=None,
-        bssid="aa:bb:cc:dd:ee:01",
-        ap_pos_x=210,
-        ap_pos_y=140,
+        bssid=["aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"],
+        ap_pos_x=[210, 300],
+        ap_pos_y=[140, 120],
         algoritmo="IDW",
         resolucion=64,
         db=db_session,
@@ -174,6 +174,12 @@ def test_generar_heatmap_retorna_matriz_y_cache(db_session, tecnico_usuario):
     assert mapa1.ssid == "BulldogCorp"
     assert mapa1.ap_pos_x == 210
     assert mapa1.ap_pos_y == 140
+    assert [ap.bssid for ap in mapa1.aps_interes] == [
+        "aa:bb:cc:dd:ee:01",
+        "aa:bb:cc:dd:ee:02",
+    ]
+    assert mapa1.aps_interes[1].pos_x == 300
+    assert mapa1.aps_interes[1].pos_y == 120
     assert mapa1.resolucion == 64
     assert len(mapa1.matriz) == 64
     assert len(mapa1.matriz[0]) == 64
@@ -188,9 +194,9 @@ def test_insertar_punto_invalida_cache_heatmap(db_session, tecnico_usuario):
     mapa1 = generar_heatmap(
         plano_id=plano_id,
         request=None,
-        bssid="aa:bb:cc:dd:ee:01",
-        ap_pos_x=210,
-        ap_pos_y=140,
+        bssid=["aa:bb:cc:dd:ee:01"],
+        ap_pos_x=[210],
+        ap_pos_y=[140],
         algoritmo="IDW",
         resolucion=64,
         db=db_session,
@@ -200,9 +206,9 @@ def test_insertar_punto_invalida_cache_heatmap(db_session, tecnico_usuario):
     mapa2 = generar_heatmap(
         plano_id=plano_id,
         request=None,
-        bssid="aa:bb:cc:dd:ee:01",
-        ap_pos_x=210,
-        ap_pos_y=140,
+        bssid=["aa:bb:cc:dd:ee:01"],
+        ap_pos_x=[210],
+        ap_pos_y=[140],
         algoritmo="IDW",
         resolucion=64,
         db=db_session,
@@ -218,9 +224,9 @@ def test_analisis_detecta_metricas_aps_e_interferencias(db_session, tecnico_usua
     mapa = generar_heatmap(
         plano_id=plano_id,
         request=None,
-        bssid="aa:bb:cc:dd:ee:01",
-        ap_pos_x=210,
-        ap_pos_y=140,
+        bssid=["aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"],
+        ap_pos_x=[210, 300],
+        ap_pos_y=[140, 120],
         algoritmo="IDW",
         resolucion=64,
         db=db_session,
@@ -249,6 +255,12 @@ def test_analisis_detecta_metricas_aps_e_interferencias(db_session, tecnico_usua
     assert ap_principal.confirmado is True
     assert ap_principal.pos_x == 210
     assert ap_principal.pos_y == 140
+    ap_secundario = next(
+        ap for ap in analisis.aps_detectados if ap.bssid == "aa:bb:cc:dd:ee:02"
+    )
+    assert ap_secundario.confirmado is True
+    assert ap_secundario.pos_x == 300
+    assert ap_secundario.pos_y == 120
 
     ap = analisis.aps_detectados[0]
     actualizado = confirmar_ap(
