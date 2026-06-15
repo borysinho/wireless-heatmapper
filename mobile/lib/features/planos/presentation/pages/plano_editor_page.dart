@@ -280,6 +280,24 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
         appBar: AppBar(
           title: Text(_plano.nombre),
           actions: [
+            if (_plano.calibrado && !_modoCalibracion && !_modoRegla)
+              IconButton(
+                tooltip: 'Ver heatmap',
+                icon: const Icon(Icons.local_fire_department_outlined),
+                onPressed: () => context.pushNamed(
+                  'heatmap',
+                  pathParameters: {
+                    'id': _plano.proyectoId.toString(),
+                    'planoId': _plano.id.toString(),
+                  },
+                  extra: {
+                    'planoId': _plano.id,
+                    'imagenUrl': resolverUrlFirmada(_plano.urlFirmada),
+                    'anchoPlanoPx': _plano.anchoPx.toDouble(),
+                    'altoPlanoPx': _plano.altoPx.toDouble(),
+                  },
+                ),
+              ),
             if (_plano.calibrado && !_modoCalibracion)
               IconButton(
                 tooltip: _modoRegla ? 'Cerrar regla' : 'Medir distancia',

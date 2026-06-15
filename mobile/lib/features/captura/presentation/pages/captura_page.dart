@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_tokens.dart';
 import '../../domain/entities/punto_medicion.dart';
@@ -342,6 +343,23 @@ class _CapturaPageState extends State<CapturaPage> {
               ),
             ),
             actions: [
+              IconButton(
+                tooltip: 'Ver heatmap',
+                icon: const Icon(Icons.local_fire_department_outlined),
+                onPressed: () => context.pushNamed(
+                  'heatmap',
+                  pathParameters: {
+                    'id': '0',
+                    'planoId': widget.planoId.toString(),
+                  },
+                  extra: {
+                    'planoId': widget.planoId,
+                    'imagenUrl': widget.imagenUrl,
+                    'anchoPlanoPx': widget.anchoPlanoPx,
+                    'altoPlanoPx': widget.altoPlanoPx,
+                  },
+                ),
+              ),
               // Botón visible únicamente cuando hay un ciclo continuo activo
               if (modoContinuo && _puntoActivoContinuoId != null)
                 IconButton(

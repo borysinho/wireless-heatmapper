@@ -3,10 +3,12 @@
 Sprint 3 — PB-03 (Captura WiFi en línea), PB-04 (Marcar puntos de medición).
 """
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.medicion import MedicionWifi, PuntoMedicion, clasificar_nivel
 from app.schemas.medicion import MedicionItemIn
+from app.services.interpolacion_service import PuntoRSSI
 
 
 class MedicionRepository:
@@ -121,6 +123,52 @@ class MedicionRepository:
             .order_by(PuntoMedicion.created_at.desc())
             .all()
         )
+
+    def listar_mediciones_por_plano(self, *, plano_id: int) -> list[MedicionWifi]:
+        """Retorna mediciones de todos los puntos del plano con el punto cargado."""
+        return (
+            self._db.query(MedicionWifi)
+            .join(PuntoMedicion, MedicionWifi.punto_id == PuntoMedicion.id)
+            .filter(PuntoMedicion.plano_id == plano_id)
+            .order_by(MedicionWifi.bssid.asc(), MedicionWifi.rssi.desc())
+            .all()
+        )
+
+    def listar_puntos_rssi_heatmap(self, *, plano_id: int) -> list[PuntoRSSI]:
+        """Agrega cada punto a un RSSI representativo para la interpolación.
+
+        Sprint 4 usa el peor RSSI observado en cada punto, conforme al diseño
+        de PB-05 y a la clasificación conservadora aplicada desde Sprint 3.
+        """
+        puntos = self.listar_puntos_por_plano(plano_id=plano_id)
+        resultado: list[PuntoRSSI] = []
+        for punto in puntos:
+            if not punto.mediciones:
+                continue
+            peor_rssi = min(m.rssi for m in punto.mediciones)
+            resultado.append(
+                PuntoRSSI(
+                    punto_id=punto.id,
+                    x=punto.pos_x,
+                    y=punto.pos_y,
+                    rssi=float(peor_rssi),
+                )
+            )
+        return resultado
+
+    def firma_mediciones_plano(self, *, plano_id: int) -> str:
+        """Firma liviana del estado de mediciones usada para cache del heatmap."""
+        conteo, max_punto, max_medicion = (
+            self._db.query(
+                func.count(MedicionWifi.id),
+                func.max(PuntoMedicion.id),
+                func.max(MedicionWifi.id),
+            )
+            .join(PuntoMedicion, MedicionWifi.punto_id == PuntoMedicion.id)
+            .filter(PuntoMedicion.plano_id == plano_id)
+            .one()
+        )
+        return f"{conteo or 0}:{max_punto or 0}:{max_medicion or 0}"
 
     def obtener_punto_por_id(self, *, punto_id: int) -> PuntoMedicion | None:
         """Retorna el punto con sus mediciones cargadas (eager via relationship)."""

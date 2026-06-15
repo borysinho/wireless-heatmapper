@@ -6,6 +6,8 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/captura/presentation/cubit/captura_cubit.dart';
 import '../../features/captura/presentation/pages/captura_page.dart';
+import '../../features/heatmap/presentation/cubit/heatmap_cubit.dart';
+import '../../features/heatmap/presentation/pages/heatmap_page.dart';
 import '../../features/planos/domain/entities/plano.dart';
 import '../../features/planos/presentation/cubit/planos_cubit.dart';
 import '../../features/planos/presentation/pages/plano_editor_page.dart';
@@ -136,6 +138,24 @@ class AppRouter {
                       return BlocProvider<CapturaCubit>(
                         create: (_) => sl<CapturaCubit>(),
                         child: CapturaPage(
+                          planoId: extra['planoId'] as int,
+                          imagenUrl: extra['imagenUrl'] as String,
+                          anchoPlanoPx:
+                              (extra['anchoPlanoPx'] as num).toDouble(),
+                          altoPlanoPx: (extra['altoPlanoPx'] as num).toDouble(),
+                        ),
+                      );
+                    },
+                  ),
+                  // Sprint 4: PB-05 / PB-06 — Heatmap y análisis sobre plano.
+                  GoRoute(
+                    path: 'heatmap',
+                    name: 'heatmap',
+                    builder: (context, routeState) {
+                      final extra = routeState.extra as Map<String, dynamic>;
+                      return BlocProvider<HeatmapCubit>(
+                        create: (_) => sl<HeatmapCubit>(),
+                        child: HeatmapPage(
                           planoId: extra['planoId'] as int,
                           imagenUrl: extra['imagenUrl'] as String,
                           anchoPlanoPx:

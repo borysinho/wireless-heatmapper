@@ -42,6 +42,11 @@ import 'features/captura/data/datasources/medicion_remote_datasource.dart';
 import 'features/captura/data/repositories/captura_repository_impl.dart';
 import 'features/captura/domain/repositories/captura_repository.dart';
 import 'features/captura/presentation/cubit/captura_cubit.dart';
+import 'features/heatmap/data/datasources/heatmap_remote_datasource.dart';
+import 'features/heatmap/data/repositories/heatmap_repository_impl.dart';
+import 'features/heatmap/domain/repositories/heatmap_repository.dart';
+import 'features/heatmap/domain/usecases/heatmap_usecases.dart';
+import 'features/heatmap/presentation/cubit/heatmap_cubit.dart';
 import 'features/planos/data/repositories/plano_repository_impl.dart';
 import 'features/planos/domain/repositories/plano_repository.dart';
 import 'features/planos/domain/usecases/plano_usecases.dart';
@@ -192,6 +197,30 @@ void _initDependencias() {
       scanner: sl<WifiScanner>(),
       throttling: sl<ThrottlingManager>(),
       connectivity: sl<ConnectivityMonitor>(),
+    ),
+  );
+
+  // Sprint 4 — PB-05 / PB-06: Heatmap y análisis de cobertura ──────────────
+  sl.registerLazySingleton<HeatmapRemoteDatasource>(
+    () => HeatmapRemoteDatasource(sl<Dio>()),
+  );
+  sl.registerLazySingleton<HeatmapRepository>(
+    () => HeatmapRepositoryImpl(sl<HeatmapRemoteDatasource>()),
+  );
+  sl.registerFactory<GenerarHeatmapUseCase>(
+    () => GenerarHeatmapUseCase(sl<HeatmapRepository>()),
+  );
+  sl.registerFactory<AnalizarMapaUseCase>(
+    () => AnalizarMapaUseCase(sl<HeatmapRepository>()),
+  );
+  sl.registerFactory<ConfirmarAPUseCase>(
+    () => ConfirmarAPUseCase(sl<HeatmapRepository>()),
+  );
+  sl.registerFactory<HeatmapCubit>(
+    () => HeatmapCubit(
+      generarHeatmap: sl<GenerarHeatmapUseCase>(),
+      analizarMapa: sl<AnalizarMapaUseCase>(),
+      confirmarAP: sl<ConfirmarAPUseCase>(),
     ),
   );
 }
