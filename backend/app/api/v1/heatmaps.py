@@ -170,6 +170,16 @@ def _resolver_aps_interes(
                 "La cantidad de coordenadas Y no coincide con los APs seleccionados."
             ),
         )
+    if ap_pos_x is not None and any(pos < 0 for pos in ap_pos_x):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Las coordenadas X de los APs de interés no pueden ser negativas.",
+        )
+    if ap_pos_y is not None and any(pos < 0 for pos in ap_pos_y):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Las coordenadas Y de los APs de interés no pueden ser negativas.",
+        )
 
     por_bssid = {ap["bssid"]: ap for ap in aps}
     faltantes = [bssid for bssid in bssids if bssid not in por_bssid]
@@ -253,12 +263,10 @@ def generar_heatmap(
     bssid: list[str] = Query(..., description="BSSID de cada AP de interés"),
     ap_pos_x: list[float] | None = Query(
         default=None,
-        ge=0,
         description="Ubicación X confirmada de cada AP sobre el plano",
     ),
     ap_pos_y: list[float] | None = Query(
         default=None,
-        ge=0,
         description="Ubicación Y confirmada de cada AP sobre el plano",
     ),
     algoritmo: str = Query(default="IDW", pattern="^(IDW|KRIGING|idw|kriging)$"),

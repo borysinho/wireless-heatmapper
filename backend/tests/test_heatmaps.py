@@ -7,6 +7,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.api.v1.heatmaps import (
+    _resolver_aps_interes,
     analizar_mapa,
     confirmar_ap,
     generar_heatmap,
@@ -185,6 +186,32 @@ def test_generar_heatmap_retorna_matriz_y_cache(db_session, tecnico_usuario):
     assert len(mapa1.matriz[0]) == 64
     assert mapa1.url_imagen.startswith("/mapas/archivo/")
     assert mapa1.cantidad_puntos == 5
+
+
+def test_resolver_aps_interes_rechaza_coordenadas_negativas():
+    aps = [
+        {
+            "bssid": "aa:bb:cc:dd:ee:01",
+            "ssid": "BulldogCorp",
+            "canal": 6,
+            "frecuencia_mhz": 2437,
+            "rssi_promedio": -60,
+            "pos_x": 10,
+            "pos_y": 20,
+            "cantidad_puntos": 5,
+        }
+    ]
+
+    with pytest.raises(HTTPException) as exc:
+        _resolver_aps_interes(
+            aps=aps,
+            bssids=["aa:bb:cc:dd:ee:01"],
+            ap_pos_x=[-1],
+            ap_pos_y=[20],
+        )
+
+    assert exc.value.status_code == 422
+    assert "no pueden ser negativas" in exc.value.detail
 
 
 def test_insertar_punto_invalida_cache_heatmap(db_session, tecnico_usuario):
