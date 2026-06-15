@@ -186,6 +186,9 @@ def test_generar_heatmap_retorna_matriz_y_cache(db_session, tecnico_usuario):
     assert len(mapa1.matriz[0]) == 64
     assert mapa1.url_imagen.startswith("/mapas/archivo/")
     assert mapa1.cantidad_puntos == 5
+    fila_ap = int((140 / 300) * 64)
+    col_ap = int((210 / 400) * 64)
+    assert mapa1.matriz[fila_ap][col_ap] >= -55
 
 
 def test_resolver_aps_interes_rechaza_coordenadas_negativas():
@@ -274,8 +277,12 @@ def test_analisis_detecta_metricas_aps_e_interferencias(db_session, tecnico_usua
         item["tipo"]
         for item in analisis.hallazgos["interferencias_canal"]
     }
-    assert {"CCI", "ACI"}.issubset(tipos)
-    assert len(analisis.aps_detectados) == 3
+    assert "CCI" in tipos
+    assert len(analisis.aps_detectados) == 2
+    assert {
+        ap.bssid
+        for ap in analisis.aps_detectados
+    } == {"aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"}
     ap_principal = next(
         ap for ap in analisis.aps_detectados if ap.bssid == "aa:bb:cc:dd:ee:01"
     )

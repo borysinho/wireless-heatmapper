@@ -155,7 +155,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
                       planoUrl: widget.imagenUrl,
                       heatmapUrl: resolverUrlFirmada(listo!.mapa.urlImagen),
                       tamanoPlano: _tamanoPlano,
-                      aps: listo.analisis?.apsDetectados ?? const [],
+                      aps: const [],
                       apsInteres: listo.mapa.apsInteres,
                       bssidActivo: listo.bssidActivo,
                       apPosXPorBssid: {
@@ -173,6 +173,9 @@ class _HeatmapPageState extends State<HeatmapPage> {
                     analisis: listo.analisis,
                     analizando: listo.analizando,
                     escala: listo.mapa.escala,
+                    bssidsPermitidos: {
+                      for (final ap in listo.mapa.apsInteres) ap.bssid,
+                    },
                     onRefreshAnalisis: () =>
                         context.read<HeatmapCubit>().regenerarAnalisis(),
                     onTapAP: _mostrarDetalleAP,
@@ -267,7 +270,9 @@ class _HeatmapCanvas extends StatefulWidget {
 }
 
 class _HeatmapCanvasState extends State<_HeatmapCanvas> {
-  static const double _hitRadioPx = 28.0;
+  static const double _hitRadioPx = 24.0;
+  static const double _apMarkerSize = 35.0;
+  static const double _apMarkerHalf = _apMarkerSize / 2;
 
   Offset? _ultimoTapDown;
   String? _bssidArrastrado;
@@ -339,11 +344,13 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
                       final posY = widget.apPosYPorBssid[ap.bssid] ?? ap.posY;
                       final activo = ap.bssid == widget.bssidActivo ||
                           ap.bssid == _bssidArrastrado;
-                      final left = ((posX / widget.tamanoPlano.width) * w - 22)
-                          .clamp(0, w - 44)
+                      final left = ((posX / widget.tamanoPlano.width) * w -
+                              _apMarkerHalf)
+                          .clamp(0, w - _apMarkerSize)
                           .toDouble();
-                      final top = ((posY / widget.tamanoPlano.height) * h - 22)
-                          .clamp(0, h - 44)
+                      final top = ((posY / widget.tamanoPlano.height) * h -
+                              _apMarkerHalf)
+                          .clamp(0, h - _apMarkerSize)
                           .toDouble();
                       return Positioned(
                         left: left,
@@ -468,26 +475,32 @@ class _APInteresMarker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color =
-        activo ? theme.colorScheme.primary : theme.colorScheme.tertiary;
+    final color = theme.colorScheme.surfaceContainerHighest;
+    final borde = activo
+        ? Border.all(color: Colors.amberAccent, width: 4)
+        : Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.55),
+            width: 1.5,
+          );
     return Tooltip(
       message: ap.ssid.isEmpty ? ap.bssid : ap.ssid,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
+          border: borde,
           boxShadow: const [
             BoxShadow(
-              blurRadius: 8,
+              blurRadius: 6,
               offset: Offset(0, 2),
               color: Color(0x33000000),
             ),
           ],
         ),
         child: const SizedBox(
-          width: 44,
-          height: 44,
-          child: Icon(Icons.router, color: Colors.white, size: 20),
+          width: 35,
+          height: 35,
+          child: Icon(Icons.router, color: Colors.white, size: 16),
         ),
       ),
     );
@@ -790,6 +803,7 @@ class _AnalisisPanel extends StatelessWidget {
   final AnalisisCobertura? analisis;
   final bool analizando;
   final List<EscalaHeatmap> escala;
+  final Set<String> bssidsPermitidos;
   final VoidCallback onRefreshAnalisis;
   final void Function(APDetectado ap) onTapAP;
 
@@ -797,6 +811,7 @@ class _AnalisisPanel extends StatelessWidget {
     required this.analisis,
     required this.analizando,
     required this.escala,
+    required this.bssidsPermitidos,
     required this.onRefreshAnalisis,
     required this.onTapAP,
   });
@@ -804,6 +819,11 @@ class _AnalisisPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final a = analisis;
+    final apsVisibles = a == null
+        ? <APDetectado>[]
+        : a.apsDetectados
+            .where((ap) => bssidsPermitidos.contains(ap.bssid))
+            .toList();
     return Material(
       elevation: 8,
       color: Theme.of(context).colorScheme.surface,
@@ -877,10 +897,10 @@ class _AnalisisPanel extends StatelessWidget {
                   height: 72,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    itemCount: a.apsDetectados.length,
+                    itemCount: apsVisibles.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 8),
                     itemBuilder: (context, index) {
-                      final ap = a.apsDetectados[index];
+                      final ap = apsVisibles[index];
                       return ActionChip(
                         avatar: Icon(
                           ap.confirmado ? Icons.verified : Icons.router,

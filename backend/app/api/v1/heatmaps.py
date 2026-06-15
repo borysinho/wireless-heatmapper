@@ -36,6 +36,7 @@ from app.services.interpolacion_service import (
     ESCALA_CWNA,
     HeatmapImageService,
     InterpolacionService,
+    PuntoRSSI,
 )
 from app.storage import LocalFilesystemStorage, generar_url_firmada, verificar_firma
 
@@ -211,6 +212,7 @@ def _resolver_aps_interes(
 
 def _firma_aps_interes(*, firma_base: str, aps_interes: list[dict]) -> str:
     payload = {
+        "modelo": "aps-interes-anclas-v2",
         "firma_base": firma_base,
         "aps": [
             {
@@ -223,6 +225,29 @@ def _firma_aps_interes(*, firma_base: str, aps_interes: list[dict]) -> str:
     }
     serializado = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return f"aps:{hashlib.sha256(serializado.encode()).hexdigest()}"
+
+
+def _agregar_anclas_aps(
+    *,
+    puntos: list[PuntoRSSI],
+    aps_interes: list[dict],
+    rssi_maximos: dict[str, float],
+) -> list[PuntoRSSI]:
+    puntos_interpolacion = list(puntos)
+    for idx, ap in enumerate(aps_interes):
+        rssi_observado = rssi_maximos.get(
+            ap["bssid"],
+            float(ap["rssi_promedio"]),
+        )
+        puntos_interpolacion.append(
+            PuntoRSSI(
+                punto_id=-(idx + 1),
+                x=float(ap["pos_x"]),
+                y=float(ap["pos_y"]),
+                rssi=max(rssi_observado, -50.0),
+            )
+        )
+    return puntos_interpolacion
 
 
 @router_planos_heatmap.get(
@@ -330,8 +355,17 @@ def generar_heatmap(
         return _mapa_out(cache, request)
 
     ap_principal = aps_interes[0]
-    matriz = InterpolacionService().interpolar(
+    rssi_maximos = med_repo.rssi_maximo_por_bssid(
+        plano_id=plano_id,
+        bssids=bssids_norm,
+    )
+    puntos_interpolacion = _agregar_anclas_aps(
         puntos=puntos,
+        aps_interes=aps_interes,
+        rssi_maximos=rssi_maximos,
+    )
+    matriz = InterpolacionService().interpolar(
+        puntos=puntos_interpolacion,
         ancho_px=plano.ancho_px,
         alto_px=plano.alto_px,
         resolucion=resolucion,
@@ -357,8 +391,8 @@ def generar_heatmap(
         escala=ESCALA_CWNA,
         ruta_imagen=ruta,
         cantidad_puntos=len(puntos),
-        rssi_min=min(p.rssi for p in puntos),
-        rssi_max=max(p.rssi for p in puntos),
+        rssi_min=min(p.rssi for p in puntos_interpolacion),
+        rssi_max=max(p.rssi for p in puntos_interpolacion),
         firma_mediciones=firma,
     )
     return _mapa_out(mapa, request)
@@ -381,22 +415,27 @@ def analizar_mapa(
         db=db,
     )
     plano = mapa.plano
-    mediciones = MedicionRepository(db).listar_mediciones_por_plano(
-        plano_id=mapa.plano_id,
-    )
+    aps_referencia = mapa.aps_interes or [
+        {
+            "bssid": mapa.bssid,
+            "pos_x": mapa.ap_pos_x,
+            "pos_y": mapa.ap_pos_y,
+        }
+    ]
+    bssids_interes = {ap["bssid"] for ap in aps_referencia}
+    mediciones = [
+        medicion
+        for medicion in MedicionRepository(db).listar_mediciones_por_plano(
+            plano_id=mapa.plano_id,
+        )
+        if medicion.bssid in bssids_interes
+    ]
     datos = AnalisisCoberturaService().analizar(
         matriz=mapa.matriz,
         mediciones=mediciones,
         ancho_px=plano.ancho_px,
         alto_px=plano.alto_px,
-        aps_referencia=mapa.aps_interes
-        or [
-            {
-                "bssid": mapa.bssid,
-                "pos_x": mapa.ap_pos_x,
-                "pos_y": mapa.ap_pos_y,
-            }
-        ],
+        aps_referencia=aps_referencia,
     )
     analisis = AnalisisCoberturaRepository(db).reemplazar(
         mapa=mapa,

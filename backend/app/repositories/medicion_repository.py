@@ -219,6 +219,23 @@ class MedicionRepository:
             )
         return resultado
 
+    def rssi_maximo_por_bssid(
+        self,
+        *,
+        plano_id: int,
+        bssids: list[str],
+    ) -> dict[str, float]:
+        """Retorna el RSSI máximo observado para cada AP de interés."""
+        filas = (
+            self._db.query(MedicionWifi.bssid, func.max(MedicionWifi.rssi))
+            .join(PuntoMedicion, MedicionWifi.punto_id == PuntoMedicion.id)
+            .filter(PuntoMedicion.plano_id == plano_id)
+            .filter(MedicionWifi.bssid.in_([bssid.lower() for bssid in bssids]))
+            .group_by(MedicionWifi.bssid)
+            .all()
+        )
+        return {bssid: float(rssi) for bssid, rssi in filas if rssi is not None}
+
     def firma_mediciones_plano(
         self,
         *,
