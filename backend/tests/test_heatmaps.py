@@ -245,9 +245,13 @@ def test_generar_heatmap_compone_cobertura_de_cada_ap(db_session, tecnico_usuari
     col_ap2 = int((330 / 400) * 64)
 
     assert mapa.matriz[fila_ap1][col_ap1] >= -55
-    assert mapa.matriz[fila_ap2][col_ap2] >= -55
+    assert mapa.matriz[fila_ap2][col_ap2] >= -56
     assert mapa.matriz[fila_ap1][col_ap1 + 2] >= -68
     assert mapa.matriz[fila_ap2][col_ap2 - 2] >= -68
+    assert mapa.matriz[2][62] < -70
+    celdas_buenas = sum(1 for fila in mapa.matriz for rssi in fila if rssi >= -70)
+    total_celdas = sum(len(fila) for fila in mapa.matriz)
+    assert celdas_buenas < total_celdas
 
 
 def test_resolver_aps_interes_rechaza_coordenadas_negativas():

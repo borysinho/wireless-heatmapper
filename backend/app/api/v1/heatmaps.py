@@ -213,7 +213,7 @@ def _resolver_aps_interes(
 
 def _firma_aps_interes(*, firma_base: str, aps_interes: list[dict]) -> str:
     payload = {
-        "modelo": "aps-interes-compuesto-v3",
+        "modelo": "aps-interes-compuesto-caida-v4",
         "firma_base": firma_base,
         "aps": [
             {
@@ -262,11 +262,10 @@ def _agregar_anclas_foco_ap(
     escala_m_por_px: float | None,
 ) -> list[PuntoRSSI]:
     puntos_interpolacion = list(puntos)
-    rssi_observado = rssi_maximos.get(
-        ap["bssid"],
-        float(ap["rssi_promedio"]),
+    rssi_centro = _rssi_centro_ap(
+        ap=ap,
+        rssi_maximos=rssi_maximos,
     )
-    rssi_centro = max(rssi_observado, -50.0)
     pos_x = float(ap["pos_x"])
     pos_y = float(ap["pos_y"])
     puntos_interpolacion.append(
@@ -297,6 +296,14 @@ def _agregar_anclas_foco_ap(
     return puntos_interpolacion
 
 
+def _rssi_centro_ap(*, ap: dict, rssi_maximos: dict[str, float]) -> float:
+    rssi_observado = rssi_maximos.get(
+        ap["bssid"],
+        float(ap["rssi_promedio"]),
+    )
+    return max(rssi_observado, -55.0)
+
+
 def _radio_foco_ap_px(
     *,
     ancho_px: int,
@@ -309,6 +316,36 @@ def _radio_foco_ap_px(
     else:
         radio_px = dimension_menor * 0.06
     return min(max(radio_px, 10.0), dimension_menor * 0.12)
+
+
+def _aplicar_caida_espacial_ap(
+    *,
+    matriz: list[list[float]],
+    ap: dict,
+    rssi_centro: float,
+    ancho_px: int,
+    alto_px: int,
+    escala_m_por_px: float | None,
+) -> list[list[float]]:
+    escala = escala_m_por_px if escala_m_por_px and escala_m_por_px > 0 else None
+    metros_por_px = escala or (8.0 / max(1, min(ancho_px, alto_px)))
+    filas = len(matriz)
+    columnas = len(matriz[0]) if filas else 0
+    pos_x = float(ap["pos_x"])
+    pos_y = float(ap["pos_y"])
+    resultado: list[list[float]] = []
+    for fila, valores in enumerate(matriz):
+        y = ((fila + 0.5) / filas) * alto_px
+        fila_ajustada: list[float] = []
+        for columna, rssi_idw in enumerate(valores):
+            x = ((columna + 0.5) / columnas) * ancho_px
+            distancia_m = math.hypot(x - pos_x, y - pos_y) * metros_por_px
+            rssi_maximo_espacial = rssi_centro - (8.0 * math.log2(1 + distancia_m))
+            fila_ajustada.append(
+                round(max(-120.0, min(rssi_idw, rssi_maximo_espacial)), 2)
+            )
+        resultado.append(fila_ajustada)
+    return resultado
 
 
 def _combinar_matrices_mejor_senal(
@@ -456,13 +493,24 @@ def generar_heatmap(
             escala_m_por_px=plano.escala_m_por_px,
         )
         puntos_interpolacion_total.extend(puntos_interpolacion_ap)
+        matriz_ap = interpolador.interpolar(
+            puntos=puntos_interpolacion_ap,
+            ancho_px=plano.ancho_px,
+            alto_px=plano.alto_px,
+            resolucion=resolucion,
+            algoritmo=algoritmo_norm,
+        )
         matrices_ap.append(
-            interpolador.interpolar(
-                puntos=puntos_interpolacion_ap,
+            _aplicar_caida_espacial_ap(
+                matriz=matriz_ap,
+                ap=ap,
+                rssi_centro=_rssi_centro_ap(
+                    ap=ap,
+                    rssi_maximos=rssi_maximos,
+                ),
                 ancho_px=plano.ancho_px,
                 alto_px=plano.alto_px,
-                resolucion=resolucion,
-                algoritmo=algoritmo_norm,
+                escala_m_por_px=plano.escala_m_por_px,
             )
         )
     matriz = _combinar_matrices_mejor_senal(matrices_ap)
