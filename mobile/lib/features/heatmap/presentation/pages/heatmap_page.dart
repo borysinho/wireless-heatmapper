@@ -270,6 +270,7 @@ class _HeatmapCanvas extends StatelessWidget {
       maxScale: 5,
       child: LayoutBuilder(
         builder: (context, constraints) {
+          final stackKey = GlobalKey();
           final aspect = tamanoPlano.width / tamanoPlano.height;
           double w = constraints.maxWidth;
           double h = w / aspect;
@@ -279,6 +280,7 @@ class _HeatmapCanvas extends StatelessWidget {
           }
           return Center(
             child: SizedBox(
+              key: stackKey,
               width: w,
               height: h,
               child: Stack(
@@ -340,13 +342,18 @@ class _HeatmapCanvas extends StatelessWidget {
                             : () => onTapAPInteres!(ap),
                         onDragPlano: onMoverAPInteres == null
                             ? null
-                            : (delta) {
+                            : (globalPosition) {
+                                final renderBox =
+                                    stackKey.currentContext?.findRenderObject();
+                                if (renderBox is! RenderBox) return;
+                                final local =
+                                    renderBox.globalToLocal(globalPosition);
                                 final nuevoX =
-                                    (posX + (delta.dx / w) * tamanoPlano.width)
+                                    ((local.dx / w) * tamanoPlano.width)
                                         .clamp(0.0, tamanoPlano.width)
                                         .toDouble();
                                 final nuevoY =
-                                    (posY + (delta.dy / h) * tamanoPlano.height)
+                                    ((local.dy / h) * tamanoPlano.height)
                                         .clamp(0.0, tamanoPlano.height)
                                         .toDouble();
                                 onMoverAPInteres!(ap, Offset(nuevoX, nuevoY));
@@ -406,7 +413,7 @@ class _APInteresMarker extends StatelessWidget {
         onPanStart: (_) => onTap?.call(),
         onPanUpdate: onDragPlano == null
             ? null
-            : (details) => onDragPlano!(details.delta),
+            : (details) => onDragPlano!(details.globalPosition),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: color,
