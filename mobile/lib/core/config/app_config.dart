@@ -1,13 +1,13 @@
 /// Configuración central de la app móvil.
 ///
-/// Para producción o cambios de entorno, modificar el valor inyectado con
-/// `--dart-define=API_BASE_URL=...` o el archivo `dart-defines/default.json`.
+/// La URL base se inyecta en tiempo de compilación con
+/// `--dart-define-from-file=dart-defines/<perfil>.json`.
 class AppConfig {
   AppConfig._();
 
   /// Punto único de acceso al backend REST.
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://10.29.23.250/api',
+    defaultValue: 'http://10.0.2.2/api',
   );
 }

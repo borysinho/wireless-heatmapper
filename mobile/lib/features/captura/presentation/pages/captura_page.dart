@@ -460,13 +460,6 @@ class _CapturaPageState extends State<CapturaPage> {
                     ),
                   ),
                 ),
-
-              // ── Leyenda ───────────────────────────────────────────────────
-              const Positioned(
-                bottom: AppSpacing.lg,
-                right: AppSpacing.md,
-                child: _Leyenda(),
-              ),
             ],
           ),
         );
@@ -661,59 +654,4 @@ class _BarraChip extends StatelessWidget {
           Text(label, style: style),
         ],
       );
-}
-
-// ── Leyenda de niveles de señal ───────────────────────────────────────────────
-
-class _Leyenda extends StatelessWidget {
-  const _Leyenda();
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.sm),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            _LeyendaItem(color: Color(0xFF27AE60), label: '≥ −70 dBm'),
-            _LeyendaItem(color: Color(0xFFF1C40F), label: '−70..−80 dBm'),
-            _LeyendaItem(color: Color(0xFFE67E22), label: '−80..−85 dBm'),
-            _LeyendaItem(color: Color(0xFFE74C3C), label: '−85..−90 dBm'),
-            _LeyendaItem(color: Color(0xFF1C1C1C), label: '< −90 dBm'),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LeyendaItem extends StatelessWidget {
-  final Color color;
-  final String label;
-  const _LeyendaItem({required this.color, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 1),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          Text(label, style: Theme.of(context).textTheme.labelSmall),
-        ],
-      ),
-    );
-  }
 }

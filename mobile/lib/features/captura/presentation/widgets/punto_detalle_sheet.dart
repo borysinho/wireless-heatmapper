@@ -13,7 +13,6 @@ import '../cubit/captura_state.dart';
 ///
 /// Muestra:
 ///   - Posición del punto (píxeles del plano).
-///   - Nivel de señal agregado.
 ///   - Lista de mediciones WiFi ordenadas por RSSI (mayor primero).
 ///   - Botón de eliminar con diálogo de confirmación.
 class PuntoDetalleSheet extends StatelessWidget {
@@ -66,8 +65,6 @@ class PuntoDetalleSheet extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      _NivelBadge(nivel: puntoDisplay.nivel),
-                      const SizedBox(width: AppSpacing.sm),
                       Expanded(
                         child: Text(
                           'Punto #${puntoDisplay.id} — (${puntoDisplay.posX.toStringAsFixed(0)}, ${puntoDisplay.posY.toStringAsFixed(0)} px)',

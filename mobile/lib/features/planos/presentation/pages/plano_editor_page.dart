@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../captura/domain/entities/punto_medicion.dart';
+import '../../../captura/presentation/cubit/captura_cubit.dart';
+import '../../../captura/presentation/cubit/captura_state.dart';
+import '../../../captura/presentation/widgets/plano_puntos_painter.dart';
 import '../../domain/entities/plano.dart';
 import '../cubit/planos_cubit.dart';
 import '../cubit/planos_state.dart';
@@ -28,6 +32,8 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
   Offset? _puntoB;
 
   /// Punto que se está arrastrando actualmente ('A', 'B' o null).
+  /// El arrastre se inicia con pulsación larga para no bloquear el pan/zoom
+  /// del plano mientras se calibra o mide.
   String? _puntoArrastrado;
 
   /// Posición del último onTapDown; usada por onTap para colocar un punto.
@@ -77,6 +83,9 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
     if (_plano.calibrado) {
       _puntoA = Offset(_plano.calibracionX1!, _plano.calibracionY1!);
       _puntoB = Offset(_plano.calibracionX2!, _plano.calibracionY2!);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _cargarPuntosSiCalibrado();
+      });
     }
   }
 
@@ -100,6 +109,11 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
     final factorX = _renderSize.width / _plano.anchoPx;
     final factorY = _renderSize.height / _plano.altoPx;
     return Offset(puntoImagen.dx * factorX, puntoImagen.dy * factorY);
+  }
+
+  void _cargarPuntosSiCalibrado() {
+    if (!mounted || !_plano.calibrado) return;
+    context.read<CapturaCubit>().iniciarSesion(_plano.id);
   }
 
   /// Devuelve true si [localPos] (coords del GestureDetector) está dentro del
@@ -144,8 +158,8 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
     }
   }
 
-  /// Inicia el arrastre si el gesto comienza sobre un punto existente.
-  void _onPanStart(DragStartDetails details) {
+  /// Inicia el arrastre si la pulsación larga comienza sobre un punto existente.
+  void _onLongPressStart(LongPressStartDetails details) {
     final pos = details.localPosition;
     if (_modoCalibracion) {
       if (_tocaPunto(pos, _puntoA)) {
@@ -163,7 +177,7 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
   }
 
   /// Mueve el punto seleccionado siguiendo el dedo.
-  void _onPanUpdate(DragUpdateDetails details) {
+  void _onLongPressMoveUpdate(LongPressMoveUpdateDetails details) {
     final puntoImagen = _tapAImagen(details.localPosition);
     if (_modoCalibracion && _puntoArrastrado != null) {
       setState(() {
@@ -185,7 +199,7 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
   }
 
   /// Suelta el punto arrastrado.
-  void _onPanEnd(DragEndDetails details) {
+  void _onLongPressEnd(LongPressEndDetails details) {
     if (_puntoArrastrado != null) {
       setState(() => _puntoArrastrado = null);
     }
@@ -274,6 +288,7 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
             _puntoA = Offset(_plano.calibracionX1!, _plano.calibracionY1!);
             _puntoB = Offset(_plano.calibracionX2!, _plano.calibracionY2!);
           });
+          _cargarPuntosSiCalibrado();
         }
       },
       child: Scaffold(
@@ -363,20 +378,23 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
                       height: h,
                       child: InteractiveViewer(
                         transformationController: _transformController,
-                        panEnabled: !_modoCalibracion && !_modoRegla,
-                        scaleEnabled: !_modoCalibracion && !_modoRegla,
+                        panEnabled: true,
+                        scaleEnabled: true,
+                        minScale: 0.5,
+                        maxScale: 5,
                         child: GestureDetector(
                           onTapDown: _onTapDown,
                           onTap:
                               (_modoCalibracion || _modoRegla) ? _onTap : null,
-                          onPanStart: (_modoCalibracion || _modoRegla)
-                              ? _onPanStart
+                          onLongPressStart: (_modoCalibracion || _modoRegla)
+                              ? _onLongPressStart
                               : null,
-                          onPanUpdate: (_modoCalibracion || _modoRegla)
-                              ? _onPanUpdate
-                              : null,
-                          onPanEnd: (_modoCalibracion || _modoRegla)
-                              ? _onPanEnd
+                          onLongPressMoveUpdate:
+                              (_modoCalibracion || _modoRegla)
+                                  ? _onLongPressMoveUpdate
+                                  : null,
+                          onLongPressEnd: (_modoCalibracion || _modoRegla)
+                              ? _onLongPressEnd
                               : null,
                           child: Stack(
                             fit: StackFit.expand,
@@ -395,6 +413,34 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
                                   ),
                                 ),
                               ),
+                              if (_plano.calibrado)
+                                BlocBuilder<CapturaCubit, CapturaState>(
+                                  builder: (context, capturaState) {
+                                    final puntos = switch (capturaState) {
+                                      CapturaActiva(:final puntos) => puntos,
+                                      CapturaEnviando(:final puntos) => puntos,
+                                      CapturaThrottling(:final puntos) =>
+                                        puntos,
+                                      CapturaPausada(:final puntos) => puntos,
+                                      CapturaPuntoDetalle(:final puntos) =>
+                                        puntos,
+                                      CapturaError(:final puntos) => puntos,
+                                      _ => const <PuntoMedicion>[],
+                                    };
+                                    if (puntos.isEmpty) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    return CustomPaint(
+                                      painter: PlanoPuntosPainter(
+                                        puntos: puntos,
+                                        tamanoPlano: Size(
+                                          _plano.anchoPx.toDouble(),
+                                          _plano.altoPx.toDouble(),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
                               if (_puntoA != null || _puntoB != null)
                                 CustomPaint(
                                   painter: _CalibracionPainter(
@@ -441,19 +487,22 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
               )
             : (_plano.calibrado
                 ? FloatingActionButton.extended(
-                    onPressed: () => context.pushNamed(
-                      'captura',
-                      pathParameters: {
-                        'id': _plano.proyectoId.toString(),
-                        'planoId': _plano.id.toString(),
-                      },
-                      extra: {
-                        'planoId': _plano.id,
-                        'imagenUrl': resolverUrlFirmada(_plano.urlFirmada),
-                        'anchoPlanoPx': _plano.anchoPx.toDouble(),
-                        'altoPlanoPx': _plano.altoPx.toDouble(),
-                      },
-                    ),
+                    onPressed: () async {
+                      await context.pushNamed(
+                        'captura',
+                        pathParameters: {
+                          'id': _plano.proyectoId.toString(),
+                          'planoId': _plano.id.toString(),
+                        },
+                        extra: {
+                          'planoId': _plano.id,
+                          'imagenUrl': resolverUrlFirmada(_plano.urlFirmada),
+                          'anchoPlanoPx': _plano.anchoPx.toDouble(),
+                          'altoPlanoPx': _plano.altoPx.toDouble(),
+                        },
+                      );
+                      _cargarPuntosSiCalibrado();
+                    },
                     icon: const Icon(Icons.wifi_find),
                     label: const Text('Iniciar captura'),
                   )

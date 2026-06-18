@@ -123,8 +123,13 @@ class AppRouter {
                   final extra = routeState.extra as Map<String, dynamic>;
                   final cubit = extra['cubit'] as PlanosCubit;
                   final plano = extra['plano'] as Plano;
-                  return BlocProvider<PlanosCubit>.value(
-                    value: cubit,
+                  return MultiBlocProvider(
+                    providers: [
+                      BlocProvider<PlanosCubit>.value(value: cubit),
+                      BlocProvider<CapturaCubit>(
+                        create: (_) => sl<CapturaCubit>(),
+                      ),
+                    ],
                     child: PlanoEditorPage(plano: plano),
                   );
                 },

@@ -21,11 +21,18 @@ flutter analyze
 # Ejecutar pruebas unitarias
 flutter test
 
-# Ejecutar en desarrollo (usa dart-defines/default.json)
-flutter run --dart-define-from-file=dart-defines/default.json
+# Debug en emulador Android (backend local vía 10.0.2.2)
+flutter run --dart-define-from-file=dart-defines/debug-emulador.json
 
-# Ejecutar con URL personalizada
-flutter run --dart-define=API_BASE_URL=http://<IP_LOCAL>/api
+# Debug en dispositivo físico por cable (backend local vía adb reverse)
+adb reverse tcp:8080 tcp:80
+flutter run --dart-define-from-file=dart-defines/debug-dispositivo-fisico.json
+
+# Debug apuntando a una IP específica de la red
+flutter run --dart-define-from-file=dart-defines/debug-ip.json
+
+# Build release (usa la URL de dart-defines/release.json)
+flutter build apk --release --dart-define-from-file=dart-defines/release.json
 ```
 
 ## Arquitectura
@@ -48,7 +55,17 @@ Estructura por capas: `presentation` → `domain` → `data` (Dio → backend RE
 
 | Variable       | Por defecto           | Descripción               |
 | -------------- | --------------------- | ------------------------- |
-| `API_BASE_URL` | `http://10.29.23.250/api` | URL base del backend REST |
+| `API_BASE_URL` | `http://10.0.2.2/api` | URL base del backend REST |
 
 La app lee este valor desde `AppConfig.apiBaseUrl`. Para cambiar de ambiente,
-usar `--dart-define=API_BASE_URL=...` o actualizar `dart-defines/default.json`.
+usar `--dart-define-from-file` con uno de estos perfiles:
+
+| Archivo                                      | Uso                                             |
+| -------------------------------------------- | ----------------------------------------------- |
+| `dart-defines/debug-emulador.json`           | Debug en emulador Android contra backend local  |
+| `dart-defines/debug-dispositivo-fisico.json` | Debug en teléfono por cable con `adb reverse`   |
+| `dart-defines/debug-ip.json`                 | Debug contra una IP específica de la red        |
+| `dart-defines/release.json`                  | Build release                                   |
+
+Para cambiar la IP de debug por red, modificar solamente `dart-defines/debug-ip.json`.
+Para cambiar la IP de release, modificar solamente `dart-defines/release.json`.

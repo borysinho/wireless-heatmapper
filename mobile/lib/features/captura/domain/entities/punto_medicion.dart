@@ -4,7 +4,8 @@ import 'medicion_wifi.dart';
 import 'nivel_senal.dart';
 
 /// Punto de medición sobre el plano.
-/// Contiene su posición en píxeles y el nivel agregado (peor RSSI del lote).
+/// Contiene su posición en píxeles y el nivel técnico agregado que retorna el
+/// backend; el marcador del plano no usa ese nivel para colorearse.
 class PuntoMedicion extends Equatable {
   final int id;
   final int planoId;

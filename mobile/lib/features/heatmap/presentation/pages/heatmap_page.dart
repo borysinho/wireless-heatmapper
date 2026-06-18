@@ -558,82 +558,84 @@ class _SeleccionAPPanel extends StatelessWidget {
       color: theme.colorScheme.surface,
       child: SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'APs de interés (${state.apsSeleccionados.length})',
-                      style: theme.textTheme.labelLarge,
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: () => _mostrarSelectorAP(context),
-                    icon: const Icon(Icons.playlist_add_check),
-                    label: const Text('Cambiar'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              _APSeleccionadoTile(
-                ap: ap,
-                onTap: () => _mostrarSelectorAP(context),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 40,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: state.apsSeleccionados.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final item = state.apsSeleccionados[index];
-                    return ChoiceChip(
-                      selected: item.bssid == state.bssidActivo,
-                      label: Text(
-                        item.ssid.isEmpty ? item.bssid : item.ssid,
-                        overflow: TextOverflow.ellipsis,
+        child: _PanelInferiorDesplazable(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'APs de interés (${state.apsSeleccionados.length})',
+                        style: theme.textTheme.labelLarge,
                       ),
-                      avatar: const Icon(Icons.router, size: 16),
-                      onSelected: (_) => onActivar(item),
-                    );
-                  },
+                    ),
+                    TextButton.icon(
+                      onPressed: () => _mostrarSelectorAP(context),
+                      icon: const Icon(Icons.playlist_add_check),
+                      label: const Text('Cambiar'),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 8),
-              _ModoHeatmapControl(
-                modo: modo,
-                enabledIndividual: state.apsSeleccionados.length > 1,
-                onChanged: onModoChanged,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Puntos medidos: ${ap.cantidadPuntos} · '
-                'RSSI prom. ${ap.rssiPromedio.toStringAsFixed(1)} dBm · '
-                'Canal ${ap.canal?.toString() ?? 's/d'}',
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Ubicación AP activo: x ${state.posXDe(ap).toStringAsFixed(1)} · '
-                'y ${state.posYDe(ap).toStringAsFixed(1)}',
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: onGenerar,
-                  icon: const Icon(Icons.local_fire_department_outlined),
-                  label: const Text('Generar heatmap'),
+                const SizedBox(height: 6),
+                _APSeleccionadoTile(
+                  ap: ap,
+                  onTap: () => _mostrarSelectorAP(context),
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 40,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: state.apsSeleccionados.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final item = state.apsSeleccionados[index];
+                      return ChoiceChip(
+                        selected: item.bssid == state.bssidActivo,
+                        label: Text(
+                          item.ssid.isEmpty ? item.bssid : item.ssid,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        avatar: const Icon(Icons.router, size: 16),
+                        onSelected: (_) => onActivar(item),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _ModoHeatmapControl(
+                  modo: modo,
+                  enabledIndividual: state.apsSeleccionados.length > 1,
+                  onChanged: onModoChanged,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Puntos medidos: ${ap.cantidadPuntos} · '
+                  'RSSI prom. ${ap.rssiPromedio.toStringAsFixed(1)} dBm · '
+                  'Canal ${ap.canal?.toString() ?? 's/d'}',
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Ubicación AP activo: x ${state.posXDe(ap).toStringAsFixed(1)} · '
+                  'y ${state.posYDe(ap).toStringAsFixed(1)}',
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: onGenerar,
+                    icon: const Icon(Icons.local_fire_department_outlined),
+                    label: const Text('Generar heatmap'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -641,15 +643,23 @@ class _SeleccionAPPanel extends StatelessWidget {
   }
 
   void _mostrarSelectorAP(BuildContext context) {
+    final cubit = context.read<HeatmapCubit>();
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (ctx) => _SelectorAPSheet(
-        aps: state.aps,
-        bssidsSeleccionados: state.bssidsSeleccionados,
-        bssidActivo: state.bssidActivo,
-        onAlternar: onAlternar,
+      builder: (ctx) => BlocBuilder<HeatmapCubit, HeatmapState>(
+        bloc: cubit,
+        builder: (context, cubitState) {
+          final selectorState =
+              cubitState is HeatmapSeleccionAP ? cubitState : state;
+          return _SelectorAPSheet(
+            aps: selectorState.aps,
+            bssidsSeleccionados: selectorState.bssidsSeleccionados,
+            bssidActivo: selectorState.bssidActivo,
+            onAlternar: onAlternar,
+          );
+        },
       ),
     );
   }
@@ -765,12 +775,16 @@ class _SelectorAPSheet extends StatelessWidget {
                 controller: scrollController,
                 itemCount: aps.length,
                 separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) => _APSelectorItem(
-                  ap: aps[index],
-                  seleccionado: bssidsSeleccionados.contains(aps[index].bssid),
-                  activo: aps[index].bssid == bssidActivo,
-                  onAlternar: onAlternar,
-                ),
+                itemBuilder: (context, index) {
+                  final ap = aps[index];
+                  return _APSelectorItem(
+                    key: ValueKey('selector-ap-${ap.bssid}'),
+                    ap: ap,
+                    seleccionado: bssidsSeleccionados.contains(ap.bssid),
+                    activo: ap.bssid == bssidActivo,
+                    onAlternar: onAlternar,
+                  );
+                },
               ),
             ),
           ],
@@ -780,13 +794,14 @@ class _SelectorAPSheet extends StatelessWidget {
   }
 }
 
-class _APSelectorItem extends StatefulWidget {
+class _APSelectorItem extends StatelessWidget {
   final APDisponible ap;
   final bool seleccionado;
   final bool activo;
   final ValueChanged<APDisponible> onAlternar;
 
   const _APSelectorItem({
+    super.key,
     required this.ap,
     required this.seleccionado,
     required this.activo,
@@ -794,42 +809,27 @@ class _APSelectorItem extends StatefulWidget {
   });
 
   @override
-  State<_APSelectorItem> createState() => _APSelectorItemState();
-}
-
-class _APSelectorItemState extends State<_APSelectorItem> {
-  late bool _seleccionado = widget.seleccionado;
-  late bool _activo = widget.activo;
-
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return CheckboxListTile(
-      value: _seleccionado,
+      value: seleccionado,
       secondary: Icon(
-        _activo ? Icons.my_location : Icons.router_outlined,
-        color: _activo ? theme.colorScheme.primary : null,
+        activo ? Icons.my_location : Icons.router_outlined,
+        color: activo ? theme.colorScheme.primary : null,
       ),
       title: Text(
-        widget.ap.ssid.isEmpty ? 'SSID oculto' : widget.ap.ssid,
+        ap.ssid.isEmpty ? 'SSID oculto' : ap.ssid,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
-        '${_detalleAP(widget.ap)} · '
-        '${widget.ap.rssiPromedio.toStringAsFixed(0)} dBm',
+        '${_detalleAP(ap)} · ${ap.rssiPromedio.toStringAsFixed(0)} dBm',
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),
       controlAffinity: ListTileControlAffinity.trailing,
-      onChanged: (_) {
-        setState(() {
-          _seleccionado = !_seleccionado;
-          _activo = true;
-        });
-        widget.onAlternar(widget.ap);
-      },
-      selected: _activo,
+      onChanged: (_) => onAlternar(ap),
+      selected: activo,
     );
   }
 }
@@ -909,119 +909,146 @@ class _AnalisisPanel extends StatelessWidget {
       color: Theme.of(context).colorScheme.surface,
       child: SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: _ModoHeatmapControl(
-                      modo: modo,
-                      enabledIndividual: puedeModoIndividual,
-                      onChanged: onModoChanged,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Regenerar heatmap',
-                    onPressed: onRegenerarHeatmap,
-                    icon: const Icon(Icons.local_fire_department_outlined),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              _LeyendaHeatmap(escala: escala),
-              const SizedBox(height: 12),
-              _ResumenMapaCalor(mapa: mapa),
-              if (mapa.advertencias.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                _AdvertenciasHeatmap(advertencias: mapa.advertencias),
-              ],
-              const SizedBox(height: 12),
-              if (a == null)
-                Row(
-                  children: [
-                    const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(analizando ? 'Analizando cobertura…' : 'Sin análisis'),
-                  ],
-                )
-              else ...[
+        child: _PanelInferiorDesplazable(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
                 Row(
                   children: [
                     Expanded(
-                      child: _Metrica(
-                        icon: Icons.check_circle_outline,
-                        valor: '${a.pctCobertura.toStringAsFixed(1)}%',
-                        label: 'Cobertura',
-                      ),
-                    ),
-                    Expanded(
-                      child: _Metrica(
-                        icon: Icons.warning_amber,
-                        valor: a.celdasZonasMuertas.toString(),
-                        label: 'Zonas muertas',
-                      ),
-                    ),
-                    Expanded(
-                      child: _Metrica(
-                        icon: Icons.hub_outlined,
-                        valor: a.cantidadSolapamientos.toString(),
-                        label: 'Solap.',
-                      ),
-                    ),
-                    Expanded(
-                      child: _Metrica(
-                        icon: Icons.wifi_tethering_error,
-                        valor: a.cantidadInterferencias.toString(),
-                        label: 'Interf.',
+                      child: _ModoHeatmapControl(
+                        modo: modo,
+                        enabledIndividual: puedeModoIndividual,
+                        onChanged: onModoChanged,
                       ),
                     ),
                     IconButton(
-                      tooltip: 'Reanalizar',
-                      onPressed: analizando ? null : onRefreshAnalisis,
-                      icon: analizando
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.analytics_outlined),
+                      tooltip: 'Regenerar heatmap',
+                      onPressed: onRegenerarHeatmap,
+                      icon: const Icon(Icons.local_fire_department_outlined),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                SizedBox(
-                  height: 72,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: apsVisibles.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final ap = apsVisibles[index];
-                      return ActionChip(
-                        avatar: Icon(
-                          ap.confirmado ? Icons.verified : Icons.router,
-                          size: 18,
+                _LeyendaHeatmap(escala: escala),
+                const SizedBox(height: 12),
+                _ResumenMapaCalor(mapa: mapa),
+                if (mapa.advertencias.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _AdvertenciasHeatmap(advertencias: mapa.advertencias),
+                ],
+                const SizedBox(height: 12),
+                if (a == null)
+                  Row(
+                    children: [
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        analizando ? 'Analizando cobertura…' : 'Sin análisis',
+                      ),
+                    ],
+                  )
+                else ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _Metrica(
+                          icon: Icons.check_circle_outline,
+                          valor: '${a.pctCobertura.toStringAsFixed(1)}%',
+                          label: 'Cobertura',
                         ),
-                        label: Text(
-                          '${ap.ssid}\n${ap.rssiPromedio.toStringAsFixed(0)} dBm',
-                          maxLines: 2,
+                      ),
+                      Expanded(
+                        child: _Metrica(
+                          icon: Icons.warning_amber,
+                          valor: a.celdasZonasMuertas.toString(),
+                          label: 'Zonas muertas',
                         ),
-                        onPressed: () => onTapAP(ap),
-                      );
-                    },
+                      ),
+                      Expanded(
+                        child: _Metrica(
+                          icon: Icons.hub_outlined,
+                          valor: a.cantidadSolapamientos.toString(),
+                          label: 'Solap.',
+                        ),
+                      ),
+                      Expanded(
+                        child: _Metrica(
+                          icon: Icons.wifi_tethering_error,
+                          valor: a.cantidadInterferencias.toString(),
+                          label: 'Interf.',
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Reanalizar',
+                        onPressed: analizando ? null : onRefreshAnalisis,
+                        icon: analizando
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.analytics_outlined),
+                      ),
+                    ],
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 72,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: apsVisibles.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) {
+                        final ap = apsVisibles[index];
+                        return ActionChip(
+                          avatar: Icon(
+                            ap.confirmado ? Icons.verified : Icons.router,
+                            size: 18,
+                          ),
+                          label: Text(
+                            '${ap.ssid}\n${ap.rssiPromedio.toStringAsFixed(0)} dBm',
+                            maxLines: 2,
+                          ),
+                          onPressed: () => onTapAP(ap),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _PanelInferiorDesplazable extends StatelessWidget {
+  final Widget child;
+
+  const _PanelInferiorDesplazable({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final esHorizontal = size.width > size.height;
+    final maxHeight = size.height * (esHorizontal ? 0.58 : 0.46);
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      child: SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
+        child: child,
       ),
     );
   }

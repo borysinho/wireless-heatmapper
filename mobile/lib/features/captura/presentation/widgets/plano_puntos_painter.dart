@@ -1,29 +1,17 @@
 import 'package:flutter/material.dart';
 
-import '../../domain/entities/nivel_senal.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../domain/entities/punto_medicion.dart';
 
 /// Painter de Flutter Canvas que dibuja los puntos de medición sobre el plano.
 /// Sprint 3 — PB-04 (Sp3-19).
 ///
-/// Cada punto se renderiza como un círculo con color según el [NivelSenal]:
-///   verde    → verde vibrante
-///   amarillo → amarillo
-///   naranja  → naranja
-///   rojo     → rojo
-///   negro    → negro / zona muerta
+/// Los puntos se renderizan como marcadores neutros de ubicación. El nivel de
+/// señal se consulta en el detalle del punto o en el heatmap filtrado por AP.
 class PlanoPuntosPainter extends CustomPainter {
   final List<PuntoMedicion> puntos;
   final int? puntoSeleccionadoId;
   final Size tamanoPlano;
-
-  static const Map<NivelSenal, Color> _colores = {
-    NivelSenal.verde: Color(0xFF27AE60),
-    NivelSenal.amarillo: Color(0xFFF1C40F),
-    NivelSenal.naranja: Color(0xFFE67E22),
-    NivelSenal.rojo: Color(0xFFE74C3C),
-    NivelSenal.negro: Color(0xFF1C1C1C),
-  };
 
   const PlanoPuntosPainter({
     required this.puntos,
@@ -42,7 +30,6 @@ class PlanoPuntosPainter extends CustomPainter {
       final cx = punto.posX * scaleX;
       final cy = punto.posY * scaleY;
 
-      final color = _colores[punto.nivel] ?? Colors.grey;
       final seleccionado = punto.id == puntoSeleccionadoId;
       final radio = seleccionado ? 14.0 : 10.0;
 
@@ -57,7 +44,7 @@ class PlanoPuntosPainter extends CustomPainter {
       canvas.drawCircle(
         Offset(cx, cy),
         radio,
-        Paint()..color = color,
+        Paint()..color = kSeedColor,
       );
 
       // Borde blanco
