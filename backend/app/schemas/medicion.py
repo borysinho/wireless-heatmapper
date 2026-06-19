@@ -110,6 +110,13 @@ class PuntoMedicionDetalleOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PuntoMedicionUpdateIn(BaseModel):
+    """Cuerpo para mover un punto de medición existente sobre el plano."""
+
+    pos_x: float = Field(..., ge=0, description="Posición X en píxeles del plano")
+    pos_y: float = Field(..., ge=0, description="Posición Y en píxeles del plano")
+
+
 class LoteMedicionOut(BaseModel):
     """Respuesta 201 del POST /api/mediciones."""
 

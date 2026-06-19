@@ -14,6 +14,7 @@ void main() {
       'tamano_bytes': 204800,
       'url_firmada': '/planos/archivo/foo.png?exp=1&sig=abc',
       'calibrado': false,
+      'cantidad_puntos': 0,
       'escala_m_por_px': null,
       'distancia_real_m': null,
       'calibracion_x1': null,
@@ -31,6 +32,7 @@ void main() {
       expect(m.proyectoId, 10);
       expect(m.formato, FormatoPlano.png);
       expect(m.calibrado, isFalse);
+      expect(m.cantidadPuntos, 0);
       expect(m.escalaMPorPx, isNull);
       expect(m.warning, isNull);
     });
@@ -47,6 +49,7 @@ void main() {
         'calibracion_y2': 200,
         'warning': 'Solo se importó la primera página del PDF.',
         'formato': 'pdf',
+        'cantidad_puntos': 3,
       };
       final m = PlanoModel.fromJson(json);
       expect(m.calibrado, isTrue);
@@ -55,6 +58,7 @@ void main() {
       expect(m.calibracionX1, 100.0);
       expect(m.calibracionX2, 300.5);
       expect(m.formato, FormatoPlano.pdf);
+      expect(m.cantidadPuntos, 3);
       expect(m.warning, contains('PDF'));
     });
 

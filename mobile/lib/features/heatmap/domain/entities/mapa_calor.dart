@@ -7,6 +7,8 @@ import 'escala_heatmap.dart';
 class MapaCalor extends Equatable {
   final int id;
   final int planoId;
+  final int? conjuntoApId;
+  final String modoGeneracion;
   final String algoritmo;
   final int resolucion;
   final String bssid;
@@ -14,6 +16,7 @@ class MapaCalor extends Equatable {
   final double apPosX;
   final double apPosY;
   final List<APDisponible> apsInteres;
+  final List<String> bssidsGeneracion;
   final String urlImagen;
   final List<List<double>> matriz;
   final List<EscalaHeatmap> escala;
@@ -28,6 +31,8 @@ class MapaCalor extends Equatable {
   const MapaCalor({
     required this.id,
     required this.planoId,
+    this.conjuntoApId,
+    this.modoGeneracion = 'SUBCONJUNTO',
     required this.algoritmo,
     required this.resolucion,
     required this.bssid,
@@ -35,6 +40,7 @@ class MapaCalor extends Equatable {
     required this.apPosX,
     required this.apPosY,
     required this.apsInteres,
+    this.bssidsGeneracion = const [],
     required this.urlImagen,
     required this.matriz,
     required this.escala,
@@ -51,6 +57,8 @@ class MapaCalor extends Equatable {
   List<Object?> get props => [
         id,
         planoId,
+        conjuntoApId,
+        modoGeneracion,
         algoritmo,
         resolucion,
         bssid,
@@ -58,6 +66,7 @@ class MapaCalor extends Equatable {
         apPosX,
         apPosY,
         apsInteres,
+        bssidsGeneracion,
         urlImagen,
         cantidadPuntos,
         rssiMin,

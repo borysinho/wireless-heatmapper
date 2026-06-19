@@ -196,6 +196,7 @@ async def importar_plano(
         plano,
         url_firmada=_firmar(plano.ruta_storage, request),
         warning=warning,
+        cantidad_puntos=0,
     )
 
 
@@ -215,9 +216,14 @@ def listar_planos(
         current_user=current_user,
         db=db,
     )
-    planos = PlanoRepository(db).listar_por_proyecto(proyecto_id=proyecto_id)
+    plano_repo = PlanoRepository(db)
+    planos = plano_repo.listar_por_proyecto(proyecto_id=proyecto_id)
     return [
-        PlanoOut.from_plano(p, url_firmada=_firmar(p.ruta_storage, request))
+        PlanoOut.from_plano(
+            p,
+            url_firmada=_firmar(p.ruta_storage, request),
+            cantidad_puntos=plano_repo.contar_puntos(plano_id=p.id),
+        )
         for p in planos
     ]
 
@@ -238,7 +244,12 @@ def obtener_plano(
         current_user=current_user,
         db=db,
     )
-    return PlanoOut.from_plano(plano, url_firmada=_firmar(plano.ruta_storage, request))
+    plano_repo = PlanoRepository(db)
+    return PlanoOut.from_plano(
+        plano,
+        url_firmada=_firmar(plano.ruta_storage, request),
+        cantidad_puntos=plano_repo.contar_puntos(plano_id=plano.id),
+    )
 
 
 @router_planos.get(
@@ -316,7 +327,11 @@ def calibrar_plano(
         distancia_real_m=body.distancia_real_m,
         escala_m_por_px=escala,
     )
-    return PlanoOut.from_plano(plano, url_firmada=_firmar(plano.ruta_storage, request))
+    return PlanoOut.from_plano(
+        plano,
+        url_firmada=_firmar(plano.ruta_storage, request),
+        cantidad_puntos=plano_repo.contar_puntos(plano_id=plano.id),
+    )
 
 
 @router_planos.delete(

@@ -6,6 +6,7 @@ import '../../../captura/domain/entities/punto_medicion.dart';
 import '../../../captura/presentation/cubit/captura_cubit.dart';
 import '../../../captura/presentation/cubit/captura_state.dart';
 import '../../../captura/presentation/widgets/plano_puntos_painter.dart';
+import '../../../captura/presentation/widgets/punto_detalle_sheet.dart';
 import '../../domain/entities/plano.dart';
 import '../cubit/planos_cubit.dart';
 import '../cubit/planos_state.dart';
@@ -52,6 +53,12 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
 
   /// Escala actual del InteractiveViewer (1.0 = sin zoom).
   double _zoomEscala = 1.0;
+
+  /// Punto de medición que se está moviendo sobre el plano.
+  int? _puntoMedicionArrastradoId;
+
+  /// Última posición local emitida mientras se arrastra un punto de medición.
+  Offset? _ultimaReubicacionPuntoImagen;
 
   late Plano _plano;
 
@@ -103,6 +110,13 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
     return Offset(tap.dx * factorX, tap.dy * factorY);
   }
 
+  Offset _limitarPuntoImagen(Offset punto) {
+    return Offset(
+      punto.dx.clamp(0.0, _plano.anchoPx.toDouble()),
+      punto.dy.clamp(0.0, _plano.altoPx.toDouble()),
+    );
+  }
+
   /// Convierte coordenadas del plano a px de pantalla para pintar overlays.
   Offset _imagenAPantalla(Offset puntoImagen) {
     if (_renderSize == Size.zero) return Offset.zero;
@@ -114,6 +128,47 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
   void _cargarPuntosSiCalibrado() {
     if (!mounted || !_plano.calibrado) return;
     context.read<CapturaCubit>().iniciarSesion(_plano.id);
+  }
+
+  List<PuntoMedicion> _puntosDesdeEstado(CapturaState state) {
+    return switch (state) {
+      CapturaActiva(:final puntos) => puntos,
+      CapturaEnviando(:final puntos) => puntos,
+      CapturaThrottling(:final puntos) => puntos,
+      CapturaPausada(:final puntos) => puntos,
+      CapturaPuntoDetalle(:final puntos) => puntos,
+      CapturaError(:final puntos) => puntos,
+      _ => const <PuntoMedicion>[],
+    };
+  }
+
+  PuntoMedicion? _puntoMedicionEnPantalla(Offset localPos) {
+    final puntos = _puntosDesdeEstado(context.read<CapturaCubit>().state);
+    if (puntos.isEmpty) return null;
+    return PlanoPuntosPainter.puntoEnPosicionPantalla(
+      tapOffset: localPos,
+      canvasSize: _renderSize,
+      tamanoPlano: Size(_plano.anchoPx.toDouble(), _plano.altoPx.toDouble()),
+      puntos: puntos,
+    );
+  }
+
+  void _abrirDetallePuntoMedicion(PuntoMedicion punto) {
+    final cubit = context.read<CapturaCubit>();
+    cubit.abrirDetallePunto(punto.id);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => BlocProvider.value(
+        value: cubit,
+        child: PuntoDetalleSheet(punto: punto, cubit: cubit),
+      ),
+    ).then((_) {
+      if (cubit.state is CapturaPuntoDetalle) {
+        cubit.cerrarDetalle();
+      }
+    });
   }
 
   /// Devuelve true si [localPos] (coords del GestureDetector) está dentro del
@@ -155,6 +210,11 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
           _reglaB = puntoImagen;
         }
       });
+    } else {
+      final punto = _puntoMedicionEnPantalla(pos);
+      if (punto != null) {
+        _abrirDetallePuntoMedicion(punto);
+      }
     }
   }
 
@@ -172,6 +232,14 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
         setState(() => _reglaArrastrado = 'A');
       } else if (_tocaPunto(pos, _reglaB)) {
         setState(() => _reglaArrastrado = 'B');
+      }
+    } else {
+      final punto = _puntoMedicionEnPantalla(pos);
+      if (punto != null) {
+        setState(() {
+          _puntoMedicionArrastradoId = punto.id;
+          _ultimaReubicacionPuntoImagen = Offset(punto.posX, punto.posY);
+        });
       }
     }
   }
@@ -195,6 +263,18 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
           _reglaB = puntoImagen;
         }
       });
+    } else if (_puntoMedicionArrastradoId != null) {
+      final puntoLimitado = _limitarPuntoImagen(puntoImagen);
+      final ultima = _ultimaReubicacionPuntoImagen;
+      if (ultima != null && (puntoLimitado - ultima).distance < 3) {
+        return;
+      }
+      _ultimaReubicacionPuntoImagen = puntoLimitado;
+      context.read<CapturaCubit>().reubicarPuntoLocal(
+            puntoId: _puntoMedicionArrastradoId!,
+            posX: puntoLimitado.dx,
+            posY: puntoLimitado.dy,
+          );
     }
   }
 
@@ -205,6 +285,20 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
     }
     if (_reglaArrastrado != null) {
       setState(() => _reglaArrastrado = null);
+    }
+    final puntoId = _puntoMedicionArrastradoId;
+    if (puntoId != null) {
+      final puntoImagen =
+          _limitarPuntoImagen(_tapAImagen(details.localPosition));
+      setState(() {
+        _puntoMedicionArrastradoId = null;
+        _ultimaReubicacionPuntoImagen = null;
+      });
+      context.read<CapturaCubit>().moverPunto(
+            puntoId: puntoId,
+            posX: puntoImagen.dx,
+            posY: puntoImagen.dy,
+          );
     }
   }
 
@@ -291,222 +385,241 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
           _cargarPuntosSiCalibrado();
         }
       },
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(_plano.nombre),
-          actions: [
-            if (_plano.calibrado && !_modoCalibracion && !_modoRegla)
-              IconButton(
-                tooltip: 'Ver heatmap',
-                icon: const Icon(Icons.local_fire_department_outlined),
-                onPressed: () => context.pushNamed(
-                  'heatmap',
-                  pathParameters: {
-                    'id': _plano.proyectoId.toString(),
-                    'planoId': _plano.id.toString(),
-                  },
-                  extra: {
-                    'planoId': _plano.id,
-                    'imagenUrl': resolverUrlFirmada(_plano.urlFirmada),
-                    'anchoPlanoPx': _plano.anchoPx.toDouble(),
-                    'altoPlanoPx': _plano.altoPx.toDouble(),
-                  },
+      child: BlocListener<CapturaCubit, CapturaState>(
+        listener: (context, state) {
+          if (state is CapturaError) {
+            ScaffoldMessenger.of(context)
+              ..clearSnackBars()
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(state.mensaje),
+                  backgroundColor: Theme.of(context).colorScheme.error,
                 ),
-              ),
-            if (_plano.calibrado && !_modoCalibracion)
-              IconButton(
-                tooltip: _modoRegla ? 'Cerrar regla' : 'Medir distancia',
-                icon: Icon(
-                  _modoRegla ? Icons.close : Icons.square_foot,
+              );
+            context.read<CapturaCubit>().reanudar();
+          }
+        },
+        child: Scaffold(
+          appBar: AppBar(
+            title: Text(_plano.nombre),
+            actions: [
+              if (_plano.calibrado && !_modoCalibracion && !_modoRegla)
+                IconButton(
+                  tooltip: 'Ver heatmap',
+                  icon: const Icon(Icons.local_fire_department_outlined),
+                  onPressed: () => context.pushNamed(
+                    'heatmap',
+                    pathParameters: {
+                      'id': _plano.proyectoId.toString(),
+                      'planoId': _plano.id.toString(),
+                    },
+                    extra: {
+                      'planoId': _plano.id,
+                      'imagenUrl': resolverUrlFirmada(_plano.urlFirmada),
+                      'anchoPlanoPx': _plano.anchoPx.toDouble(),
+                      'altoPlanoPx': _plano.altoPx.toDouble(),
+                    },
+                  ),
                 ),
-                onPressed: () => setState(() {
-                  _modoRegla = !_modoRegla;
-                  if (!_modoRegla) {
-                    _reglaA = null;
-                    _reglaB = null;
-                  }
-                }),
-              ),
-            if (!_modoRegla)
-              IconButton(
-                tooltip: _modoCalibracion
-                    ? 'Cancelar calibración'
-                    : 'Calibrar escala',
-                icon: Icon(_modoCalibracion ? Icons.close : Icons.straighten),
-                onPressed: () => setState(() {
-                  _modoCalibracion = !_modoCalibracion;
-                  if (_modoCalibracion) {
-                    _modoRegla = false;
-                    _reglaA = null;
-                    _reglaB = null;
-                  }
-                  if (!_modoCalibracion && !_plano.calibrado) {
-                    _puntoA = null;
-                    _puntoB = null;
-                  }
-                }),
-              ),
-          ],
-        ),
-        body: Column(
-          children: [
-            _StatusBar(
-              plano: _plano,
-              modoCalibracion: _modoCalibracion,
-              modoRegla: _modoRegla,
-              distanciaReglaM: _distanciaReglaM,
-            ),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  // Mantener el aspect ratio del plano dentro del Box.
-                  final aspect = _plano.anchoPx / _plano.altoPx;
-                  double w = constraints.maxWidth;
-                  double h = w / aspect;
-                  if (h > constraints.maxHeight) {
-                    h = constraints.maxHeight;
-                    w = h * aspect;
-                  }
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (_renderSize != Size(w, h)) {
-                      setState(() => _renderSize = Size(w, h));
+              if (_plano.calibrado && !_modoCalibracion)
+                IconButton(
+                  tooltip: _modoRegla ? 'Cerrar regla' : 'Medir distancia',
+                  icon: Icon(
+                    _modoRegla ? Icons.close : Icons.square_foot,
+                  ),
+                  onPressed: () => setState(() {
+                    _modoRegla = !_modoRegla;
+                    if (!_modoRegla) {
+                      _reglaA = null;
+                      _reglaB = null;
                     }
-                  });
-                  return Center(
-                    child: SizedBox(
-                      width: w,
-                      height: h,
-                      child: InteractiveViewer(
-                        transformationController: _transformController,
-                        panEnabled: true,
-                        scaleEnabled: true,
-                        minScale: 0.5,
-                        maxScale: 5,
-                        child: GestureDetector(
-                          onTapDown: _onTapDown,
-                          onTap:
-                              (_modoCalibracion || _modoRegla) ? _onTap : null,
-                          onLongPressStart: (_modoCalibracion || _modoRegla)
-                              ? _onLongPressStart
-                              : null,
-                          onLongPressMoveUpdate:
-                              (_modoCalibracion || _modoRegla)
-                                  ? _onLongPressMoveUpdate
-                                  : null,
-                          onLongPressEnd: (_modoCalibracion || _modoRegla)
-                              ? _onLongPressEnd
-                              : null,
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              Image.network(
-                                url,
-                                fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) => const Center(
-                                  child: Padding(
-                                    padding: EdgeInsets.all(16),
-                                    child: Text(
-                                      'No se pudo cargar la imagen del plano. '
-                                      'La URL pudo expirar; vuelve a entrar al editor.',
-                                      textAlign: TextAlign.center,
+                  }),
+                ),
+              if (!_modoRegla)
+                IconButton(
+                  tooltip: _modoCalibracion
+                      ? 'Cancelar calibración'
+                      : 'Calibrar escala',
+                  icon: Icon(_modoCalibracion ? Icons.close : Icons.straighten),
+                  onPressed: () => setState(() {
+                    _modoCalibracion = !_modoCalibracion;
+                    if (_modoCalibracion) {
+                      _modoRegla = false;
+                      _reglaA = null;
+                      _reglaB = null;
+                    }
+                    if (!_modoCalibracion && !_plano.calibrado) {
+                      _puntoA = null;
+                      _puntoB = null;
+                    }
+                  }),
+                ),
+            ],
+          ),
+          body: Column(
+            children: [
+              _StatusBar(
+                plano: _plano,
+                modoCalibracion: _modoCalibracion,
+                modoRegla: _modoRegla,
+                distanciaReglaM: _distanciaReglaM,
+              ),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    // Mantener el aspect ratio del plano dentro del Box.
+                    final aspect = _plano.anchoPx / _plano.altoPx;
+                    double w = constraints.maxWidth;
+                    double h = w / aspect;
+                    if (h > constraints.maxHeight) {
+                      h = constraints.maxHeight;
+                      w = h * aspect;
+                    }
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (_renderSize != Size(w, h)) {
+                        setState(() => _renderSize = Size(w, h));
+                      }
+                    });
+                    return Center(
+                      child: SizedBox(
+                        width: w,
+                        height: h,
+                        child: InteractiveViewer(
+                          transformationController: _transformController,
+                          panEnabled: true,
+                          scaleEnabled: true,
+                          minScale: 0.5,
+                          maxScale: 5,
+                          child: GestureDetector(
+                            onTapDown: _onTapDown,
+                            onTap: _onTap,
+                            onLongPressStart: _onLongPressStart,
+                            onLongPressMoveUpdate: _onLongPressMoveUpdate,
+                            onLongPressEnd: _onLongPressEnd,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Image.network(
+                                  url,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(16),
+                                      child: Text(
+                                        'No se pudo cargar la imagen del plano. '
+                                        'La URL pudo expirar; vuelve a entrar al editor.',
+                                        textAlign: TextAlign.center,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              if (_plano.calibrado)
-                                BlocBuilder<CapturaCubit, CapturaState>(
-                                  builder: (context, capturaState) {
-                                    final puntos = switch (capturaState) {
-                                      CapturaActiva(:final puntos) => puntos,
-                                      CapturaEnviando(:final puntos) => puntos,
-                                      CapturaThrottling(:final puntos) =>
-                                        puntos,
-                                      CapturaPausada(:final puntos) => puntos,
-                                      CapturaPuntoDetalle(:final puntos) =>
-                                        puntos,
-                                      CapturaError(:final puntos) => puntos,
-                                      _ => const <PuntoMedicion>[],
-                                    };
-                                    if (puntos.isEmpty) {
-                                      return const SizedBox.shrink();
-                                    }
-                                    return CustomPaint(
-                                      painter: PlanoPuntosPainter(
-                                        puntos: puntos,
-                                        tamanoPlano: Size(
-                                          _plano.anchoPx.toDouble(),
-                                          _plano.altoPx.toDouble(),
+                                if (_plano.calibrado)
+                                  BlocBuilder<CapturaCubit, CapturaState>(
+                                    builder: (context, capturaState) {
+                                      final puntos = switch (capturaState) {
+                                        CapturaActiva(:final puntos) => puntos,
+                                        CapturaEnviando(:final puntos) =>
+                                          puntos,
+                                        CapturaThrottling(:final puntos) =>
+                                          puntos,
+                                        CapturaPausada(:final puntos) => puntos,
+                                        CapturaPuntoDetalle(:final puntos) =>
+                                          puntos,
+                                        CapturaError(:final puntos) => puntos,
+                                        _ => const <PuntoMedicion>[],
+                                      };
+                                      final puntoSeleccionadoId =
+                                          _puntoMedicionArrastradoId ??
+                                              switch (capturaState) {
+                                                CapturaPuntoDetalle(
+                                                  :final puntoSeleccionado
+                                                ) =>
+                                                  puntoSeleccionado.id,
+                                                _ => null,
+                                              };
+                                      if (puntos.isEmpty) {
+                                        return const SizedBox.shrink();
+                                      }
+                                      return CustomPaint(
+                                        painter: PlanoPuntosPainter(
+                                          puntos: puntos,
+                                          tamanoPlano: Size(
+                                            _plano.anchoPx.toDouble(),
+                                            _plano.altoPx.toDouble(),
+                                          ),
+                                          puntoSeleccionadoId:
+                                              puntoSeleccionadoId,
                                         ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              if (_puntoA != null || _puntoB != null)
-                                CustomPaint(
-                                  painter: _CalibracionPainter(
-                                    puntoA: _puntoA == null
-                                        ? null
-                                        : _imagenAPantalla(_puntoA!),
-                                    puntoB: _puntoB == null
-                                        ? null
-                                        : _imagenAPantalla(_puntoB!),
-                                    zoomEscala: _zoomEscala,
-                                    puntoArrastrado: _puntoArrastrado,
+                                      );
+                                    },
                                   ),
-                                ),
-                              if (_reglaA != null || _reglaB != null)
-                                CustomPaint(
-                                  painter: _ReglaPainter(
-                                    puntoA: _reglaA == null
-                                        ? null
-                                        : _imagenAPantalla(_reglaA!),
-                                    puntoB: _reglaB == null
-                                        ? null
-                                        : _imagenAPantalla(_reglaB!),
-                                    distanciaM: _distanciaReglaM,
-                                    zoomEscala: _zoomEscala,
-                                    puntoArrastrado: _reglaArrastrado,
+                                if (_puntoA != null || _puntoB != null)
+                                  CustomPaint(
+                                    painter: _CalibracionPainter(
+                                      puntoA: _puntoA == null
+                                          ? null
+                                          : _imagenAPantalla(_puntoA!),
+                                      puntoB: _puntoB == null
+                                          ? null
+                                          : _imagenAPantalla(_puntoB!),
+                                      zoomEscala: _zoomEscala,
+                                      puntoArrastrado: _puntoArrastrado,
+                                    ),
                                   ),
-                                ),
-                            ],
+                                if (_reglaA != null || _reglaB != null)
+                                  CustomPaint(
+                                    painter: _ReglaPainter(
+                                      puntoA: _reglaA == null
+                                          ? null
+                                          : _imagenAPantalla(_reglaA!),
+                                      puntoB: _reglaB == null
+                                          ? null
+                                          : _imagenAPantalla(_reglaB!),
+                                      distanciaM: _distanciaReglaM,
+                                      zoomEscala: _zoomEscala,
+                                      puntoArrastrado: _reglaArrastrado,
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+          floatingActionButton: _modoCalibracion
+              ? FloatingActionButton.extended(
+                  onPressed: _confirmarCalibracion,
+                  icon: const Icon(Icons.check),
+                  label: const Text('Confirmar'),
+                )
+              : (_plano.calibrado
+                  ? FloatingActionButton.extended(
+                      onPressed: () async {
+                        await context.pushNamed(
+                          'captura',
+                          pathParameters: {
+                            'id': _plano.proyectoId.toString(),
+                            'planoId': _plano.id.toString(),
+                          },
+                          extra: {
+                            'planoId': _plano.id,
+                            'imagenUrl': resolverUrlFirmada(_plano.urlFirmada),
+                            'anchoPlanoPx': _plano.anchoPx.toDouble(),
+                            'altoPlanoPx': _plano.altoPx.toDouble(),
+                          },
+                        );
+                        _cargarPuntosSiCalibrado();
+                      },
+                      icon: const Icon(Icons.wifi_find),
+                      label: const Text('Iniciar captura'),
+                    )
+                  : null),
         ),
-        floatingActionButton: _modoCalibracion
-            ? FloatingActionButton.extended(
-                onPressed: _confirmarCalibracion,
-                icon: const Icon(Icons.check),
-                label: const Text('Confirmar'),
-              )
-            : (_plano.calibrado
-                ? FloatingActionButton.extended(
-                    onPressed: () async {
-                      await context.pushNamed(
-                        'captura',
-                        pathParameters: {
-                          'id': _plano.proyectoId.toString(),
-                          'planoId': _plano.id.toString(),
-                        },
-                        extra: {
-                          'planoId': _plano.id,
-                          'imagenUrl': resolverUrlFirmada(_plano.urlFirmada),
-                          'anchoPlanoPx': _plano.anchoPx.toDouble(),
-                          'altoPlanoPx': _plano.altoPx.toDouble(),
-                        },
-                      );
-                      _cargarPuntosSiCalibrado();
-                    },
-                    icon: const Icon(Icons.wifi_find),
-                    label: const Text('Iniciar captura'),
-                  )
-                : null),
       ),
     );
   }

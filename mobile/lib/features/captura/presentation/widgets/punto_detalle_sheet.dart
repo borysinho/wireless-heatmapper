@@ -33,8 +33,10 @@ class PuntoDetalleSheet extends StatelessWidget {
         // El cubit carga el detalle completo del punto de forma asíncrona y
         // emite CapturaPuntoDetalle con mediciones. Mientras llega, se muestra
         // el punto local (sin mediciones) con un indicador de carga.
-        final puntoDetalle =
-            state is CapturaPuntoDetalle ? state.puntoSeleccionado : null;
+        final puntoDetalle = state is CapturaPuntoDetalle &&
+                state.puntoSeleccionado.id == punto.id
+            ? state.puntoSeleccionado
+            : null;
         final mediciones = puntoDetalle?.mediciones ?? const [];
         final cargando = puntoDetalle == null;
         final puntoDisplay = puntoDetalle ?? punto;

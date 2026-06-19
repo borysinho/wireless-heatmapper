@@ -1,5 +1,11 @@
 from app.models.cliente import Cliente  # noqa: F401
-from app.models.heatmap import AnalisisCobertura, APDetectado, MapaCalor  # noqa: F401
+from app.models.heatmap import (  # noqa: F401
+    AnalisisCobertura,
+    APDetectado,
+    ConjuntoAP,
+    ConjuntoAPItem,
+    MapaCalor,
+)
 from app.models.medicion import MedicionWifi, PuntoMedicion  # noqa: F401
 from app.models.plano import Plano  # noqa: F401
 from app.models.proyecto import Proyecto  # noqa: F401

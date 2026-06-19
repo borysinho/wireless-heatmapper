@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 
 import '../../domain/entities/analisis_cobertura.dart';
 import '../../domain/entities/ap_disponible.dart';
+import '../../domain/entities/conjunto_ap.dart';
 import '../../domain/entities/mapa_calor.dart';
 
 sealed class HeatmapState extends Equatable {
@@ -11,7 +12,7 @@ sealed class HeatmapState extends Equatable {
   List<Object?> get props => [];
 }
 
-enum HeatmapModo { conjunto, apActivo }
+const Object _sinCambio = Object();
 
 class HeatmapInitial extends HeatmapState {
   const HeatmapInitial();
@@ -26,15 +27,33 @@ class HeatmapLoading extends HeatmapState {
   List<Object?> get props => [mensaje];
 }
 
+class HeatmapConjuntos extends HeatmapState {
+  final List<APDisponible> aps;
+  final List<ConjuntoAP> conjuntos;
+  final String? mensaje;
+
+  HeatmapConjuntos({
+    required List<APDisponible> aps,
+    required List<ConjuntoAP> conjuntos,
+    this.mensaje,
+  })  : aps = List<APDisponible>.unmodifiable(aps),
+        conjuntos = List<ConjuntoAP>.unmodifiable(conjuntos);
+
+  @override
+  List<Object?> get props => [aps, conjuntos, mensaje];
+}
+
 class HeatmapSeleccionAP extends HeatmapState {
+  final ConjuntoAP? conjunto;
   final List<APDisponible> aps;
   final Set<String> bssidsSeleccionados;
-  final String bssidActivo;
+  final String? bssidActivo;
   final Map<String, double> apPosXPorBssid;
   final Map<String, double> apPosYPorBssid;
   final String? mensaje;
 
   HeatmapSeleccionAP({
+    this.conjunto,
     required List<APDisponible> aps,
     required Set<String> bssidsSeleccionados,
     required this.bssidActivo,
@@ -50,7 +69,7 @@ class HeatmapSeleccionAP extends HeatmapState {
     for (final ap in aps) {
       if (ap.bssid == bssidActivo) return ap;
     }
-    return aps.first;
+    return apsSeleccionados.isNotEmpty ? apsSeleccionados.first : aps.first;
   }
 
   List<APDisponible> get apsSeleccionados =>
@@ -62,15 +81,17 @@ class HeatmapSeleccionAP extends HeatmapState {
 
   HeatmapSeleccionAP copyWith({
     Set<String>? bssidsSeleccionados,
-    String? bssidActivo,
+    Object? bssidActivo = _sinCambio,
     Map<String, double>? apPosXPorBssid,
     Map<String, double>? apPosYPorBssid,
     String? mensaje,
   }) {
     return HeatmapSeleccionAP(
+      conjunto: conjunto,
       aps: aps,
       bssidsSeleccionados: bssidsSeleccionados ?? this.bssidsSeleccionados,
-      bssidActivo: bssidActivo ?? this.bssidActivo,
+      bssidActivo:
+          bssidActivo == _sinCambio ? this.bssidActivo : bssidActivo as String?,
       apPosXPorBssid: apPosXPorBssid ?? this.apPosXPorBssid,
       apPosYPorBssid: apPosYPorBssid ?? this.apPosYPorBssid,
       mensaje: mensaje,
@@ -79,6 +100,7 @@ class HeatmapSeleccionAP extends HeatmapState {
 
   @override
   List<Object?> get props => [
+        conjunto,
         aps,
         bssidsSeleccionados.toList()..sort(),
         bssidActivo,
@@ -96,9 +118,10 @@ class HeatmapSeleccionAP extends HeatmapState {
 
 class HeatmapReady extends HeatmapState {
   final MapaCalor mapa;
+  final ConjuntoAP? conjunto;
   final List<APDisponible> aps;
   final Set<String> bssidsSeleccionados;
-  final String bssidActivo;
+  final String? bssidActivo;
   final Map<String, double> apPosXPorBssid;
   final Map<String, double> apPosYPorBssid;
   final AnalisisCobertura? analisis;
@@ -107,6 +130,7 @@ class HeatmapReady extends HeatmapState {
 
   HeatmapReady({
     required this.mapa,
+    this.conjunto,
     required List<APDisponible> aps,
     required Set<String> bssidsSeleccionados,
     required this.bssidActivo,
@@ -124,7 +148,7 @@ class HeatmapReady extends HeatmapState {
     MapaCalor? mapa,
     List<APDisponible>? aps,
     Set<String>? bssidsSeleccionados,
-    String? bssidActivo,
+    Object? bssidActivo = _sinCambio,
     Map<String, double>? apPosXPorBssid,
     Map<String, double>? apPosYPorBssid,
     AnalisisCobertura? analisis,
@@ -133,9 +157,11 @@ class HeatmapReady extends HeatmapState {
   }) {
     return HeatmapReady(
       mapa: mapa ?? this.mapa,
+      conjunto: conjunto,
       aps: aps ?? this.aps,
       bssidsSeleccionados: bssidsSeleccionados ?? this.bssidsSeleccionados,
-      bssidActivo: bssidActivo ?? this.bssidActivo,
+      bssidActivo:
+          bssidActivo == _sinCambio ? this.bssidActivo : bssidActivo as String?,
       apPosXPorBssid: apPosXPorBssid ?? this.apPosXPorBssid,
       apPosYPorBssid: apPosYPorBssid ?? this.apPosYPorBssid,
       analisis: analisis ?? this.analisis,
@@ -147,6 +173,7 @@ class HeatmapReady extends HeatmapState {
   @override
   List<Object?> get props => [
         mapa,
+        conjunto,
         aps,
         bssidsSeleccionados.toList()..sort(),
         bssidActivo,

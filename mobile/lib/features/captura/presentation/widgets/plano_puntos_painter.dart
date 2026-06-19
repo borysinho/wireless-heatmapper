@@ -100,4 +100,36 @@ class PlanoPuntosPainter extends CustomPainter {
     }
     return cercano;
   }
+
+  /// Retorna el punto más cercano al toque midiendo la distancia en pantalla.
+  ///
+  /// Esto evita que los puntos de planos grandes queden casi imposibles de
+  /// tocar cuando el plano se renderiza reducido en el móvil.
+  static PuntoMedicion? puntoEnPosicionPantalla({
+    required Offset tapOffset,
+    required Size canvasSize,
+    required Size tamanoPlano,
+    required List<PuntoMedicion> puntos,
+    double radioToleranciaPantalla = 28,
+  }) {
+    if (canvasSize.isEmpty || tamanoPlano.isEmpty) return null;
+
+    final scaleX = canvasSize.width / tamanoPlano.width;
+    final scaleY = canvasSize.height / tamanoPlano.height;
+    PuntoMedicion? cercano;
+    var minDist = radioToleranciaPantalla;
+
+    for (final punto in puntos) {
+      final centroPantalla = Offset(
+        punto.posX * scaleX,
+        punto.posY * scaleY,
+      );
+      final dist = (centroPantalla - tapOffset).distance;
+      if (dist < minDist) {
+        minDist = dist;
+        cercano = punto;
+      }
+    }
+    return cercano;
+  }
 }

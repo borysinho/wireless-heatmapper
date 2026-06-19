@@ -45,6 +45,7 @@ class Plano extends Equatable {
   final int tamanoBytes;
   final String urlFirmada;
   final bool calibrado;
+  final int cantidadPuntos;
   final double? escalaMPorPx;
   final double? distanciaRealM;
   final double? calibracionX1;
@@ -65,6 +66,7 @@ class Plano extends Equatable {
     required this.tamanoBytes,
     required this.urlFirmada,
     required this.calibrado,
+    this.cantidadPuntos = 0,
     this.escalaMPorPx,
     this.distanciaRealM,
     this.calibracionX1,
@@ -79,6 +81,7 @@ class Plano extends Equatable {
   Plano copyWith({
     String? urlFirmada,
     bool? calibrado,
+    int? cantidadPuntos,
     double? escalaMPorPx,
     double? distanciaRealM,
     double? calibracionX1,
@@ -98,6 +101,7 @@ class Plano extends Equatable {
       tamanoBytes: tamanoBytes,
       urlFirmada: urlFirmada ?? this.urlFirmada,
       calibrado: calibrado ?? this.calibrado,
+      cantidadPuntos: cantidadPuntos ?? this.cantidadPuntos,
       escalaMPorPx: escalaMPorPx ?? this.escalaMPorPx,
       distanciaRealM: distanciaRealM ?? this.distanciaRealM,
       calibracionX1: calibracionX1 ?? this.calibracionX1,
@@ -121,6 +125,7 @@ class Plano extends Equatable {
         tamanoBytes,
         urlFirmada,
         calibrado,
+        cantidadPuntos,
         escalaMPorPx,
         distanciaRealM,
         calibracionX1,

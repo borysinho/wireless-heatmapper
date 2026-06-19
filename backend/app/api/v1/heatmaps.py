@@ -19,6 +19,7 @@ from app.models.heatmap import MapaCalor
 from app.models.usuario import Usuario
 from app.repositories.heatmap_repository import (
     AnalisisCoberturaRepository,
+    ConjuntoAPRepository,
     MapaCalorRepository,
 )
 from app.repositories.medicion_repository import MedicionRepository
@@ -28,7 +29,13 @@ from app.schemas.heatmap import (
     AnalisisCoberturaOut,
     APDetectadoOut,
     APDisponibleOut,
+    ActualizarUbicacionAPConjuntoIn,
+    ConjuntoAPActualizarIn,
+    ConjuntoAPCrearIn,
+    ConjuntoAPItemOut,
+    ConjuntoAPOut,
     ConfirmarAPIn,
+    GenerarHeatmapConjuntoIn,
     MapaCalorOut,
     PuntoLecturaHeatmapOut,
 )
@@ -44,6 +51,7 @@ from app.storage import LocalFilesystemStorage, generar_url_firmada, verificar_f
 router_planos_heatmap = APIRouter(prefix="/planos", tags=["heatmaps"])
 router_mapas = APIRouter(prefix="/mapas", tags=["heatmaps"])
 router_aps = APIRouter(prefix="/aps", tags=["heatmaps"])
+router_conjuntos_ap = APIRouter(prefix="/conjuntos-ap", tags=["heatmaps"])
 
 
 def _storage() -> LocalFilesystemStorage:
@@ -131,6 +139,8 @@ def _mapa_out(
     return MapaCalorOut(
         id=mapa.id,
         plano_id=mapa.plano_id,
+        conjunto_ap_id=mapa.conjunto_ap_id,
+        modo_generacion=mapa.modo_generacion,
         algoritmo=mapa.algoritmo,
         resolucion=mapa.resolucion,
         bssid=mapa.bssid,
@@ -138,6 +148,8 @@ def _mapa_out(
         ap_pos_x=mapa.ap_pos_x,
         ap_pos_y=mapa.ap_pos_y,
         aps_interes=aps_interes,
+        bssids_generacion=mapa.bssids_generacion
+        or [ap["bssid"] for ap in aps_interes],
         url_imagen=_firmar(mapa.ruta_imagen, request),
         matriz=mapa.matriz,
         escala=mapa.escala,
@@ -261,10 +273,91 @@ def _resolver_aps_interes(
     return seleccionados
 
 
-def _firma_aps_interes(*, firma_base: str, aps_interes: list[dict]) -> str:
+def _resolver_items_conjunto(*, aps: list[dict], bssids: list[str]) -> list[dict]:
+    bssids_norm = _normalizar_bssids(bssids)
+    if not bssids_norm:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Debe seleccionar al menos un AP para el conjunto.",
+        )
+    por_bssid = {ap["bssid"]: ap for ap in aps}
+    faltantes = [bssid for bssid in bssids_norm if bssid not in por_bssid]
+    if faltantes:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Uno o más APs no existen en las mediciones del plano.",
+        )
+    return [
+        {
+            "bssid": bssid,
+            "ssid_snapshot": por_bssid[bssid]["ssid"],
+            "canal_snapshot": por_bssid[bssid]["canal"],
+            "rssi_promedio_snapshot": por_bssid[bssid]["rssi_promedio"],
+            "pos_x": por_bssid[bssid]["pos_x"],
+            "pos_y": por_bssid[bssid]["pos_y"],
+        }
+        for bssid in bssids_norm
+    ]
+
+
+def _conjunto_out(conjunto) -> ConjuntoAPOut:
+    items = [
+        ConjuntoAPItemOut(
+            bssid=item.bssid,
+            ssid=item.ssid_snapshot or "",
+            canal=item.canal_snapshot,
+            rssi_promedio=item.rssi_promedio_snapshot,
+            pos_x=item.pos_x,
+            pos_y=item.pos_y,
+        )
+        for item in conjunto.items
+    ]
+    return ConjuntoAPOut(
+        id=conjunto.id,
+        plano_id=conjunto.plano_id,
+        nombre=conjunto.nombre,
+        proposito=conjunto.proposito,
+        descripcion=conjunto.descripcion,
+        es_principal=conjunto.es_principal,
+        cantidad_aps=len(items),
+        items=items,
+        created_at=conjunto.created_at,
+        updated_at=conjunto.updated_at,
+    )
+
+
+def _verificar_ownership_conjunto(
+    *,
+    conjunto_id: int,
+    current_user: Usuario,
+    db: Session,
+):
+    conjunto = ConjuntoAPRepository(db).obtener_por_id(conjunto_id=conjunto_id)
+    if conjunto is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conjunto de APs no encontrado.",
+        )
+    _verificar_ownership_plano(
+        plano_id=conjunto.plano_id,
+        current_user=current_user,
+        db=db,
+    )
+    return conjunto
+
+
+def _firma_aps_interes(
+    *,
+    firma_base: str,
+    aps_interes: list[dict],
+    conjunto_ap_id: int | None = None,
+    modo_generacion: str = "SUBCONJUNTO",
+) -> str:
     payload = {
-        "modelo": "aps-interes-mediciones-v7",
+        "modelo": "aps-interes-mediciones-v8",
         "firma_base": firma_base,
+        "conjunto_ap_id": conjunto_ap_id,
+        "modo_generacion": modo_generacion,
         "aps": [
             {
                 "bssid": ap["bssid"],
@@ -298,34 +391,44 @@ def listar_aps_disponibles(
         db=db,
     )
     aps = MedicionRepository(db).listar_aps_por_plano(plano_id=plano_id)
+    mapas_recientes = MapaCalorRepository(db).listar_recientes_por_plano(
+        plano_id=plano_id,
+    )
+    if mapas_recientes:
+        ultimo_mapa = mapas_recientes[0]
+        aps_ultimo_mapa = ultimo_mapa.aps_interes or [
+            {"bssid": ultimo_mapa.bssid}
+        ]
+    else:
+        aps_ultimo_mapa = []
+    bssids_ultimo_mapa = {ap["bssid"] for ap in aps_ultimo_mapa}
+    posiciones_previas: dict[str, dict] = {}
+    for mapa in mapas_recientes:
+        for ap in mapa.aps_interes or []:
+            posiciones_previas.setdefault(ap["bssid"], ap)
+    for ap in aps:
+        posicion = posiciones_previas.get(ap["bssid"])
+        if posicion is None:
+            continue
+        ap["pos_x"] = posicion["pos_x"]
+        ap["pos_y"] = posicion["pos_y"]
+        ap["seleccionado"] = ap["bssid"] in bssids_ultimo_mapa
     return [APDisponibleOut(**ap) for ap in aps]
 
 
-@router_planos_heatmap.get(
-    "/{plano_id}/heatmap",
-    response_model=MapaCalorOut,
-    summary="Generar mapa de calor",
-    description=(
-        "Genera o reutiliza el heatmap cacheado del plano mediante IDW. "
-        "PB-05 — CA-1 a CA-6."
-    ),
-)
-def generar_heatmap(
+def _generar_heatmap_core(
+    *,
     plano_id: int,
     request: Request,
-    bssid: list[str] = Query(..., description="BSSID de cada AP de interés"),
-    ap_pos_x: list[float] | None = Query(
-        default=None,
-        description="Ubicación X confirmada de cada AP sobre el plano",
-    ),
-    ap_pos_y: list[float] | None = Query(
-        default=None,
-        description="Ubicación Y confirmada de cada AP sobre el plano",
-    ),
-    algoritmo: str = Query(default="IDW", pattern="^(IDW|KRIGING|idw|kriging)$"),
-    resolucion: int = Query(default=128, enum=[64, 128, 256]),
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    bssid: list[str],
+    ap_pos_x: list[float] | None,
+    ap_pos_y: list[float] | None,
+    algoritmo: str,
+    resolucion: int,
+    db: Session,
+    current_user: Usuario,
+    conjunto_ap_id: int | None = None,
+    modo_generacion: str | None = None,
 ) -> MapaCalorOut:
     plano = _verificar_ownership_plano(
         plano_id=plano_id,
@@ -364,6 +467,9 @@ def generar_heatmap(
         )
 
     algoritmo_norm = algoritmo.upper()
+    modo_norm = modo_generacion or (
+        "INDIVIDUAL" if len(bssids_norm) == 1 else "SUBCONJUNTO"
+    )
     firma_base = med_repo.firma_mediciones_plano(
         plano_id=plano_id,
         bssids=bssids_norm,
@@ -371,6 +477,8 @@ def generar_heatmap(
     firma = _firma_aps_interes(
         firma_base=firma_base,
         aps_interes=aps_interes,
+        conjunto_ap_id=conjunto_ap_id,
+        modo_generacion=modo_norm,
     )
     mapa_repo = MapaCalorRepository(db)
     cache = mapa_repo.obtener_cache(
@@ -399,6 +507,8 @@ def generar_heatmap(
 
     mapa = mapa_repo.crear(
         plano_id=plano_id,
+        conjunto_ap_id=conjunto_ap_id,
+        modo_generacion=modo_norm,
         algoritmo=algoritmo_norm,
         resolucion=resolucion,
         bssid=ap_principal["bssid"],
@@ -406,6 +516,7 @@ def generar_heatmap(
         ap_pos_x=ap_principal["pos_x"],
         ap_pos_y=ap_principal["pos_y"],
         aps_interes=aps_interes,
+        bssids_generacion=bssids_norm,
         matriz=matriz,
         escala=ESCALA_CWNA,
         ruta_imagen=ruta,
@@ -415,6 +526,312 @@ def generar_heatmap(
         firma_mediciones=firma,
     )
     return _mapa_out(mapa, request, puntos=puntos)
+
+
+@router_planos_heatmap.get(
+    "/{plano_id}/heatmap",
+    response_model=MapaCalorOut,
+    summary="Generar mapa de calor",
+    description=(
+        "Genera o reutiliza el heatmap cacheado del plano mediante IDW. "
+        "PB-05 — CA-1 a CA-6."
+    ),
+)
+def generar_heatmap(
+    plano_id: int,
+    request: Request,
+    bssid: list[str] = Query(..., description="BSSID de cada AP de interés"),
+    ap_pos_x: list[float] | None = Query(
+        default=None,
+        description="Ubicación X confirmada de cada AP sobre el plano",
+    ),
+    ap_pos_y: list[float] | None = Query(
+        default=None,
+        description="Ubicación Y confirmada de cada AP sobre el plano",
+    ),
+    algoritmo: str = Query(default="IDW", pattern="^(IDW|KRIGING|idw|kriging)$"),
+    resolucion: int = Query(default=128, enum=[64, 128, 256]),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> MapaCalorOut:
+    return _generar_heatmap_core(
+        plano_id=plano_id,
+        request=request,
+        bssid=bssid,
+        ap_pos_x=ap_pos_x,
+        ap_pos_y=ap_pos_y,
+        algoritmo=algoritmo,
+        resolucion=resolucion,
+        db=db,
+        current_user=current_user,
+    )
+
+
+@router_planos_heatmap.get(
+    "/{plano_id}/conjuntos-ap",
+    response_model=list[ConjuntoAPOut],
+    summary="Listar conjuntos de APs del plano",
+)
+def listar_conjuntos_ap(
+    plano_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> list[ConjuntoAPOut]:
+    _verificar_ownership_plano(
+        plano_id=plano_id,
+        current_user=current_user,
+        db=db,
+    )
+    conjuntos = ConjuntoAPRepository(db).listar_por_plano(plano_id=plano_id)
+    return [_conjunto_out(conjunto) for conjunto in conjuntos]
+
+
+@router_planos_heatmap.post(
+    "/{plano_id}/conjuntos-ap",
+    response_model=ConjuntoAPOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear conjunto de APs del plano",
+)
+def crear_conjunto_ap(
+    plano_id: int,
+    body: ConjuntoAPCrearIn,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> ConjuntoAPOut:
+    _verificar_ownership_plano(
+        plano_id=plano_id,
+        current_user=current_user,
+        db=db,
+    )
+    repo = ConjuntoAPRepository(db)
+    nombre = body.nombre.strip()
+    proposito = body.proposito.strip()
+    if repo.existe_nombre(plano_id=plano_id, nombre=nombre):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe un conjunto de APs con ese nombre en el plano.",
+        )
+    aps = MedicionRepository(db).listar_aps_por_plano(plano_id=plano_id)
+    items = _resolver_items_conjunto(aps=aps, bssids=body.bssids)
+    conjunto = repo.crear(
+        plano_id=plano_id,
+        nombre=nombre,
+        proposito=proposito,
+        descripcion=body.descripcion,
+        es_principal=body.es_principal,
+        items=items,
+    )
+    return _conjunto_out(conjunto)
+
+
+@router_conjuntos_ap.get(
+    "/{conjunto_id}",
+    response_model=ConjuntoAPOut,
+    summary="Obtener conjunto de APs",
+)
+def obtener_conjunto_ap(
+    conjunto_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> ConjuntoAPOut:
+    conjunto = _verificar_ownership_conjunto(
+        conjunto_id=conjunto_id,
+        current_user=current_user,
+        db=db,
+    )
+    return _conjunto_out(conjunto)
+
+
+@router_conjuntos_ap.patch(
+    "/{conjunto_id}",
+    response_model=ConjuntoAPOut,
+    summary="Actualizar conjunto de APs",
+)
+def actualizar_conjunto_ap(
+    conjunto_id: int,
+    body: ConjuntoAPActualizarIn,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> ConjuntoAPOut:
+    conjunto = _verificar_ownership_conjunto(
+        conjunto_id=conjunto_id,
+        current_user=current_user,
+        db=db,
+    )
+    repo = ConjuntoAPRepository(db)
+    nombre = body.nombre.strip() if body.nombre is not None else None
+    if nombre is not None and repo.existe_nombre(
+        plano_id=conjunto.plano_id,
+        nombre=nombre,
+        excluir_id=conjunto.id,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe un conjunto de APs con ese nombre en el plano.",
+        )
+    items = None
+    if body.bssids is not None:
+        aps = MedicionRepository(db).listar_aps_por_plano(plano_id=conjunto.plano_id)
+        items = _resolver_items_conjunto(aps=aps, bssids=body.bssids)
+    descripcion = (
+        body.descripcion
+        if "descripcion" in body.model_fields_set
+        else conjunto.descripcion
+    )
+    actualizado = repo.actualizar(
+        conjunto=conjunto,
+        nombre=nombre,
+        proposito=body.proposito.strip() if body.proposito is not None else None,
+        descripcion=descripcion,
+        es_principal=body.es_principal,
+        items=items,
+    )
+    return _conjunto_out(actualizado)
+
+
+@router_conjuntos_ap.delete(
+    "/{conjunto_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar conjunto de APs",
+)
+def eliminar_conjunto_ap(
+    conjunto_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> Response:
+    conjunto = _verificar_ownership_conjunto(
+        conjunto_id=conjunto_id,
+        current_user=current_user,
+        db=db,
+    )
+    ConjuntoAPRepository(db).eliminar(conjunto=conjunto)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router_conjuntos_ap.patch(
+    "/{conjunto_id}/ubicacion-ap",
+    response_model=ConjuntoAPOut,
+    summary="Actualizar ubicación de un AP dentro del conjunto",
+)
+def actualizar_ubicacion_ap_conjunto(
+    conjunto_id: int,
+    body: ActualizarUbicacionAPConjuntoIn,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> ConjuntoAPOut:
+    conjunto = _verificar_ownership_conjunto(
+        conjunto_id=conjunto_id,
+        current_user=current_user,
+        db=db,
+    )
+    repo = ConjuntoAPRepository(db)
+    actualizado = repo.actualizar_ubicacion_ap(
+        conjunto=conjunto,
+        bssid=body.bssid.lower(),
+        pos_x=body.pos_x,
+        pos_y=body.pos_y,
+    )
+    if actualizado is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="El AP no pertenece al conjunto.",
+        )
+    return _conjunto_out(actualizado)
+
+
+@router_conjuntos_ap.post(
+    "/{conjunto_id}/heatmaps",
+    response_model=MapaCalorOut,
+    summary="Generar heatmap desde conjunto de APs",
+)
+def generar_heatmap_conjunto(
+    conjunto_id: int,
+    body: GenerarHeatmapConjuntoIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> MapaCalorOut:
+    conjunto = _verificar_ownership_conjunto(
+        conjunto_id=conjunto_id,
+        current_user=current_user,
+        db=db,
+    )
+    bssids_conjunto = [item.bssid for item in conjunto.items]
+    bssids_solicitados = _normalizar_bssids(body.bssids or [])
+    if body.modo == "CONJUNTO_COMPLETO":
+        bssids_generacion = bssids_conjunto
+    elif body.modo == "INDIVIDUAL":
+        if len(bssids_solicitados) != 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="El modo INDIVIDUAL requiere exactamente un AP del conjunto.",
+            )
+        bssids_generacion = bssids_solicitados
+    else:
+        if not bssids_solicitados:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="El modo SUBCONJUNTO requiere al menos un AP del conjunto.",
+            )
+        bssids_generacion = bssids_solicitados
+
+    fuera_del_conjunto = [
+        bssid for bssid in bssids_generacion if bssid not in bssids_conjunto
+    ]
+    if fuera_del_conjunto:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Uno o más APs seleccionados no pertenecen al conjunto.",
+        )
+
+    if (body.ap_pos_x is None) != (body.ap_pos_y is None):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Las coordenadas X/Y de los APs del conjunto deben enviarse juntas.",
+        )
+    posiciones_request_completas = (
+        body.ap_pos_x is not None
+        and body.ap_pos_y is not None
+        and len(body.ap_pos_x) == len(bssids_generacion)
+        and len(body.ap_pos_y) == len(bssids_generacion)
+    )
+    if body.ap_pos_x is not None and not posiciones_request_completas:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La cantidad de coordenadas no coincide con los APs seleccionados.",
+        )
+    if posiciones_request_completas:
+        ap_pos_x = body.ap_pos_x
+        ap_pos_y = body.ap_pos_y
+    else:
+        items_por_bssid = {item.bssid: item for item in conjunto.items}
+        ap_pos_x = [
+            items_por_bssid[bssid].pos_x
+            for bssid in bssids_generacion
+            if items_por_bssid[bssid].pos_x is not None
+        ]
+        ap_pos_y = [
+            items_por_bssid[bssid].pos_y
+            for bssid in bssids_generacion
+            if items_por_bssid[bssid].pos_y is not None
+        ]
+    posiciones_completas = len(ap_pos_x) == len(bssids_generacion) and len(
+        ap_pos_y
+    ) == len(bssids_generacion)
+
+    return _generar_heatmap_core(
+        plano_id=conjunto.plano_id,
+        request=request,
+        bssid=bssids_generacion,
+        ap_pos_x=ap_pos_x if posiciones_completas else None,
+        ap_pos_y=ap_pos_y if posiciones_completas else None,
+        algoritmo=body.algoritmo,
+        resolucion=body.resolucion,
+        db=db,
+        current_user=current_user,
+        conjunto_ap_id=conjunto.id,
+        modo_generacion=body.modo,
+    )
 
 
 @router_mapas.post(

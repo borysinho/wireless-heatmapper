@@ -84,40 +84,28 @@ class _CapturaPageState extends State<CapturaPage> {
 
   Size get _tamanoPlano => Size(widget.anchoPlanoPx, widget.altoPlanoPx);
 
-  // ── Conversión coordenadas ─────────────────────────────────────────────────
-
-  /// Convierte un tap en el widget canvas a coordenadas del plano.
-  ///
-  /// [tapLocal] es el [localPosition] del GestureDetector, que Flutter ya
-  /// entrega en el espacio de contenido (pre-transformación del InteractiveViewer).
-  /// No se aplica compensación manual adicional.
-  Offset? _tapACoordenadasPlano(Offset tapLocal) {
-    final box = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null) return null;
-    final widgetSize = box.size;
-
-    return PlanoPuntosPainter.pantallaToPlanoCoordenadas(
-      tapOffset: tapLocal,
-      canvasSize: widgetSize,
-      tamanoPlano: _tamanoPlano,
-    );
-  }
-
   // ── Handlers de gestos ─────────────────────────────────────────────────────
 
   void _onTap(TapUpDetails details, List<PuntoMedicion> puntos) {
-    final posPlano = _tapACoordenadasPlano(details.localPosition);
-    if (posPlano == null) return;
+    final box = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return;
 
-    // Verificar si tocó un punto existente
-    final puntoTocado = PlanoPuntosPainter.puntoEnPosicion(
-      posPlano: posPlano,
+    final puntoTocado = PlanoPuntosPainter.puntoEnPosicionPantalla(
+      tapOffset: details.localPosition,
+      canvasSize: box.size,
+      tamanoPlano: _tamanoPlano,
       puntos: puntos,
     );
 
     if (puntoTocado != null) {
       _abrirDetalle(puntoTocado);
     } else {
+      final posPlano = PlanoPuntosPainter.pantallaToPlanoCoordenadas(
+        tapOffset: details.localPosition,
+        canvasSize: box.size,
+        tamanoPlano: _tamanoPlano,
+      );
+
       // Bloquear marcado de nuevos puntos mientras el ciclo continuo está activo.
       // El técnico debe tocar ⊙ para detener antes de cambiar de posición.
       if (_puntoActivoContinuoId != null) {
@@ -327,6 +315,10 @@ class _CapturaPageState extends State<CapturaPage> {
           CapturaPuntoDetalle(:final intervaloSegundos) => intervaloSegundos,
           _ => 30,
         };
+        final puntoSeleccionadoId = switch (state) {
+          CapturaPuntoDetalle(:final puntoSeleccionado) => puntoSeleccionado.id,
+          _ => null,
+        };
 
         return Scaffold(
           appBar: AppBar(
@@ -418,6 +410,7 @@ class _CapturaPageState extends State<CapturaPage> {
                             foregroundPainter: PlanoPuntosPainter(
                               puntos: puntos,
                               tamanoPlano: _tamanoPlano,
+                              puntoSeleccionadoId: puntoSeleccionadoId,
                             ),
                             child: Image.network(
                               widget.imagenUrl,

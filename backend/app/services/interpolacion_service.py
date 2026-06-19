@@ -21,10 +21,12 @@ class PuntoRSSI:
 
 
 ESCALA_CWNA = [
-    {"desde": -50, "hasta": 0, "color": "#0B7A3B", "etiqueta": "Excelente"},
-    {"desde": -70, "hasta": -51, "color": "#57B65A", "etiqueta": "Buena"},
-    {"desde": -80, "hasta": -71, "color": "#F4D35E", "etiqueta": "Aceptable"},
-    {"desde": -90, "hasta": -81, "color": "#F08A24", "etiqueta": "Débil"},
+    {"desde": -60, "hasta": 0, "color": "#0B7A3B", "etiqueta": "Excelente"},
+    {"desde": -67, "hasta": -61, "color": "#57B65A", "etiqueta": "Muy buena"},
+    {"desde": -70, "hasta": -68, "color": "#A7C957", "etiqueta": "Buena"},
+    {"desde": -75, "hasta": -71, "color": "#F4D35E", "etiqueta": "Advertencia"},
+    {"desde": -80, "hasta": -76, "color": "#F08A24", "etiqueta": "Débil"},
+    {"desde": -90, "hasta": -81, "color": "#D95D39", "etiqueta": "Muy débil"},
     {"desde": -120, "hasta": -91, "color": "#D7263D", "etiqueta": "Zona muerta"},
 ]
 
@@ -246,9 +248,16 @@ class HeatmapImageService:
         paradas = [
             (-120.0, (215, 38, 61)),
             (-91.0, (215, 38, 61)),
-            (-90.0, (240, 138, 36)),
-            (-80.0, (244, 211, 94)),
-            (-70.0, (87, 182, 90)),
+            (-90.0, (217, 93, 57)),
+            (-80.0, (217, 93, 57)),
+            (-76.0, (240, 138, 36)),
+            (-75.0, (244, 211, 94)),
+            (-71.0, (244, 211, 94)),
+            (-70.0, (167, 201, 87)),
+            (-68.0, (167, 201, 87)),
+            (-67.0, (87, 182, 90)),
+            (-61.0, (87, 182, 90)),
+            (-60.0, (11, 122, 59)),
             (-50.0, (11, 122, 59)),
             (0.0, (11, 122, 59)),
         ]

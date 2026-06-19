@@ -123,9 +123,8 @@ class PlanosCubit extends Cubit<PlanosState> {
         y2: y2,
         distanciaRealM: distanciaRealM,
       );
-      final lista = _proyectoId != null
-          ? await _listar(_proyectoId!)
-          : actuales;
+      final lista =
+          _proyectoId != null ? await _listar(_proyectoId!) : actuales;
       emit(PlanosOperacionExitosa(
         planos: lista,
         mensaje: 'Escala calibrada: '
@@ -161,6 +160,8 @@ class PlanosCubit extends Cubit<PlanosState> {
       ));
     } on PlanoNoEncontradoException {
       emit(PlanosError('El plano no existe.', planos: actuales));
+    } on PlanoEliminacionBloqueadaException catch (e) {
+      emit(PlanosError(e.toString(), planos: actuales));
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) return;
       emit(PlanosError('No se pudo eliminar el plano.', planos: actuales));

@@ -97,8 +97,10 @@ void main() {
       seed: () => PlanosListaExitosa([_planoFake(id: 5)]),
       act: (c) => c.calibrarPlano(
         planoId: 5,
-        x1: 0, y1: 0,
-        x2: 100, y2: 0,
+        x1: 0,
+        y1: 0,
+        x2: 100,
+        y2: 0,
         distanciaRealM: 0.5,
       ),
       expect: () => [
@@ -127,13 +129,36 @@ void main() {
       seed: () => PlanosListaExitosa([_planoFake(id: 5)]),
       act: (c) => c.calibrarPlano(
         planoId: 5,
-        x1: 50, y1: 50,
-        x2: 50, y2: 50,
+        x1: 50,
+        y1: 50,
+        x2: 50,
+        y2: 50,
         distanciaRealM: 5,
       ),
       expect: () => [
         isA<PlanosLoading>(),
         isA<PlanosError>(),
+      ],
+    );
+  });
+
+  group('eliminarPlano', () {
+    blocTest<PlanosCubit, PlanosState>(
+      'mapea PlanoEliminacionBloqueadaException a mensaje específico',
+      build: () {
+        when(() => repo.eliminar(5))
+            .thenThrow(const PlanoEliminacionBloqueadaException());
+        return cubit;
+      },
+      seed: () => PlanosListaExitosa([_planoFake(id: 5)]),
+      act: (c) => c.eliminarPlano(5),
+      expect: () => [
+        isA<PlanosLoading>(),
+        isA<PlanosError>().having(
+          (e) => e.mensaje,
+          'mensaje',
+          'No es posible eliminar un plano con mediciones registradas.',
+        ),
       ],
     );
   });

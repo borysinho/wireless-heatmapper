@@ -41,8 +41,10 @@ class AnalisisCoberturaService:
     ) -> dict:
         total_celdas = sum(len(fila) for fila in matriz)
         celdas_cobertura = sum(1 for fila in matriz for rssi in fila if rssi >= -70)
+        celdas_problematicas = sum(1 for fila in matriz for rssi in fila if rssi < -75)
         celdas_muertas = sum(1 for fila in matriz for rssi in fila if rssi < -90)
         pct_cobertura = self._porcentaje(celdas_cobertura, total_celdas)
+        pct_zonas_problematicas = self._porcentaje(celdas_problematicas, total_celdas)
         pct_zonas_muertas = self._porcentaje(celdas_muertas, total_celdas)
 
         aps = self._calcular_aps(
@@ -62,12 +64,18 @@ class AnalisisCoberturaService:
                 "porcentaje": pct_zonas_muertas,
                 "umbral": "RSSI < −90 dBm",
             },
+            "zonas_problematicas": {
+                "celdas": celdas_problematicas,
+                "porcentaje": pct_zonas_problematicas,
+                "umbral": "RSSI < −75 dBm",
+            },
             "solapamientos_ap": solapamientos,
             "interferencias_canal": interferencias,
         }
         resumen = (
             f"Cobertura adecuada en {pct_cobertura:.2f}% del plano; "
-            f"{pct_zonas_muertas:.2f}% corresponde a zonas muertas."
+            f"{pct_zonas_problematicas:.2f}% está bajo el umbral operativo de "
+            f"−75 dBm y {pct_zonas_muertas:.2f}% corresponde a zonas muertas."
         )
 
         return {

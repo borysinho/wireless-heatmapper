@@ -10,6 +10,7 @@ class APDisponible extends Equatable {
   final double posX;
   final double posY;
   final int cantidadPuntos;
+  final bool seleccionado;
 
   const APDisponible({
     required this.bssid,
@@ -20,6 +21,7 @@ class APDisponible extends Equatable {
     required this.posX,
     required this.posY,
     required this.cantidadPuntos,
+    this.seleccionado = false,
   });
 
   @override
@@ -32,5 +34,6 @@ class APDisponible extends Equatable {
         posX,
         posY,
         cantidadPuntos,
+        seleccionado,
       ];
 }

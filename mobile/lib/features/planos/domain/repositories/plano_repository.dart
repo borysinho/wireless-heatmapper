@@ -46,8 +46,7 @@ class PlanoArchivoMuyGrandeException implements Exception {
   final int tamanoBytes;
   const PlanoArchivoMuyGrandeException(this.tamanoBytes);
   @override
-  String toString() =>
-      'El archivo excede el tamaño máximo permitido (20 MB).';
+  String toString() => 'El archivo excede el tamaño máximo permitido (20 MB).';
 }
 
 /// Formato de archivo no soportado (PB-02 CA-2).
@@ -55,24 +54,21 @@ class PlanoFormatoNoSoportadoException implements Exception {
   final String extension;
   const PlanoFormatoNoSoportadoException(this.extension);
   @override
-  String toString() =>
-      'Formato no soportado ($extension). Use PNG, JPG o PDF.';
+  String toString() => 'Formato no soportado ($extension). Use PNG, JPG o PDF.';
 }
 
 /// Distancia real fuera de rango (PB-11 CA-3 — debe ser ≥ 1 metro).
 class PlanoDistanciaInvalidaException implements Exception {
   const PlanoDistanciaInvalidaException();
   @override
-  String toString() =>
-      'La distancia real debe ser mayor o igual a 1 metro.';
+  String toString() => 'La distancia real debe ser mayor o igual a 1 metro.';
 }
 
 /// Puntos de calibración coincidentes o demasiado próximos (PB-11 CA-2).
 class PlanoPuntosInvalidosException implements Exception {
   const PlanoPuntosInvalidosException();
   @override
-  String toString() =>
-      'Los puntos seleccionados deben ser distintos.';
+  String toString() => 'Los puntos seleccionados deben ser distintos.';
 }
 
 /// Recalibración bloqueada porque ya existen puntos asociados (PB-11 CA-4).
@@ -81,6 +77,14 @@ class PlanoRecalibracionBloqueadaException implements Exception {
   @override
   String toString() =>
       'No se puede recalibrar: el plano ya tiene puntos de medición.';
+}
+
+/// Eliminación bloqueada porque ya existen puntos asociados (PB-02 CA-6).
+class PlanoEliminacionBloqueadaException implements Exception {
+  const PlanoEliminacionBloqueadaException();
+  @override
+  String toString() =>
+      'No es posible eliminar un plano con mediciones registradas.';
 }
 
 /// Error genérico de almacenamiento o red.

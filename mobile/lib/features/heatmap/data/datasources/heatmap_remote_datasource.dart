@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../models/analisis_cobertura_model.dart';
 import '../models/ap_disponible_model.dart';
 import '../models/ap_detectado_model.dart';
+import '../models/conjunto_ap_model.dart';
 import '../models/mapa_calor_model.dart';
 
 class HeatmapRemoteDatasource {
@@ -16,6 +17,105 @@ class HeatmapRemoteDatasource {
       return (response.data ?? [])
           .map((e) => APDisponibleModel.fromJson(e as Map<String, dynamic>))
           .toList();
+    } on DioException catch (e) {
+      throw HeatmapApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  Future<List<ConjuntoAPModel>> listarConjuntosAP(int planoId) async {
+    try {
+      final response = await _dio.get<List<dynamic>>(
+        '/planos/$planoId/conjuntos-ap',
+      );
+      return (response.data ?? [])
+          .map((e) => ConjuntoAPModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw HeatmapApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  Future<ConjuntoAPModel> crearConjuntoAP({
+    required int planoId,
+    required String nombre,
+    required String proposito,
+    String? descripcion,
+    required List<String> bssids,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/planos/$planoId/conjuntos-ap',
+        data: {
+          'nombre': nombre,
+          'proposito': proposito,
+          'descripcion': descripcion,
+          'bssids': bssids,
+        },
+      );
+      return ConjuntoAPModel.fromJson(response.data!);
+    } on DioException catch (e) {
+      throw HeatmapApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  Future<ConjuntoAPModel> actualizarConjuntoAP({
+    required int conjuntoId,
+    required String nombre,
+    required String proposito,
+    String? descripcion,
+    required List<String> bssids,
+  }) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/conjuntos-ap/$conjuntoId',
+        data: {
+          'nombre': nombre,
+          'proposito': proposito,
+          'descripcion': descripcion,
+          'bssids': bssids,
+        },
+      );
+      return ConjuntoAPModel.fromJson(response.data!);
+    } on DioException catch (e) {
+      throw HeatmapApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  Future<void> eliminarConjuntoAP(int conjuntoId) async {
+    try {
+      await _dio.delete<void>('/conjuntos-ap/$conjuntoId');
+    } on DioException catch (e) {
+      throw HeatmapApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  Future<ConjuntoAPModel> actualizarUbicacionAPConjunto({
+    required int conjuntoId,
+    required String bssid,
+    required double posX,
+    required double posY,
+  }) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/conjuntos-ap/$conjuntoId/ubicacion-ap',
+        data: {'bssid': bssid, 'pos_x': posX, 'pos_y': posY},
+      );
+      return ConjuntoAPModel.fromJson(response.data!);
     } on DioException catch (e) {
       throw HeatmapApiException(
         _mensajeDesdeError(e),
@@ -41,6 +141,36 @@ class HeatmapRemoteDatasource {
           'bssid': bssids,
           'ap_pos_x': apPosX,
           'ap_pos_y': apPosY,
+        },
+      );
+      return MapaCalorModel.fromJson(response.data!);
+    } on DioException catch (e) {
+      throw HeatmapApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  Future<MapaCalorModel> generarHeatmapDesdeConjunto({
+    required int conjuntoId,
+    required String modo,
+    required String algoritmo,
+    required int resolucion,
+    List<String>? bssids,
+    List<double>? apPosX,
+    List<double>? apPosY,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/conjuntos-ap/$conjuntoId/heatmaps',
+        data: {
+          'modo': modo,
+          'algoritmo': algoritmo,
+          'resolucion': resolucion,
+          if (bssids != null) 'bssids': bssids,
+          if (apPosX != null) 'ap_pos_x': apPosX,
+          if (apPosY != null) 'ap_pos_y': apPosY,
         },
       );
       return MapaCalorModel.fromJson(response.data!);

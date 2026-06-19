@@ -26,6 +26,13 @@ abstract class CapturaRepository {
     required List<ResultadoEscaneo> escaneos,
   });
 
+  /// Mueve un punto existente sobre el plano.
+  Future<PuntoMedicion> moverPunto({
+    required int puntoId,
+    required double posX,
+    required double posY,
+  });
+
   /// Elimina un punto y sus mediciones en cascada.
   Future<void> eliminarPunto(int puntoId);
 }

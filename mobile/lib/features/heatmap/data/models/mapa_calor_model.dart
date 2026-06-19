@@ -6,6 +6,8 @@ class MapaCalorModel extends MapaCalor {
   const MapaCalorModel({
     required super.id,
     required super.planoId,
+    required super.conjuntoApId,
+    required super.modoGeneracion,
     required super.algoritmo,
     required super.resolucion,
     required super.bssid,
@@ -13,6 +15,7 @@ class MapaCalorModel extends MapaCalor {
     required super.apPosX,
     required super.apPosY,
     required super.apsInteres,
+    required super.bssidsGeneracion,
     required super.urlImagen,
     required super.matriz,
     required super.escala,
@@ -29,6 +32,8 @@ class MapaCalorModel extends MapaCalor {
     return MapaCalorModel(
       id: json['id'] as int,
       planoId: json['plano_id'] as int,
+      conjuntoApId: json['conjunto_ap_id'] as int?,
+      modoGeneracion: json['modo_generacion'] as String? ?? 'SUBCONJUNTO',
       algoritmo: json['algoritmo'] as String,
       resolucion: json['resolucion'] as int,
       bssid: json['bssid'] as String,
@@ -36,6 +41,10 @@ class MapaCalorModel extends MapaCalor {
       apPosX: (json['ap_pos_x'] as num).toDouble(),
       apPosY: (json['ap_pos_y'] as num).toDouble(),
       apsInteres: _apsInteresDesdeJson(json),
+      bssidsGeneracion:
+          (json['bssids_generacion'] as List<dynamic>? ?? const [])
+              .map((item) => item.toString())
+              .toList(),
       urlImagen: json['url_imagen'] as String,
       matriz: (json['matriz'] as List<dynamic>)
           .map(
@@ -99,6 +108,7 @@ class MapaCalorModel extends MapaCalor {
         posX: (json['ap_pos_x'] as num).toDouble(),
         posY: (json['ap_pos_y'] as num).toDouble(),
         cantidadPuntos: json['cantidad_puntos'] as int,
+        seleccionado: true,
       ),
     ];
   }

@@ -7,19 +7,29 @@ import pytest
 from fastapi import HTTPException
 
 from app.api.v1.heatmaps import (
+    crear_conjunto_ap,
     _resolver_aps_interes,
     analizar_mapa,
+    actualizar_ubicacion_ap_conjunto,
     confirmar_ap,
     generar_heatmap,
+    generar_heatmap_conjunto,
     listar_aps_disponibles,
+    listar_conjuntos_ap,
 )
 from app.core.config import settings
 from app.models.plano import Plano
 from app.models.proyecto import Proyecto
 from app.repositories.medicion_repository import MedicionRepository
-from app.schemas.heatmap import ConfirmarAPIn
+from app.schemas.heatmap import ActualizarUbicacionAPConjuntoIn, ConfirmarAPIn
+from app.schemas.heatmap import ConjuntoAPCrearIn, GenerarHeatmapConjuntoIn
 from app.schemas.medicion import MedicionItemIn
-from app.services.interpolacion_service import InterpolacionService, PuntoRSSI
+from app.services.interpolacion_service import (
+    ESCALA_CWNA,
+    HeatmapImageService,
+    InterpolacionService,
+    PuntoRSSI,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -141,6 +151,143 @@ def test_listar_aps_disponibles_para_seleccion(db_session, tecnico_usuario):
     assert len(aps) == 3
     assert aps[0].bssid == "aa:bb:cc:dd:ee:03"
     assert aps[0].cantidad_puntos == 5
+    assert all(not ap.seleccionado for ap in aps)
+
+
+def test_crear_conjunto_ap_y_generar_heatmaps_por_modo(db_session, tecnico_usuario):
+    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
+    _insertar_puntos_sinteticos(db_session, plano_id, cantidad=5)
+
+    conjunto = crear_conjunto_ap(
+        plano_id=plano_id,
+        body=ConjuntoAPCrearIn(
+            nombre="Red corporativa",
+            proposito="Evaluar cobertura principal de Bulldog Tech.",
+            bssids=["aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"],
+        ),
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    assert conjunto.nombre == "Red corporativa"
+    assert conjunto.cantidad_aps == 2
+    assert [item.bssid for item in conjunto.items] == [
+        "aa:bb:cc:dd:ee:01",
+        "aa:bb:cc:dd:ee:02",
+    ]
+    assert listar_conjuntos_ap(
+        plano_id=plano_id,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )[0].id == conjunto.id
+
+    mapa_completo = generar_heatmap_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapConjuntoIn(modo="CONJUNTO_COMPLETO", resolucion=64),
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    mapa_individual = generar_heatmap_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapConjuntoIn(
+            modo="INDIVIDUAL",
+            bssids=["aa:bb:cc:dd:ee:01"],
+            resolucion=64,
+        ),
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    mapa_subconjunto = generar_heatmap_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapConjuntoIn(
+            modo="SUBCONJUNTO",
+            bssids=["aa:bb:cc:dd:ee:02"],
+            resolucion=64,
+        ),
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    assert mapa_completo.conjunto_ap_id == conjunto.id
+    assert mapa_completo.modo_generacion == "CONJUNTO_COMPLETO"
+    assert mapa_completo.bssids_generacion == [
+        "aa:bb:cc:dd:ee:01",
+        "aa:bb:cc:dd:ee:02",
+    ]
+    assert mapa_individual.modo_generacion == "INDIVIDUAL"
+    assert mapa_individual.bssids_generacion == ["aa:bb:cc:dd:ee:01"]
+    assert mapa_subconjunto.modo_generacion == "SUBCONJUNTO"
+    assert mapa_subconjunto.bssids_generacion == ["aa:bb:cc:dd:ee:02"]
+
+
+def test_ubicacion_ap_conjunto_persiste_y_se_usa_en_heatmap(
+    db_session,
+    tecnico_usuario,
+):
+    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
+    _insertar_puntos_sinteticos(db_session, plano_id, cantidad=5)
+    conjunto = crear_conjunto_ap(
+        plano_id=plano_id,
+        body=ConjuntoAPCrearIn(
+            nombre="AP puntual",
+            proposito="Validar persistencia de ubicación.",
+            bssids=["aa:bb:cc:dd:ee:01"],
+        ),
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    actualizado = actualizar_ubicacion_ap_conjunto(
+        conjunto_id=conjunto.id,
+        body=ActualizarUbicacionAPConjuntoIn(
+            bssid="aa:bb:cc:dd:ee:01",
+            pos_x=321,
+            pos_y=123,
+        ),
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    assert actualizado.items[0].pos_x == 321
+    assert actualizado.items[0].pos_y == 123
+
+    mapa = generar_heatmap_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapConjuntoIn(
+            modo="INDIVIDUAL",
+            bssids=["aa:bb:cc:dd:ee:01"],
+            resolucion=64,
+        ),
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    assert mapa.ap_pos_x == 321
+    assert mapa.ap_pos_y == 123
+
+
+def test_conjunto_ap_rechaza_bssid_inexistente(db_session, tecnico_usuario):
+    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
+    _insertar_puntos_sinteticos(db_session, plano_id, cantidad=5)
+
+    with pytest.raises(HTTPException) as exc:
+        crear_conjunto_ap(
+            plano_id=plano_id,
+            body=ConjuntoAPCrearIn(
+                nombre="AP sospechoso",
+                proposito="Validar una selección inválida.",
+                bssids=["aa:bb:cc:dd:ee:99"],
+            ),
+            db=db_session,
+            current_user=tecnico_usuario,
+        )
+
+    assert exc.value.status_code == 422
+    assert "no existen en las mediciones" in exc.value.detail
 
 
 def test_generar_heatmap_retorna_matriz_y_cache(db_session, tecnico_usuario):
@@ -198,6 +345,65 @@ def test_generar_heatmap_retorna_matriz_y_cache(db_session, tecnico_usuario):
     fila_lectura_media = int((20 / 300) * 64)
     col_lectura_media = int((380 / 400) * 64)
     assert mapa1.matriz[fila_lectura_media][col_lectura_media] >= -65
+
+    aps_recargados = listar_aps_disponibles(
+        plano_id=plano_id,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    posiciones = {ap.bssid: (ap.pos_x, ap.pos_y) for ap in aps_recargados}
+    seleccionados = {ap.bssid for ap in aps_recargados if ap.seleccionado}
+    assert posiciones["aa:bb:cc:dd:ee:01"] == (210, 140)
+    assert posiciones["aa:bb:cc:dd:ee:02"] == (300, 120)
+    assert seleccionados == {"aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"}
+
+    generar_heatmap(
+        plano_id=plano_id,
+        request=None,
+        bssid=["aa:bb:cc:dd:ee:01"],
+        ap_pos_x=[211],
+        ap_pos_y=[141],
+        algoritmo="IDW",
+        resolucion=64,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    aps_tras_mapa_individual = listar_aps_disponibles(
+        plano_id=plano_id,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    posiciones = {ap.bssid: (ap.pos_x, ap.pos_y) for ap in aps_tras_mapa_individual}
+    seleccionados = {
+        ap.bssid for ap in aps_tras_mapa_individual if ap.seleccionado
+    }
+    assert posiciones["aa:bb:cc:dd:ee:01"] == (211, 141)
+    assert posiciones["aa:bb:cc:dd:ee:02"] == (300, 120)
+    assert seleccionados == {"aa:bb:cc:dd:ee:01"}
+
+
+def test_escala_heatmap_prioriza_umbral_operativo():
+    etiquetas = [item["etiqueta"] for item in ESCALA_CWNA]
+    assert etiquetas == [
+        "Excelente",
+        "Muy buena",
+        "Buena",
+        "Advertencia",
+        "Débil",
+        "Muy débil",
+        "Zona muerta",
+    ]
+    assert ESCALA_CWNA[3]["desde"] == -75
+    assert ESCALA_CWNA[-1]["desde"] == -120
+
+
+def test_render_heatmap_muestra_advertencia_en_menos_72_dbm():
+    service = HeatmapImageService()
+
+    assert service._color_para_rssi(-72) == (244, 211, 94)
+    assert service._color_para_rssi(-78) == (228, 116, 46)
+    assert service._color_para_rssi(-85) == (217, 93, 57)
+    assert service._color_para_rssi(-91) == (215, 38, 61)
 
 
 def test_generar_heatmap_compone_mejor_rssi_por_punto(db_session, tecnico_usuario):

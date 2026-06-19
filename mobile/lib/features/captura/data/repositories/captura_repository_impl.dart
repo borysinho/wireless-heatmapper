@@ -40,5 +40,13 @@ class CapturaRepositoryImpl implements CapturaRepository {
       _datasource.agregarMediciones(puntoId: puntoId, escaneos: escaneos);
 
   @override
+  Future<PuntoMedicion> moverPunto({
+    required int puntoId,
+    required double posX,
+    required double posY,
+  }) =>
+      _datasource.moverPunto(puntoId: puntoId, posX: posX, posY: posY);
+
+  @override
   Future<void> eliminarPunto(int puntoId) => _datasource.eliminarPunto(puntoId);
 }

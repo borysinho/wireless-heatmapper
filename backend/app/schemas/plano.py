@@ -23,6 +23,7 @@ class PlanoOut(BaseModel):
     tamano_bytes: int
     url_firmada: str
     calibrado: bool
+    cantidad_puntos: int
     escala_m_por_px: float | None = None
     distancia_real_m: float | None = None
     calibracion_x1: float | None = None
@@ -42,6 +43,7 @@ class PlanoOut(BaseModel):
         *,
         url_firmada: str,
         warning: str | None = None,
+        cantidad_puntos: int | None = None,
     ) -> "PlanoOut":
         return cls(
             id=p.id,
@@ -53,6 +55,11 @@ class PlanoOut(BaseModel):
             tamano_bytes=p.tamano_bytes,
             url_firmada=url_firmada,
             calibrado=p.calibrado,
+            cantidad_puntos=(
+                cantidad_puntos
+                if cantidad_puntos is not None
+                else len(p.puntos_medicion)
+            ),
             escala_m_por_px=p.escala_m_por_px,
             distancia_real_m=p.distancia_real_m,
             calibracion_x1=p.calibracion_x1,

@@ -22,7 +22,8 @@ class DioClient {
       : _dio = Dio(
           BaseOptions(
             baseUrl: AppConfig.apiBaseUrl,
-            connectTimeout: const Duration(seconds: 10),
+            connectTimeout: const Duration(seconds: 6),
+            sendTimeout: const Duration(seconds: 10),
             receiveTimeout: const Duration(seconds: 30),
             headers: const {'Content-Type': 'application/json'},
           ),
@@ -34,11 +35,11 @@ class DioClient {
   Dio get dio => _dio;
 }
 
-/// Interceptor de reintentos con backoff exponencial para fallos de red.
-/// Sprint 3 (Sp3-10): 3 intentos máx., backoff 1→2→4 s, total ≤ 4 s acumulado.
-/// Solo reintenta errores de conexión/timeout, NO errores HTTP (4xx/5xx).
+/// Interceptor de reintentos con backoff corto para lecturas idempotentes.
+/// Solo reintenta fallos antes de recibir respuesta del servidor; no repite
+/// escrituras ni timeouts de lectura para evitar duplicados y esperas largas.
 class _RetryInterceptor extends Interceptor {
-  static const int _maxReintentos = 3;
+  static const int _maxReintentos = 1;
 
   final Dio _dio;
 
@@ -51,18 +52,19 @@ class _RetryInterceptor extends Interceptor {
   ) async {
     final tipo = err.type;
     final intentos = err.requestOptions.extra['_reintentos'] as int? ?? 0;
+    final metodo = err.requestOptions.method.toUpperCase();
 
-    final esErrorRed = tipo == DioExceptionType.connectionError ||
-        tipo == DioExceptionType.connectionTimeout ||
-        tipo == DioExceptionType.receiveTimeout;
+    final esLecturaSegura =
+        metodo == 'GET' || metodo == 'HEAD' || metodo == 'OPTIONS';
+    final esErrorConexion = tipo == DioExceptionType.connectionError ||
+        tipo == DioExceptionType.connectionTimeout;
 
-    if (!esErrorRed || intentos >= _maxReintentos) {
+    if (!esLecturaSegura || !esErrorConexion || intentos >= _maxReintentos) {
       handler.next(err);
       return;
     }
 
-    final esperaMs = (1 << intentos) * 1000; // 1s, 2s, 4s
-    await Future<void>.delayed(Duration(milliseconds: esperaMs));
+    await Future<void>.delayed(const Duration(milliseconds: 800));
 
     final opciones = err.requestOptions;
     opciones.extra['_reintentos'] = intentos + 1;

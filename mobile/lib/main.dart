@@ -213,6 +213,24 @@ void _initDependencias() {
   sl.registerFactory<ListarAPsDisponiblesUseCase>(
     () => ListarAPsDisponiblesUseCase(sl<HeatmapRepository>()),
   );
+  sl.registerFactory<ListarConjuntosAPUseCase>(
+    () => ListarConjuntosAPUseCase(sl<HeatmapRepository>()),
+  );
+  sl.registerFactory<CrearConjuntoAPUseCase>(
+    () => CrearConjuntoAPUseCase(sl<HeatmapRepository>()),
+  );
+  sl.registerFactory<ActualizarConjuntoAPUseCase>(
+    () => ActualizarConjuntoAPUseCase(sl<HeatmapRepository>()),
+  );
+  sl.registerFactory<EliminarConjuntoAPUseCase>(
+    () => EliminarConjuntoAPUseCase(sl<HeatmapRepository>()),
+  );
+  sl.registerFactory<GenerarHeatmapDesdeConjuntoUseCase>(
+    () => GenerarHeatmapDesdeConjuntoUseCase(sl<HeatmapRepository>()),
+  );
+  sl.registerFactory<ActualizarUbicacionAPConjuntoUseCase>(
+    () => ActualizarUbicacionAPConjuntoUseCase(sl<HeatmapRepository>()),
+  );
   sl.registerFactory<AnalizarMapaUseCase>(
     () => AnalizarMapaUseCase(sl<HeatmapRepository>()),
   );
@@ -222,7 +240,13 @@ void _initDependencias() {
   sl.registerFactory<HeatmapCubit>(
     () => HeatmapCubit(
       listarAPs: sl<ListarAPsDisponiblesUseCase>(),
+      listarConjuntos: sl<ListarConjuntosAPUseCase>(),
+      crearConjunto: sl<CrearConjuntoAPUseCase>(),
+      actualizarConjunto: sl<ActualizarConjuntoAPUseCase>(),
+      eliminarConjunto: sl<EliminarConjuntoAPUseCase>(),
       generarHeatmap: sl<GenerarHeatmapUseCase>(),
+      generarHeatmapDesdeConjunto: sl<GenerarHeatmapDesdeConjuntoUseCase>(),
+      actualizarUbicacionAPConjunto: sl<ActualizarUbicacionAPConjuntoUseCase>(),
       analizarMapa: sl<AnalizarMapaUseCase>(),
       confirmarAP: sl<ConfirmarAPUseCase>(),
     ),

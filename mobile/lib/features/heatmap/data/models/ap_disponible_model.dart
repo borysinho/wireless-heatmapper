@@ -10,6 +10,7 @@ class APDisponibleModel extends APDisponible {
     required super.posX,
     required super.posY,
     required super.cantidadPuntos,
+    super.seleccionado,
   });
 
   factory APDisponibleModel.fromJson(Map<String, dynamic> json) {
@@ -22,6 +23,7 @@ class APDisponibleModel extends APDisponible {
       posX: (json['pos_x'] as num).toDouble(),
       posY: (json['pos_y'] as num).toDouble(),
       cantidadPuntos: json['cantidad_puntos'] as int,
+      seleccionado: json['seleccionado'] as bool? ?? false,
     );
   }
 }

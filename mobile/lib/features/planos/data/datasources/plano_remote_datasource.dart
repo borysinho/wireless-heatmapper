@@ -131,14 +131,20 @@ class PlanoRemoteDatasource {
     if (status == 415) {
       throw PlanoFormatoNoSoportadoException(detail);
     }
-    if (status == 409 && detail.toLowerCase().contains('punto')) {
+    final detailLower = detail.toLowerCase();
+    if (status == 409 &&
+        detailLower.contains('eliminar') &&
+        detailLower.contains('punto')) {
+      throw const PlanoEliminacionBloqueadaException();
+    }
+    if (status == 409 && detailLower.contains('punto')) {
       throw const PlanoRecalibracionBloqueadaException();
     }
     if (status == 422) {
-      if (detail.toLowerCase().contains('distancia')) {
+      if (detailLower.contains('distancia')) {
         throw const PlanoDistanciaInvalidaException();
       }
-      if (detail.toLowerCase().contains('punto')) {
+      if (detailLower.contains('punto')) {
         throw const PlanoPuntosInvalidosException();
       }
     }

@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/entities/analisis_cobertura.dart';
 import '../../domain/entities/ap_disponible.dart';
 import '../../domain/entities/ap_detectado.dart';
+import '../../domain/entities/conjunto_ap.dart';
 import '../../domain/entities/escala_heatmap.dart';
 import '../../domain/entities/mapa_calor.dart';
 import '../cubit/heatmap_cubit.dart';
@@ -31,7 +32,6 @@ class HeatmapPage extends StatefulWidget {
 class _HeatmapPageState extends State<HeatmapPage> {
   String _algoritmo = 'IDW';
   int _resolucion = 128;
-  HeatmapModo _modo = HeatmapModo.conjunto;
 
   Size get _tamanoPlano => Size(widget.anchoPlanoPx, widget.altoPlanoPx);
 
@@ -50,7 +50,23 @@ class _HeatmapPageState extends State<HeatmapPage> {
           planoId: widget.planoId,
           algoritmo: _algoritmo,
           resolucion: _resolucion,
-          modo: _modo,
+        );
+  }
+
+  void _alternarFiltroAP(APDisponible ap) {
+    context.read<HeatmapCubit>().alternarFiltroAP(
+          planoId: widget.planoId,
+          ap: ap,
+          algoritmo: _algoritmo,
+          resolucion: _resolucion,
+        );
+  }
+
+  void _limpiarFiltroAP() {
+    context.read<HeatmapCubit>().limpiarFiltroAP(
+          planoId: widget.planoId,
+          algoritmo: _algoritmo,
+          resolucion: _resolucion,
         );
   }
 
@@ -59,41 +75,75 @@ class _HeatmapPageState extends State<HeatmapPage> {
     return BlocConsumer<HeatmapCubit, HeatmapState>(
       listener: (context, state) {
         if (state is HeatmapReady && state.mensaje != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.mensaje!)),
-          );
+          ScaffoldMessenger.of(context)
+            ..clearSnackBars()
+            ..showSnackBar(SnackBar(content: Text(state.mensaje!)));
         } else if (state is HeatmapSeleccionAP && state.mensaje != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.mensaje!)),
-          );
+          ScaffoldMessenger.of(context)
+            ..clearSnackBars()
+            ..showSnackBar(SnackBar(content: Text(state.mensaje!)));
+        } else if (state is HeatmapConjuntos && state.mensaje != null) {
+          ScaffoldMessenger.of(context)
+            ..clearSnackBars()
+            ..showSnackBar(SnackBar(content: Text(state.mensaje!)));
         } else if (state is HeatmapError) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(state.mensaje),
-              backgroundColor: Theme.of(context).colorScheme.error,
-            ),
-          );
+          ScaffoldMessenger.of(context)
+            ..clearSnackBars()
+            ..showSnackBar(
+              SnackBar(
+                content: Text(state.mensaje),
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+            );
         }
       },
       builder: (context, state) {
         final listo = state is HeatmapReady ? state : null;
+        final apsSeleccionadosListo = listo == null
+            ? <APDisponible>[]
+            : listo.aps
+                .where((ap) => listo.bssidsSeleccionados.contains(ap.bssid))
+                .toList();
+        final apsInteresListo = listo == null
+            ? <APDisponible>[]
+            : listo.bssidActivo == null
+                ? apsSeleccionadosListo
+                : apsSeleccionadosListo
+                    .where((ap) => ap.bssid == listo.bssidActivo)
+                    .toList();
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Heatmap'),
+            title: Text(
+              state is HeatmapConjuntos ? 'Conjuntos de APs' : 'Heatmap',
+            ),
             actions: [
-              _SelectorAlgoritmo(
-                valor: _algoritmo,
-                onChanged: (valor) => setState(() => _algoritmo = valor),
-              ),
-              _SelectorResolucion(
-                valor: _resolucion,
-                onChanged: (valor) => setState(() => _resolucion = valor),
-              ),
-              IconButton(
-                tooltip: 'Actualizar',
-                icon: const Icon(Icons.refresh),
-                onPressed: _cargar,
-              ),
+              if (state is HeatmapConjuntos)
+                IconButton(
+                  tooltip: 'Crear conjunto',
+                  icon: const Icon(Icons.add),
+                  onPressed: () => _mostrarCrearConjunto(state),
+                ),
+              if (state is HeatmapSeleccionAP || state is HeatmapReady)
+                IconButton(
+                  tooltip: 'Conjuntos',
+                  icon: const Icon(Icons.list_alt),
+                  onPressed: context.read<HeatmapCubit>().volverAConjuntos,
+                ),
+              if (state is HeatmapSeleccionAP || state is HeatmapReady) ...[
+                _SelectorAlgoritmo(
+                  valor: _algoritmo,
+                  onChanged: (valor) => setState(() => _algoritmo = valor),
+                ),
+                _SelectorResolucion(
+                  valor: _resolucion,
+                  onChanged: (valor) => setState(() => _resolucion = valor),
+                ),
+                IconButton(
+                  tooltip: 'Actualizar',
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _cargar,
+                ),
+              ],
             ],
           ),
           body: switch (state) {
@@ -112,6 +162,13 @@ class _HeatmapPageState extends State<HeatmapPage> {
             HeatmapError(:final mensaje) => _HeatmapErrorView(
                 mensaje: mensaje,
                 onRetry: _cargar,
+              ),
+            HeatmapConjuntos() => _ConjuntosAPView(
+                state: state,
+                onAbrir: context.read<HeatmapCubit>().abrirConjunto,
+                onCrear: () => _mostrarCrearConjunto(state),
+                onEditar: (conjunto) => _mostrarEditarConjunto(state, conjunto),
+                onEliminar: _confirmarEliminarConjunto,
               ),
             HeatmapSeleccionAP() => Column(
                 children: [
@@ -136,6 +193,14 @@ class _HeatmapPageState extends State<HeatmapPage> {
                                 bssid: ap.bssid,
                                 posX: pos.dx,
                                 posY: pos.dy,
+                                persistir: false,
+                              ),
+                      onSoltarAPInteres: (ap, pos) =>
+                          context.read<HeatmapCubit>().ubicarAP(
+                                bssid: ap.bssid,
+                                posX: pos.dx,
+                                posY: pos.dy,
+                                persistir: true,
                               ),
                       onTapAP: _mostrarDetalleAP,
                     ),
@@ -144,10 +209,6 @@ class _HeatmapPageState extends State<HeatmapPage> {
                     state: state,
                     onAlternar: (ap) =>
                         context.read<HeatmapCubit>().alternarAPInteres(ap),
-                    onActivar: (ap) =>
-                        context.read<HeatmapCubit>().activarAP(ap),
-                    modo: _modo,
-                    onModoChanged: (modo) => setState(() => _modo = modo),
                     onGenerar: _generarHeatmap,
                   ),
                 ],
@@ -161,17 +222,20 @@ class _HeatmapPageState extends State<HeatmapPage> {
                       puntosLectura: listo.mapa.puntosLectura,
                       tamanoPlano: _tamanoPlano,
                       aps: const [],
-                      apsInteres: listo.mapa.apsInteres,
+                      apsInteres: apsInteresListo,
                       bssidActivo: listo.bssidActivo,
                       apPosXPorBssid: {
-                        for (final ap in listo.mapa.apsInteres)
-                          ap.bssid: ap.posX,
+                        for (final ap in apsInteresListo)
+                          ap.bssid: listo.apPosXPorBssid[ap.bssid] ?? ap.posX,
                       },
                       apPosYPorBssid: {
-                        for (final ap in listo.mapa.apsInteres)
-                          ap.bssid: ap.posY,
+                        for (final ap in apsInteresListo)
+                          ap.bssid: listo.apPosYPorBssid[ap.bssid] ?? ap.posY,
                       },
+                      onTapPlano: (_) => _limpiarFiltroAP(),
+                      onTapAPInteres: _alternarFiltroAP,
                       onTapAP: _mostrarDetalleAP,
+                      onTapPuntoLectura: _mostrarDetallePuntoLectura,
                     ),
                   ),
                   _AnalisisPanel(
@@ -179,24 +243,12 @@ class _HeatmapPageState extends State<HeatmapPage> {
                     analisis: listo.analisis,
                     analizando: listo.analizando,
                     escala: listo.mapa.escala,
-                    modo: _modo,
-                    puedeModoIndividual: listo.bssidsSeleccionados.length > 1,
-                    bssidsPermitidos: {
-                      for (final ap in listo.mapa.apsInteres) ap.bssid,
-                    },
-                    onModoChanged: (modo) {
-                      setState(() => _modo = modo);
-                      context.read<HeatmapCubit>().generar(
-                            planoId: widget.planoId,
-                            algoritmo: _algoritmo,
-                            resolucion: _resolucion,
-                            modo: modo,
-                          );
-                    },
+                    apsInteres: apsInteresListo,
+                    bssidActivo: listo.bssidActivo,
+                    onLimpiarFiltro: _limpiarFiltroAP,
                     onRefreshAnalisis: () =>
                         context.read<HeatmapCubit>().regenerarAnalisis(),
                     onRegenerarHeatmap: _generarHeatmap,
-                    onTapAP: _mostrarDetalleAP,
                   ),
                 ],
               ),
@@ -252,7 +304,425 @@ class _HeatmapPageState extends State<HeatmapPage> {
       ),
     );
   }
+
+  void _mostrarDetallePuntoLectura(PuntoLecturaHeatmap punto) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => _PuntoLecturaSheet(punto: punto),
+    );
+  }
+
+  void _mostrarCrearConjunto(HeatmapConjuntos state) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => _CrearConjuntoAPSheet(
+        aps: state.aps,
+        onGuardar: ({
+          required nombre,
+          required proposito,
+          required bssids,
+        }) {
+          context.read<HeatmapCubit>().crearConjunto(
+                planoId: widget.planoId,
+                nombre: nombre,
+                proposito: proposito,
+                descripcion: null,
+                bssids: bssids,
+              );
+        },
+      ),
+    );
+  }
+
+  void _mostrarEditarConjunto(HeatmapConjuntos state, ConjuntoAP conjunto) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => _CrearConjuntoAPSheet(
+        aps: state.aps,
+        conjunto: conjunto,
+        onGuardar: ({
+          required nombre,
+          required proposito,
+          required bssids,
+        }) {
+          context.read<HeatmapCubit>().actualizarConjunto(
+                conjuntoId: conjunto.id,
+                nombre: nombre,
+                proposito: proposito,
+                descripcion: null,
+                bssids: bssids,
+              );
+        },
+      ),
+    );
+  }
+
+  Future<void> _confirmarEliminarConjunto(ConjuntoAP conjunto) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar conjunto'),
+        content: Text('Se eliminará "${conjunto.nombre}".'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (confirmar ?? false) {
+      context.read<HeatmapCubit>().eliminarConjunto(conjunto.id);
+    }
+  }
 }
+
+class _CrearConjuntoAPSheet extends StatefulWidget {
+  final List<APDisponible> aps;
+  final ConjuntoAP? conjunto;
+  final void Function({
+    required String nombre,
+    required String proposito,
+    required List<String> bssids,
+  }) onGuardar;
+
+  const _CrearConjuntoAPSheet({
+    required this.aps,
+    this.conjunto,
+    required this.onGuardar,
+  });
+
+  @override
+  State<_CrearConjuntoAPSheet> createState() => _CrearConjuntoAPSheetState();
+}
+
+class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
+  late final TextEditingController _nombreCtrl;
+  late final TextEditingController _propositoCtrl;
+  late final TextEditingController _filtroCtrl;
+  late final Set<String> _seleccionados;
+
+  @override
+  void initState() {
+    super.initState();
+    _nombreCtrl = TextEditingController(text: widget.conjunto?.nombre ?? '');
+    _propositoCtrl = TextEditingController(
+      text: widget.conjunto?.proposito ?? '',
+    );
+    _filtroCtrl = TextEditingController();
+    _seleccionados = widget.conjunto == null
+        ? {for (final ap in widget.aps) ap.bssid}
+        : {for (final ap in widget.conjunto!.items) ap.bssid};
+  }
+
+  @override
+  void dispose() {
+    _nombreCtrl.dispose();
+    _propositoCtrl.dispose();
+    _filtroCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtro = _filtroCtrl.text.trim().toLowerCase();
+    final apsFiltrados = filtro.isEmpty
+        ? widget.aps
+        : widget.aps.where((ap) {
+            final canal = ap.canal?.toString() ?? '';
+            return ap.ssid.toLowerCase().contains(filtro) ||
+                ap.bssid.toLowerCase().contains(filtro) ||
+                canal.contains(filtro);
+          }).toList();
+    final todosSeleccionados = _seleccionados.length == widget.aps.length;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        8,
+        20,
+        24 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          Text(
+            widget.conjunto == null
+                ? 'Nuevo conjunto de APs'
+                : 'Editar conjunto de APs',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _nombreCtrl,
+            decoration: const InputDecoration(labelText: 'Nombre'),
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _propositoCtrl,
+            decoration: const InputDecoration(labelText: 'Propósito'),
+            maxLines: 2,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'APs seleccionados: ${_seleccionados.length}/${widget.aps.length}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    if (todosSeleccionados) {
+                      _seleccionados.clear();
+                    } else {
+                      _seleccionados
+                        ..clear()
+                        ..addAll(widget.aps.map((ap) => ap.bssid));
+                    }
+                  });
+                },
+                icon: Icon(
+                  todosSeleccionados
+                      ? Icons.deselect_outlined
+                      : Icons.select_all,
+                ),
+                label: Text(
+                  todosSeleccionados ? 'Desmarcar todos' : 'Marcar todos',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _filtroCtrl,
+            decoration: InputDecoration(
+              labelText: 'Filtrar APs',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _filtroCtrl.text.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Limpiar filtro',
+                      icon: const Icon(Icons.close),
+                      onPressed: () {
+                        _filtroCtrl.clear();
+                        setState(() {});
+                      },
+                    ),
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 8),
+          if (apsFiltrados.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Text('No hay APs que coincidan con el filtro.'),
+            )
+          else
+            ...apsFiltrados.map(
+              (ap) => CheckboxListTile(
+                value: _seleccionados.contains(ap.bssid),
+                onChanged: (checked) {
+                  setState(() {
+                    if (checked ?? false) {
+                      _seleccionados.add(ap.bssid);
+                    } else {
+                      _seleccionados.remove(ap.bssid);
+                    }
+                  });
+                },
+                title: Text(ap.ssid.isEmpty ? 'SSID oculto' : ap.ssid),
+                subtitle: Text(_detalleAP(ap)),
+              ),
+            ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _guardar,
+            icon: const Icon(Icons.save_outlined),
+            label: Text(
+              widget.conjunto == null ? 'Guardar conjunto' : 'Guardar cambios',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _guardar() {
+    final nombre = _nombreCtrl.text.trim();
+    final proposito = _propositoCtrl.text.trim();
+    if (nombre.isEmpty || proposito.isEmpty) {
+      _mostrarMensaje('Nombre y propósito son obligatorios.');
+      return;
+    }
+    if (_seleccionados.isEmpty) {
+      _mostrarMensaje('Selecciona al menos un AP.');
+      return;
+    }
+    widget.onGuardar(
+      nombre: nombre,
+      proposito: proposito,
+      bssids: _seleccionados.toList(),
+    );
+    Navigator.of(context).pop();
+  }
+
+  void _mostrarMensaje(String mensaje) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(mensaje)));
+  }
+}
+
+class _ConjuntosAPView extends StatelessWidget {
+  final HeatmapConjuntos state;
+  final ValueChanged<ConjuntoAP> onAbrir;
+  final VoidCallback onCrear;
+  final ValueChanged<ConjuntoAP> onEditar;
+  final ValueChanged<ConjuntoAP> onEliminar;
+
+  const _ConjuntosAPView({
+    required this.state,
+    required this.onAbrir,
+    required this.onCrear,
+    required this.onEditar,
+    required this.onEliminar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Conjuntos de APs',
+                style: theme.textTheme.titleLarge,
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: onCrear,
+              icon: const Icon(Icons.add),
+              label: const Text('Crear'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        if (state.conjuntos.isEmpty)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Sin conjuntos creados',
+                      style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Crea un conjunto con propósito para generar heatmaps focalizados.',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ...state.conjuntos.map(
+            (conjunto) => _ConjuntoAPTile(
+              conjunto: conjunto,
+              onTap: () => onAbrir(conjunto),
+              onEditar: () => onEditar(conjunto),
+              onEliminar: () => onEliminar(conjunto),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _ConjuntoAPTile extends StatelessWidget {
+  final ConjuntoAP conjunto;
+  final VoidCallback onTap;
+  final VoidCallback onEditar;
+  final VoidCallback onEliminar;
+
+  const _ConjuntoAPTile({
+    required this.conjunto,
+    required this.onTap,
+    required this.onEditar,
+    required this.onEliminar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: ListTile(
+          onTap: onTap,
+          leading: const Icon(Icons.wifi_tethering),
+          title: Text(conjunto.nombre),
+          subtitle: Text('${conjunto.proposito}\n${conjunto.cantidadAps} APs'),
+          isThreeLine: true,
+          trailing: PopupMenuButton<_AccionConjuntoAP>(
+            tooltip: 'Opciones',
+            onSelected: (accion) {
+              switch (accion) {
+                case _AccionConjuntoAP.abrir:
+                  onTap();
+                case _AccionConjuntoAP.editar:
+                  onEditar();
+                case _AccionConjuntoAP.eliminar:
+                  onEliminar();
+              }
+            },
+            itemBuilder: (ctx) => const [
+              PopupMenuItem(
+                value: _AccionConjuntoAP.abrir,
+                child: ListTile(
+                  leading: Icon(Icons.open_in_new),
+                  title: Text('Abrir'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _AccionConjuntoAP.editar,
+                child: ListTile(
+                  leading: Icon(Icons.edit_outlined),
+                  title: Text('Editar'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _AccionConjuntoAP.eliminar,
+                child: ListTile(
+                  leading: Icon(Icons.delete_outline),
+                  title: Text('Eliminar'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+enum _AccionConjuntoAP { abrir, editar, eliminar }
 
 class _HeatmapCanvas extends StatefulWidget {
   final String planoUrl;
@@ -267,7 +737,9 @@ class _HeatmapCanvas extends StatefulWidget {
   final void Function(Offset posPlano)? onTapPlano;
   final void Function(APDisponible ap)? onTapAPInteres;
   final void Function(APDisponible ap, Offset posPlano)? onMoverAPInteres;
+  final void Function(APDisponible ap, Offset posPlano)? onSoltarAPInteres;
   final void Function(APDetectado ap) onTapAP;
+  final void Function(PuntoLecturaHeatmap punto)? onTapPuntoLectura;
 
   const _HeatmapCanvas({
     required this.planoUrl,
@@ -282,7 +754,9 @@ class _HeatmapCanvas extends StatefulWidget {
     this.onTapPlano,
     this.onTapAPInteres,
     this.onMoverAPInteres,
+    this.onSoltarAPInteres,
     required this.onTapAP,
+    this.onTapPuntoLectura,
   });
 
   @override
@@ -296,6 +770,7 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
 
   Offset? _ultimoTapDown;
   String? _bssidArrastrado;
+  Offset? _ultimaPosArrastradaPlano;
 
   @override
   Widget build(BuildContext context) {
@@ -306,8 +781,9 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
       maxScale: 5,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final puedeTocar =
-              widget.onTapPlano != null || widget.onTapAPInteres != null;
+          final puedeTocar = widget.onTapPlano != null ||
+              widget.onTapAPInteres != null ||
+              widget.onTapPuntoLectura != null;
           final aspect = widget.tamanoPlano.width / widget.tamanoPlano.height;
           double w = constraints.maxWidth;
           double h = w / aspect;
@@ -331,9 +807,8 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
                 onPanUpdate: widget.onMoverAPInteres == null
                     ? null
                     : (details) => _onPanUpdate(details, w: w, h: h),
-                onPanEnd: widget.onMoverAPInteres == null
-                    ? null
-                    : (_) => setState(() => _bssidArrastrado = null),
+                onPanEnd:
+                    widget.onMoverAPInteres == null ? null : (_) => _onPanEnd(),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -419,6 +894,11 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
       widget.onTapAPInteres?.call(ap);
       return;
     }
+    final punto = _puntoLecturaEnPosicion(pos, w: w, h: h);
+    if (punto != null) {
+      widget.onTapPuntoLectura?.call(punto);
+      return;
+    }
     widget.onTapPlano?.call(_tapAPlano(pos, w: w, h: h));
   }
 
@@ -430,6 +910,7 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
     final ap = _apEnPosicion(details.localPosition, w: w, h: h);
     if (ap == null) return;
     setState(() => _bssidArrastrado = ap.bssid);
+    _ultimaPosArrastradaPlano = _tapAPlano(details.localPosition, w: w, h: h);
     widget.onTapAPInteres?.call(ap);
   }
 
@@ -442,10 +923,20 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
     if (bssid == null) return;
     final ap = _apPorBssid(bssid);
     if (ap == null) return;
-    widget.onMoverAPInteres?.call(
-      ap,
-      _tapAPlano(details.localPosition, w: w, h: h),
-    );
+    final pos = _tapAPlano(details.localPosition, w: w, h: h);
+    _ultimaPosArrastradaPlano = pos;
+    widget.onMoverAPInteres?.call(ap, pos);
+  }
+
+  void _onPanEnd() {
+    final bssid = _bssidArrastrado;
+    final pos = _ultimaPosArrastradaPlano;
+    final ap = bssid == null ? null : _apPorBssid(bssid);
+    if (ap != null && pos != null) {
+      widget.onSoltarAPInteres?.call(ap, pos);
+    }
+    setState(() => _bssidArrastrado = null);
+    _ultimaPosArrastradaPlano = null;
   }
 
   APDisponible? _apEnPosicion(
@@ -468,6 +959,22 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
   APDisponible? _apPorBssid(String bssid) {
     for (final ap in widget.apsInteres) {
       if (ap.bssid == bssid) return ap;
+    }
+    return null;
+  }
+
+  PuntoLecturaHeatmap? _puntoLecturaEnPosicion(
+    Offset local, {
+    required double w,
+    required double h,
+  }) {
+    if (widget.onTapPuntoLectura == null) return null;
+    for (final punto in widget.puntosLectura.reversed) {
+      final pantalla = Offset(
+        (punto.posX / widget.tamanoPlano.width) * w,
+        (punto.posY / widget.tamanoPlano.height) * h,
+      );
+      if ((local - pantalla).distance <= 18) return punto;
     }
     return null;
   }
@@ -532,20 +1039,57 @@ class _APInteresMarker extends StatelessWidget {
   }
 }
 
+class _PanelHeader extends StatelessWidget {
+  final String titulo;
+  final String subtitulo;
+  final Widget accion;
+
+  const _PanelHeader({
+    required this.titulo,
+    required this.subtitulo,
+    required this.accion,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                titulo,
+                style: theme.textTheme.titleSmall,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitulo,
+                style: theme.textTheme.bodySmall,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+        accion,
+      ],
+    );
+  }
+}
+
 class _SeleccionAPPanel extends StatelessWidget {
   final HeatmapSeleccionAP state;
   final ValueChanged<APDisponible> onAlternar;
-  final ValueChanged<APDisponible> onActivar;
-  final HeatmapModo modo;
-  final ValueChanged<HeatmapModo> onModoChanged;
   final VoidCallback onGenerar;
 
   const _SeleccionAPPanel({
     required this.state,
     required this.onAlternar,
-    required this.onActivar,
-    required this.modo,
-    required this.onModoChanged,
     required this.onGenerar,
   });
 
@@ -565,67 +1109,21 @@ class _SeleccionAPPanel extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'APs de interés (${state.apsSeleccionados.length})',
-                        style: theme.textTheme.labelLarge,
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => _mostrarSelectorAP(context),
-                      icon: const Icon(Icons.playlist_add_check),
-                      label: const Text('Cambiar'),
-                    ),
-                  ],
+                _PanelHeader(
+                  titulo: 'APs (${state.apsSeleccionados.length})',
+                  subtitulo: 'Toca un marcador para moverlo o seleccionarlo.',
+                  accion: IconButton(
+                    tooltip: 'Cambiar APs',
+                    onPressed: () => _mostrarSelectorAP(context),
+                    icon: const Icon(Icons.playlist_add_check),
+                  ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 _APSeleccionadoTile(
                   ap: ap,
                   onTap: () => _mostrarSelectorAP(context),
                 ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  height: 40,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: state.apsSeleccionados.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final item = state.apsSeleccionados[index];
-                      return ChoiceChip(
-                        selected: item.bssid == state.bssidActivo,
-                        label: Text(
-                          item.ssid.isEmpty ? item.bssid : item.ssid,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        avatar: const Icon(Icons.router, size: 16),
-                        onSelected: (_) => onActivar(item),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
-                _ModoHeatmapControl(
-                  modo: modo,
-                  enabledIndividual: state.apsSeleccionados.length > 1,
-                  onChanged: onModoChanged,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Puntos medidos: ${ap.cantidadPuntos} · '
-                  'RSSI prom. ${ap.rssiPromedio.toStringAsFixed(1)} dBm · '
-                  'Canal ${ap.canal?.toString() ?? 's/d'}',
-                  style: theme.textTheme.bodySmall,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Ubicación AP activo: x ${state.posXDe(ap).toStringAsFixed(1)} · '
-                  'y ${state.posYDe(ap).toStringAsFixed(1)}',
-                  style: theme.textTheme.bodySmall,
-                ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
@@ -693,7 +1191,7 @@ class _APSeleccionadoTile extends StatelessWidget {
                 child: _APResumen(ap: ap),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.keyboard_arrow_up),
+              const Icon(Icons.touch_app_outlined),
             ],
           ),
         ),
@@ -702,45 +1200,10 @@ class _APSeleccionadoTile extends StatelessWidget {
   }
 }
 
-class _ModoHeatmapControl extends StatelessWidget {
-  final HeatmapModo modo;
-  final bool enabledIndividual;
-  final ValueChanged<HeatmapModo> onChanged;
-
-  const _ModoHeatmapControl({
-    required this.modo,
-    required this.enabledIndividual,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final modoVisible = enabledIndividual ? modo : HeatmapModo.conjunto;
-    return SegmentedButton<HeatmapModo>(
-      showSelectedIcon: false,
-      segments: [
-        const ButtonSegment(
-          value: HeatmapModo.conjunto,
-          icon: Icon(Icons.hub_outlined),
-          label: Text('Conjunto'),
-        ),
-        ButtonSegment(
-          value: HeatmapModo.apActivo,
-          icon: const Icon(Icons.router),
-          label: const Text('AP activo'),
-          enabled: enabledIndividual,
-        ),
-      ],
-      selected: {modoVisible},
-      onSelectionChanged: (value) => onChanged(value.first),
-    );
-  }
-}
-
 class _SelectorAPSheet extends StatelessWidget {
   final List<APDisponible> aps;
   final Set<String> bssidsSeleccionados;
-  final String bssidActivo;
+  final String? bssidActivo;
   final ValueChanged<APDisponible> onAlternar;
 
   const _SelectorAPSheet({
@@ -874,161 +1337,112 @@ class _AnalisisPanel extends StatelessWidget {
   final AnalisisCobertura? analisis;
   final bool analizando;
   final List<EscalaHeatmap> escala;
-  final HeatmapModo modo;
-  final bool puedeModoIndividual;
-  final Set<String> bssidsPermitidos;
-  final ValueChanged<HeatmapModo> onModoChanged;
+  final List<APDisponible> apsInteres;
+  final String? bssidActivo;
+  final VoidCallback onLimpiarFiltro;
   final VoidCallback onRefreshAnalisis;
   final VoidCallback onRegenerarHeatmap;
-  final void Function(APDetectado ap) onTapAP;
 
   const _AnalisisPanel({
     required this.mapa,
     required this.analisis,
     required this.analizando,
     required this.escala,
-    required this.modo,
-    required this.puedeModoIndividual,
-    required this.bssidsPermitidos,
-    required this.onModoChanged,
+    required this.apsInteres,
+    required this.bssidActivo,
+    required this.onLimpiarFiltro,
     required this.onRefreshAnalisis,
     required this.onRegenerarHeatmap,
-    required this.onTapAP,
   });
 
   @override
   Widget build(BuildContext context) {
     final a = analisis;
-    final apsVisibles = a == null
-        ? <APDetectado>[]
-        : a.apsDetectados
-            .where((ap) => bssidsPermitidos.contains(ap.bssid))
-            .toList();
+    APDisponible? apActivo;
+    for (final ap in apsInteres) {
+      if (ap.bssid == bssidActivo) {
+        apActivo = ap;
+        break;
+      }
+    }
+    final titulo = apActivo == null
+        ? 'Todos los APs seleccionados'
+        : (apActivo.ssid.isEmpty ? 'SSID oculto' : apActivo.ssid);
+    final subtitulo = apActivo == null
+        ? 'Toca un AP para ver su heatmap individual.'
+        : '${apActivo.rssiPromedio.toStringAsFixed(0)} dBm · toca el plano para volver al conjunto';
     return Material(
       elevation: 8,
       color: Theme.of(context).colorScheme.surface,
       child: SafeArea(
         top: false,
-        child: _PanelInferiorDesplazable(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            child: Column(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+          child: _PanelHeader(
+            titulo: titulo,
+            subtitulo: subtitulo,
+            accion: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: _ModoHeatmapControl(
-                        modo: modo,
-                        enabledIndividual: puedeModoIndividual,
-                        onChanged: onModoChanged,
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Regenerar heatmap',
-                      onPressed: onRegenerarHeatmap,
-                      icon: const Icon(Icons.local_fire_department_outlined),
-                    ),
-                  ],
+                if (bssidActivo != null)
+                  IconButton(
+                    tooltip: 'Ver conjunto',
+                    onPressed: onLimpiarFiltro,
+                    icon: const Icon(Icons.layers_clear_outlined),
+                  ),
+                IconButton(
+                  tooltip: 'Información del heatmap',
+                  onPressed: () => _mostrarInfoHeatmap(context),
+                  icon: const Icon(Icons.info_outline),
                 ),
-                const SizedBox(height: 8),
-                _LeyendaHeatmap(escala: escala),
-                const SizedBox(height: 12),
-                _ResumenMapaCalor(mapa: mapa),
-                if (mapa.advertencias.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  _AdvertenciasHeatmap(advertencias: mapa.advertencias),
-                ],
-                const SizedBox(height: 12),
-                if (a == null)
-                  Row(
-                    children: [
-                      const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        analizando ? 'Analizando cobertura…' : 'Sin análisis',
-                      ),
-                    ],
-                  )
-                else ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _Metrica(
-                          icon: Icons.check_circle_outline,
-                          valor: '${a.pctCobertura.toStringAsFixed(1)}%',
-                          label: 'Cobertura',
-                        ),
-                      ),
-                      Expanded(
-                        child: _Metrica(
-                          icon: Icons.warning_amber,
-                          valor: a.celdasZonasMuertas.toString(),
-                          label: 'Zonas muertas',
-                        ),
-                      ),
-                      Expanded(
-                        child: _Metrica(
-                          icon: Icons.hub_outlined,
-                          valor: a.cantidadSolapamientos.toString(),
-                          label: 'Solap.',
-                        ),
-                      ),
-                      Expanded(
-                        child: _Metrica(
-                          icon: Icons.wifi_tethering_error,
-                          valor: a.cantidadInterferencias.toString(),
-                          label: 'Interf.',
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Reanalizar',
-                        onPressed: analizando ? null : onRefreshAnalisis,
-                        icon: analizando
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.analytics_outlined),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 72,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: apsVisibles.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        final ap = apsVisibles[index];
-                        return ActionChip(
-                          avatar: Icon(
-                            ap.confirmado ? Icons.verified : Icons.router,
-                            size: 18,
-                          ),
-                          label: Text(
-                            '${ap.ssid}\n${ap.rssiPromedio.toStringAsFixed(0)} dBm',
-                            maxLines: 2,
-                          ),
-                          onPressed: () => onTapAP(ap),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+                IconButton(
+                  tooltip: a == null ? 'Analizando cobertura' : 'Ver análisis',
+                  onPressed:
+                      a == null ? null : () => _mostrarAnalisis(context, a),
+                  icon: analizando
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.analytics_outlined),
+                ),
+                IconButton(
+                  tooltip: 'Reanalizar',
+                  onPressed: analizando ? null : onRefreshAnalisis,
+                  icon: const Icon(Icons.refresh),
+                ),
+                IconButton(
+                  tooltip: 'Regenerar heatmap',
+                  onPressed: onRegenerarHeatmap,
+                  icon: const Icon(Icons.local_fire_department_outlined),
+                ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  void _mostrarInfoHeatmap(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (ctx) => _InfoHeatmapSheet(
+        mapa: mapa,
+        escala: escala,
+      ),
+    );
+  }
+
+  void _mostrarAnalisis(BuildContext context, AnalisisCobertura analisis) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (ctx) => _AnalisisHeatmapSheet(analisis: analisis),
     );
   }
 }
@@ -1051,6 +1465,178 @@ class _PanelInferiorDesplazable extends StatelessWidget {
         child: child,
       ),
     );
+  }
+}
+
+class _InfoHeatmapSheet extends StatelessWidget {
+  final MapaCalor mapa;
+  final List<EscalaHeatmap> escala;
+
+  const _InfoHeatmapSheet({
+    required this.mapa,
+    required this.escala,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Text('Información del heatmap', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 12),
+            _LeyendaHeatmap(escala: escala),
+            const SizedBox(height: 16),
+            _ResumenMapaCalor(mapa: mapa),
+            if (mapa.advertencias.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text('Recomendaciones', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 8),
+              for (final advertencia in mapa.advertencias)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 18,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(advertencia)),
+                    ],
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AnalisisHeatmapSheet extends StatelessWidget {
+  final AnalisisCobertura analisis;
+
+  const _AnalisisHeatmapSheet({required this.analisis});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Text('Análisis de cobertura', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(analisis.resumen),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _Metrica(
+                    icon: Icons.check_circle_outline,
+                    valor: '${analisis.pctCobertura.toStringAsFixed(1)}%',
+                    label: 'Cobertura',
+                  ),
+                ),
+                Expanded(
+                  child: _Metrica(
+                    icon: Icons.do_not_disturb_on_outlined,
+                    valor: '${analisis.pctZonasMuertas.toStringAsFixed(1)}%',
+                    label: 'Zonas muertas',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _Metrica(
+                    icon: Icons.hub_outlined,
+                    valor: analisis.cantidadSolapamientos.toString(),
+                    label: 'Solap.',
+                  ),
+                ),
+                Expanded(
+                  child: _Metrica(
+                    icon: Icons.wifi_tethering_error,
+                    valor: analisis.cantidadInterferencias.toString(),
+                    label: 'Interf.',
+                  ),
+                ),
+                Expanded(
+                  child: _Metrica(
+                    icon: Icons.grid_view_outlined,
+                    valor: analisis.celdasZonasMuertas.toString(),
+                    label: 'Celdas',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PuntoLecturaSheet extends StatelessWidget {
+  final PuntoLecturaHeatmap punto;
+
+  const _PuntoLecturaSheet({required this.punto});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Punto de lectura #${punto.puntoId}',
+                style: theme.textTheme.titleLarge),
+            const SizedBox(height: 12),
+            _DatoAP(
+              label: 'RSSI',
+              value: '${punto.rssi.toStringAsFixed(0)} dBm',
+            ),
+            _DatoAP(
+              label: 'Ubicación',
+              value:
+                  'x ${punto.posX.toStringAsFixed(1)} · y ${punto.posY.toStringAsFixed(1)}',
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _descripcionRSSI(punto.rssi),
+              style: theme.textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _descripcionRSSI(double rssi) {
+    if (rssi >= -60) return 'Señal excelente para diseño de alta calidad.';
+    if (rssi >= -67) return 'Señal muy buena para uso normal.';
+    if (rssi >= -70) return 'Cumple el objetivo de diseño ≥ -70 dBm.';
+    if (rssi >= -75) return 'Advertencia: conviene revisar cobertura.';
+    if (rssi >= -80) return 'Señal débil en esta ubicación.';
+    if (rssi >= -90) return 'Señal muy débil; posible zona problemática.';
+    return 'Zona muerta: RSSI < -90 dBm.';
   }
 }
 
@@ -1096,73 +1682,54 @@ class _ResumenMapaCalor extends StatelessWidget {
   }
 }
 
-class _AdvertenciasHeatmap extends StatelessWidget {
-  final List<String> advertencias;
-
-  const _AdvertenciasHeatmap({required this.advertencias});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: theme.colorScheme.tertiary.withValues(alpha: 0.40),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.info_outline,
-            size: 18,
-            color: theme.colorScheme.tertiary,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              advertencias.join(' '),
-              style: theme.textTheme.bodySmall,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _LeyendaHeatmap extends StatelessWidget {
   final List<EscalaHeatmap> escala;
   const _LeyendaHeatmap({required this.escala});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: escala
-          .map(
-            (item) => Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
+    final textStyle = Theme.of(context).textTheme.labelSmall;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: escala
+              .map(
+                (item) => Expanded(
+                  child: Container(
                     height: 8,
                     color: _colorDesdeHex(item.colorHex),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.etiqueta,
-                    style: Theme.of(context).textTheme.labelSmall,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          )
-          .toList(),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 10,
+          runSpacing: 4,
+          alignment: WrapAlignment.center,
+          children: escala
+              .map(
+                (item) => Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      color: _colorDesdeHex(item.colorHex),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      item.etiqueta,
+                      style: textStyle,
+                    ),
+                  ],
+                ),
+              )
+              .toList(),
+        ),
+      ],
     );
   }
 
@@ -1236,9 +1803,16 @@ class _HeatmapMatrixPainter extends CustomPainter {
     const paradas = [
       _ColorStop(-120, Color(0xFFD7263D)),
       _ColorStop(-91, Color(0xFFD7263D)),
-      _ColorStop(-90, Color(0xFFF08A24)),
-      _ColorStop(-80, Color(0xFFF4D35E)),
-      _ColorStop(-70, Color(0xFF57B65A)),
+      _ColorStop(-90, Color(0xFFD95D39)),
+      _ColorStop(-80, Color(0xFFD95D39)),
+      _ColorStop(-76, Color(0xFFF08A24)),
+      _ColorStop(-75, Color(0xFFF4D35E)),
+      _ColorStop(-71, Color(0xFFF4D35E)),
+      _ColorStop(-70, Color(0xFFA7C957)),
+      _ColorStop(-68, Color(0xFFA7C957)),
+      _ColorStop(-67, Color(0xFF57B65A)),
+      _ColorStop(-61, Color(0xFF57B65A)),
+      _ColorStop(-60, Color(0xFF0B7A3B)),
       _ColorStop(-50, Color(0xFF0B7A3B)),
       _ColorStop(0, Color(0xFF0B7A3B)),
     ];
@@ -1298,10 +1872,12 @@ class _PuntosLecturaPainter extends CustomPainter {
   }
 
   Color _colorParaRssi(double rssi) {
-    if (rssi >= -50) return const Color(0xFF0B7A3B);
-    if (rssi >= -70) return const Color(0xFF57B65A);
-    if (rssi >= -80) return const Color(0xFFF4D35E);
-    if (rssi >= -90) return const Color(0xFFF08A24);
+    if (rssi >= -60) return const Color(0xFF0B7A3B);
+    if (rssi >= -67) return const Color(0xFF57B65A);
+    if (rssi >= -70) return const Color(0xFFA7C957);
+    if (rssi >= -75) return const Color(0xFFF4D35E);
+    if (rssi >= -80) return const Color(0xFFF08A24);
+    if (rssi >= -90) return const Color(0xFFD95D39);
     return const Color(0xFFD7263D);
   }
 

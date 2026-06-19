@@ -232,10 +232,13 @@ class _PlanoCard extends StatelessWidget {
     final tema = Theme.of(context);
     final tamanoMb = (plano.tamanoBytes / 1024 / 1024).toStringAsFixed(2);
     final dimensiones = '${plano.anchoPx} × ${plano.altoPx} px';
+    final puedeEliminar = plano.cantidadPuntos == 0;
+    final etiquetaPuntos = plano.cantidadPuntos == 1
+        ? '1 punto de medición registrado'
+        : '${plano.cantidadPuntos} puntos de medición registrados';
     return Card(
       child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
           backgroundColor: tema.colorScheme.primaryContainer,
           child: Icon(
@@ -265,20 +268,47 @@ class _PlanoCard extends StatelessWidget {
                   color: plano.calibrado ? Colors.green : Colors.orange,
                 ),
                 const SizedBox(width: 4),
-                Text(
-                  plano.calibrado
-                      ? 'Calibrado · ${plano.escalaMPorPx!.toStringAsFixed(4)} m/px'
-                      : 'Sin calibrar',
-                  style: tema.textTheme.bodySmall,
+                Flexible(
+                  child: Text(
+                    plano.calibrado
+                        ? 'Calibrado · ${plano.escalaMPorPx!.toStringAsFixed(4)} m/px'
+                        : 'Sin calibrar',
+                    style: tema.textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
+            if (plano.cantidadPuntos > 0) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(
+                    Icons.location_on_outlined,
+                    size: 16,
+                    color: tema.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      etiquetaPuntos,
+                      style: tema.textTheme.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
         trailing: IconButton(
           icon: const Icon(Icons.delete_outline),
-          tooltip: 'Eliminar',
-          onPressed: onEliminar,
+          tooltip: puedeEliminar
+              ? 'Eliminar'
+              : 'No es posible eliminar un plano con mediciones registradas',
+          onPressed: puedeEliminar ? onEliminar : null,
         ),
         onTap: onTap,
       ),

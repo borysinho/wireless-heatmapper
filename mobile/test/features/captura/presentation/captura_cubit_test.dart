@@ -198,6 +198,48 @@ void main() {
     );
   });
 
+  // ── moverPunto ─────────────────────────────────────────────────────────────
+
+  group('moverPunto', () {
+    setUp(() async {
+      when(() => repo.listarPuntos(10))
+          .thenAnswer((_) async => [_puntoFake(id: 1)]);
+      await cubit.iniciarSesion(10);
+    });
+
+    blocTest<CapturaCubit, CapturaState>(
+      'reubica localmente y persiste la posición del punto',
+      build: () => cubit,
+      setUp: () {
+        when(() => repo.moverPunto(
+              puntoId: 1,
+              posX: 140,
+              posY: 240,
+            )).thenAnswer(
+          (_) async => PuntoMedicion(
+            id: 1,
+            planoId: 10,
+            posX: 140,
+            posY: 240,
+            nivel: NivelSenal.verde,
+          ),
+        );
+      },
+      act: (c) async {
+        c.reubicarPuntoLocal(puntoId: 1, posX: 130, posY: 230);
+        await c.moverPunto(puntoId: 1, posX: 140, posY: 240);
+      },
+      expect: () => [
+        isA<CapturaActiva>()
+            .having((s) => s.puntos.first.posX, 'posX local', 130)
+            .having((s) => s.puntos.first.posY, 'posY local', 230),
+        isA<CapturaActiva>()
+            .having((s) => s.puntos.first.posX, 'posX backend', 140)
+            .having((s) => s.puntos.first.posY, 'posY backend', 240),
+      ],
+    );
+  });
+
   // ── eliminarPunto ──────────────────────────────────────────────────────────
 
   group('eliminarPunto', () {

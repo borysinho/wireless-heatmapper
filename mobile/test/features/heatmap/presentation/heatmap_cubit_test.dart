@@ -1,0 +1,145 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:heatmapper/features/heatmap/domain/entities/ap_disponible.dart';
+import 'package:heatmapper/features/heatmap/domain/entities/conjunto_ap.dart';
+import 'package:heatmapper/features/heatmap/domain/repositories/heatmap_repository.dart';
+import 'package:heatmapper/features/heatmap/domain/usecases/heatmap_usecases.dart';
+import 'package:heatmapper/features/heatmap/presentation/cubit/heatmap_cubit.dart';
+import 'package:mocktail/mocktail.dart';
+
+class _MockHeatmapRepository extends Mock implements HeatmapRepository {}
+
+const _apPrincipal = APDisponible(
+  bssid: '3c:41:0e:a8:70:a0',
+  ssid: 'LCM',
+  canal: 1,
+  frecuenciaMhz: 2412,
+  rssiPromedio: -62,
+  posX: 100,
+  posY: 120,
+  cantidadPuntos: 13,
+);
+
+const _apSecundario = APDisponible(
+  bssid: '3c:41:0e:a8:70:a1',
+  ssid: 'LCM',
+  canal: 6,
+  frecuenciaMhz: 2437,
+  rssiPromedio: -68,
+  posX: 220,
+  posY: 260,
+  cantidadPuntos: 10,
+);
+
+ConjuntoAP _conjunto({double posX = 0, double posY = 0}) => ConjuntoAP(
+      id: 9,
+      planoId: 37,
+      nombre: 'LCM 2.4',
+      proposito: 'Lecturas de red LCM 2.4 GHz',
+      descripcion: null,
+      esPrincipal: false,
+      cantidadAps: 2,
+      items: [
+        APDisponible(
+          bssid: _apPrincipal.bssid,
+          ssid: _apPrincipal.ssid,
+          canal: _apPrincipal.canal,
+          frecuenciaMhz: _apPrincipal.frecuenciaMhz,
+          rssiPromedio: _apPrincipal.rssiPromedio,
+          posX: posX,
+          posY: posY,
+          cantidadPuntos: _apPrincipal.cantidadPuntos,
+        ),
+        _apSecundario,
+      ],
+      createdAt: DateTime(2026, 6, 19),
+      updatedAt: DateTime(2026, 6, 19),
+    );
+
+HeatmapCubit _crearCubit(HeatmapRepository repo) => HeatmapCubit(
+      listarAPs: ListarAPsDisponiblesUseCase(repo),
+      listarConjuntos: ListarConjuntosAPUseCase(repo),
+      crearConjunto: CrearConjuntoAPUseCase(repo),
+      actualizarConjunto: ActualizarConjuntoAPUseCase(repo),
+      eliminarConjunto: EliminarConjuntoAPUseCase(repo),
+      generarHeatmap: GenerarHeatmapUseCase(repo),
+      generarHeatmapDesdeConjunto: GenerarHeatmapDesdeConjuntoUseCase(repo),
+      actualizarUbicacionAPConjunto: ActualizarUbicacionAPConjuntoUseCase(repo),
+      analizarMapa: AnalizarMapaUseCase(repo),
+      confirmarAP: ConfirmarAPUseCase(repo),
+    );
+
+void main() {
+  late _MockHeatmapRepository repo;
+  late HeatmapCubit cubit;
+
+  setUp(() {
+    repo = _MockHeatmapRepository();
+    cubit = _crearCubit(repo);
+  });
+
+  tearDown(() => cubit.close());
+
+  test('persiste ubicación luego de seleccionar un AP dentro del conjunto',
+      () async {
+    final conjunto = _conjunto();
+    when(() => repo.listarAPsDisponibles(37))
+        .thenAnswer((_) async => const [_apPrincipal, _apSecundario]);
+    when(() => repo.listarConjuntosAP(37)).thenAnswer((_) async => [conjunto]);
+    when(
+      () => repo.actualizarUbicacionAPConjunto(
+        conjuntoId: any(named: 'conjuntoId'),
+        bssid: any(named: 'bssid'),
+        posX: any(named: 'posX'),
+        posY: any(named: 'posY'),
+      ),
+    ).thenAnswer((_) async => _conjunto(posX: 340, posY: 280));
+
+    await cubit.iniciar(37);
+    cubit.abrirConjunto(conjunto);
+    cubit.activarAP(_apPrincipal);
+    cubit.ubicarAP(bssid: _apPrincipal.bssid, posX: 340, posY: 280);
+
+    await untilCalled(
+      () => repo.actualizarUbicacionAPConjunto(
+        conjuntoId: 9,
+        bssid: _apPrincipal.bssid,
+        posX: 340,
+        posY: 280,
+      ),
+    );
+    verify(
+      () => repo.actualizarUbicacionAPConjunto(
+        conjuntoId: 9,
+        bssid: _apPrincipal.bssid,
+        posX: 340,
+        posY: 280,
+      ),
+    ).called(1);
+  });
+
+  test('no persiste movimientos transitorios durante el arrastre', () async {
+    final conjunto = _conjunto();
+    when(() => repo.listarAPsDisponibles(37))
+        .thenAnswer((_) async => const [_apPrincipal, _apSecundario]);
+    when(() => repo.listarConjuntosAP(37)).thenAnswer((_) async => [conjunto]);
+
+    await cubit.iniciar(37);
+    cubit.abrirConjunto(conjunto);
+    cubit.activarAP(_apPrincipal);
+    cubit.ubicarAP(
+      bssid: _apPrincipal.bssid,
+      posX: 330,
+      posY: 270,
+      persistir: false,
+    );
+
+    verifyNever(
+      () => repo.actualizarUbicacionAPConjunto(
+        conjuntoId: any(named: 'conjuntoId'),
+        bssid: any(named: 'bssid'),
+        posX: any(named: 'posX'),
+        posY: any(named: 'posY'),
+      ),
+    );
+  });
+}

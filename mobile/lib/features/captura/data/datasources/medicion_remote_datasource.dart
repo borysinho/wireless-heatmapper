@@ -113,6 +113,29 @@ class MedicionRemoteDatasource {
     }
   }
 
+  /// Mueve un punto existente. PATCH /api/puntos/{id}.
+  Future<PuntoMedicion> moverPunto({
+    required int puntoId,
+    required double posX,
+    required double posY,
+  }) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/puntos/$puntoId',
+        data: {
+          'pos_x': posX,
+          'pos_y': posY,
+        },
+      );
+      return PuntoMedicionModel.fromJson(response.data!);
+    } on DioException catch (e) {
+      throw CapturaApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
   /// Elimina un punto. DELETE /api/puntos/{id}.
   Future<void> eliminarPunto(int puntoId) async {
     try {

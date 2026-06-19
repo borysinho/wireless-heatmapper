@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 AlgoritmoHeatmap = Literal["IDW", "KRIGING"]
 ResolucionHeatmap = Literal[64, 128, 256]
+ModoGeneracionHeatmap = Literal["INDIVIDUAL", "SUBCONJUNTO", "CONJUNTO_COMPLETO"]
 
 
 class EscalaHeatmapItem(BaseModel):
@@ -28,9 +29,23 @@ class PuntoLecturaHeatmapOut(BaseModel):
     rssi: float
 
 
+class APDisponibleOut(BaseModel):
+    bssid: str
+    ssid: str
+    canal: int | None
+    frecuencia_mhz: int | None
+    rssi_promedio: float
+    pos_x: float
+    pos_y: float
+    cantidad_puntos: int
+    seleccionado: bool = False
+
+
 class MapaCalorOut(BaseModel):
     id: int
     plano_id: int
+    conjunto_ap_id: int | None = None
+    modo_generacion: str = "SUBCONJUNTO"
     algoritmo: str
     resolucion: int
     bssid: str
@@ -38,6 +53,7 @@ class MapaCalorOut(BaseModel):
     ap_pos_x: float
     ap_pos_y: float
     aps_interes: list[APDisponibleOut]
+    bssids_generacion: list[str]
     url_imagen: str
     matriz: list[list[float]]
     escala: list[EscalaHeatmapItem]
@@ -67,15 +83,63 @@ class APDetectadoOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class APDisponibleOut(BaseModel):
+class ConjuntoAPItemOut(BaseModel):
     bssid: str
     ssid: str
     canal: int | None
-    frecuencia_mhz: int | None
-    rssi_promedio: float
-    pos_x: float
-    pos_y: float
-    cantidad_puntos: int
+    frecuencia_mhz: int | None = None
+    rssi_promedio: float | None = None
+    pos_x: float | None = None
+    pos_y: float | None = None
+    cantidad_puntos: int | None = None
+
+
+class ConjuntoAPBase(BaseModel):
+    nombre: str = Field(..., min_length=1, max_length=100)
+    proposito: str = Field(..., min_length=1, max_length=255)
+    descripcion: str | None = Field(default=None, max_length=1000)
+    es_principal: bool = False
+    bssids: list[str] = Field(..., min_length=1)
+
+
+class ConjuntoAPCrearIn(ConjuntoAPBase):
+    pass
+
+
+class ConjuntoAPActualizarIn(BaseModel):
+    nombre: str | None = Field(default=None, min_length=1, max_length=100)
+    proposito: str | None = Field(default=None, min_length=1, max_length=255)
+    descripcion: str | None = Field(default=None, max_length=1000)
+    es_principal: bool | None = None
+    bssids: list[str] | None = Field(default=None, min_length=1)
+
+
+class ConjuntoAPOut(BaseModel):
+    id: int
+    plano_id: int
+    nombre: str
+    proposito: str
+    descripcion: str | None
+    es_principal: bool
+    cantidad_aps: int
+    items: list[ConjuntoAPItemOut]
+    created_at: datetime
+    updated_at: datetime
+
+
+class GenerarHeatmapConjuntoIn(BaseModel):
+    modo: ModoGeneracionHeatmap = "CONJUNTO_COMPLETO"
+    bssids: list[str] | None = None
+    ap_pos_x: list[float] | None = None
+    ap_pos_y: list[float] | None = None
+    algoritmo: AlgoritmoHeatmap = "IDW"
+    resolucion: ResolucionHeatmap = 128
+
+
+class ActualizarUbicacionAPConjuntoIn(BaseModel):
+    bssid: str = Field(..., min_length=17, max_length=17)
+    pos_x: float = Field(..., ge=0)
+    pos_y: float = Field(..., ge=0)
 
 
 class AnalisisCoberturaOut(BaseModel):

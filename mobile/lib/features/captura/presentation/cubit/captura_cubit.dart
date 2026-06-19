@@ -100,7 +100,7 @@ class CapturaCubit extends Cubit<CapturaState> {
   ///   2. Verifica throttling → CapturaThrottling si se alcanzó el límite.
   ///   3. Realiza el escaneo WiFi.
   ///   4. Registra el escaneo en el ThrottlingManager.
-  ///   5. Envía el lote al backend (con reintentos gestionados por Dio).
+  ///   5. Envía el lote al backend.
   ///   6. Agrega el punto a la lista local y emite CapturaActiva.
   Future<void> marcarPunto({
     required double posX,
@@ -265,6 +265,89 @@ class CapturaCubit extends Cubit<CapturaState> {
       ));
     } else {
       emit(CapturaActiva(planoId: planoId, puntos: puntos));
+    }
+  }
+
+  PuntoMedicion _puntoConPosicion(
+    PuntoMedicion punto, {
+    required double posX,
+    required double posY,
+  }) {
+    return PuntoMedicion(
+      id: punto.id,
+      planoId: punto.planoId,
+      posX: posX,
+      posY: posY,
+      nivel: punto.nivel,
+      mediciones: punto.mediciones,
+    );
+  }
+
+  List<PuntoMedicion> _actualizarPuntoEnLista(
+    List<PuntoMedicion> puntos,
+    PuntoMedicion actualizado,
+  ) {
+    return puntos
+        .map((punto) => punto.id == actualizado.id ? actualizado : punto)
+        .toList();
+  }
+
+  /// Reubica el punto localmente para dar retroalimentación inmediata al arrastrar.
+  void reubicarPuntoLocal({
+    required int puntoId,
+    required double posX,
+    required double posY,
+  }) {
+    final planoId = _planoIdActual;
+    if (planoId == null) return;
+    final estadoAntes = state;
+    PuntoMedicion? actual = estadoAntes is CapturaPuntoDetalle &&
+            estadoAntes.puntoSeleccionado.id == puntoId
+        ? estadoAntes.puntoSeleccionado
+        : null;
+    for (final punto in _puntosActuales) {
+      if (actual != null) break;
+      if (punto.id == puntoId) {
+        actual = punto;
+        break;
+      }
+    }
+    if (actual == null) return;
+    final actualizado = _puntoConPosicion(actual, posX: posX, posY: posY);
+    final nuevaLista = _actualizarPuntoEnLista(_puntosActuales, actualizado);
+    _restaurarActivo(estadoAntes, planoId, nuevaLista);
+  }
+
+  /// Persiste la nueva posición del punto en backend.
+  Future<void> moverPunto({
+    required int puntoId,
+    required double posX,
+    required double posY,
+  }) async {
+    final planoId = _planoIdActual;
+    if (planoId == null) return;
+    final estadoAntes = state;
+    final anteriores = _puntosActuales;
+    try {
+      final actualizado = await _repo.moverPunto(
+        puntoId: puntoId,
+        posX: posX,
+        posY: posY,
+      );
+      final nuevaLista = _actualizarPuntoEnLista(_puntosActuales, actualizado);
+      _restaurarActivo(estadoAntes, planoId, nuevaLista);
+    } on CapturaApiException catch (e) {
+      emit(CapturaError(
+        planoId: planoId,
+        puntos: anteriores,
+        mensaje: e.mensaje,
+      ));
+    } catch (_) {
+      emit(CapturaError(
+        planoId: planoId,
+        puntos: anteriores,
+        mensaje: 'No se pudo mover el punto.',
+      ));
     }
   }
 

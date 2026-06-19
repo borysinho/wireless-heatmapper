@@ -294,6 +294,19 @@ class MedicionRepository:
             .first()
         )
 
+    def actualizar_posicion(
+        self,
+        *,
+        punto: PuntoMedicion,
+        pos_x: float,
+        pos_y: float,
+    ) -> PuntoMedicion:
+        """Actualiza la posición de un punto sin alterar sus mediciones."""
+        punto.pos_x = pos_x
+        punto.pos_y = pos_y
+        self._db.flush()
+        return punto
+
     # ------------------------------------------------------------------
     # Eliminación — PB-04 (DELETE /api/puntos/{id})
     # ------------------------------------------------------------------
