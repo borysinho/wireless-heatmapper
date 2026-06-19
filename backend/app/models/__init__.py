@@ -1,4 +1,9 @@
 from app.models.cliente import Cliente  # noqa: F401
+from app.models.escenario import (  # noqa: F401
+    EscenarioOptimizado,
+    RecomendacionAP,
+    Reporte,
+)
 from app.models.heatmap import (  # noqa: F401
     AnalisisCobertura,
     APDetectado,

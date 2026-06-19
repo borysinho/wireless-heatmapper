@@ -2,6 +2,7 @@ import '../../domain/entities/analisis_cobertura.dart';
 import '../../domain/entities/ap_disponible.dart';
 import '../../domain/entities/ap_detectado.dart';
 import '../../domain/entities/conjunto_ap.dart';
+import '../../domain/entities/escenario_optimizado.dart';
 import '../../domain/entities/mapa_calor.dart';
 import '../../domain/repositories/heatmap_repository.dart';
 import '../datasources/heatmap_remote_datasource.dart';
@@ -129,5 +130,43 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
     required double posY,
   }) {
     return _datasource.confirmarAP(apId: apId, posX: posX, posY: posY);
+  }
+
+  @override
+  Future<List<EscenarioOptimizado>> generarEscenarios({
+    required int proyectoId,
+    required int maxAps,
+    double? presupuesto,
+    required String bandaPreferida,
+    required String modeloAp,
+    required double costoUnitario,
+    int resolucion = 64,
+  }) async {
+    final escenarios = await _datasource.generarEscenarios(
+      proyectoId: proyectoId,
+      maxAps: maxAps,
+      presupuesto: presupuesto,
+      bandaPreferida: bandaPreferida,
+      modeloAp: modeloAp,
+      costoUnitario: costoUnitario,
+      resolucion: resolucion,
+    );
+    return List<EscenarioOptimizado>.of(escenarios);
+  }
+
+  @override
+  Future<ComparacionEscenario> compararEscenario(int escenarioId) {
+    return _datasource.compararEscenario(escenarioId);
+  }
+
+  @override
+  Future<ReporteTecnico> crearReporte({
+    required int proyectoId,
+    int? escenarioId,
+  }) {
+    return _datasource.crearReporte(
+      proyectoId: proyectoId,
+      escenarioId: escenarioId,
+    );
   }
 }

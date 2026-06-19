@@ -2,6 +2,7 @@ import '../entities/analisis_cobertura.dart';
 import '../entities/ap_disponible.dart';
 import '../entities/ap_detectado.dart';
 import '../entities/conjunto_ap.dart';
+import '../entities/escenario_optimizado.dart';
 import '../entities/mapa_calor.dart';
 
 abstract class HeatmapRepository {
@@ -59,5 +60,22 @@ abstract class HeatmapRepository {
     required int apId,
     required double posX,
     required double posY,
+  });
+
+  Future<List<EscenarioOptimizado>> generarEscenarios({
+    required int proyectoId,
+    required int maxAps,
+    double? presupuesto,
+    required String bandaPreferida,
+    required String modeloAp,
+    required double costoUnitario,
+    int resolucion = 64,
+  });
+
+  Future<ComparacionEscenario> compararEscenario(int escenarioId);
+
+  Future<ReporteTecnico> crearReporte({
+    required int proyectoId,
+    int? escenarioId,
   });
 }

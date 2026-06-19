@@ -4,6 +4,7 @@ import '../models/analisis_cobertura_model.dart';
 import '../models/ap_disponible_model.dart';
 import '../models/ap_detectado_model.dart';
 import '../models/conjunto_ap_model.dart';
+import '../models/escenario_optimizado_model.dart';
 import '../models/mapa_calor_model.dart';
 
 class HeatmapRemoteDatasource {
@@ -207,6 +208,75 @@ class HeatmapRemoteDatasource {
         data: {'pos_x': posX, 'pos_y': posY, 'confirmado': true},
       );
       return APDetectadoModel.fromJson(response.data!);
+    } on DioException catch (e) {
+      throw HeatmapApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  Future<List<EscenarioOptimizadoModel>> generarEscenarios({
+    required int proyectoId,
+    required int maxAps,
+    double? presupuesto,
+    required String bandaPreferida,
+    required String modeloAp,
+    required double costoUnitario,
+    int resolucion = 64,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/proyectos/$proyectoId/escenarios',
+        data: {
+          'max_aps': maxAps,
+          if (presupuesto != null) 'presupuesto': presupuesto,
+          'banda_preferida': bandaPreferida,
+          'modelo_ap': modeloAp,
+          'costo_unitario': costoUnitario,
+          'resolucion': resolucion,
+        },
+      );
+      final escenarios = response.data?['escenarios'] as List<dynamic>? ?? [];
+      return escenarios
+          .map(
+            (e) => EscenarioOptimizadoModel.fromJson(
+              e as Map<String, dynamic>,
+            ),
+          )
+          .toList();
+    } on DioException catch (e) {
+      throw HeatmapApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  Future<ComparacionEscenarioModel> compararEscenario(int escenarioId) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/escenarios/$escenarioId/comparacion',
+      );
+      return ComparacionEscenarioModel.fromJson(response.data!);
+    } on DioException catch (e) {
+      throw HeatmapApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  Future<ReporteTecnicoModel> crearReporte({
+    required int proyectoId,
+    int? escenarioId,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/proyectos/$proyectoId/reportes',
+        data: {if (escenarioId != null) 'escenario_id': escenarioId},
+      );
+      return ReporteTecnicoModel.fromJson(response.data!);
     } on DioException catch (e) {
       throw HeatmapApiException(
         _mensajeDesdeError(e),

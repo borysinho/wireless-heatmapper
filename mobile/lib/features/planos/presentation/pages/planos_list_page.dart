@@ -122,6 +122,16 @@ class _PlanosListPageState extends State<PlanosListPage> {
         title: Text(widget.proyectoNombre != null
             ? 'Planos · ${widget.proyectoNombre}'
             : 'Planos del proyecto'),
+        actions: [
+          IconButton(
+            tooltip: 'Escenarios IA',
+            icon: const Icon(Icons.auto_awesome),
+            onPressed: () => context.pushNamed(
+              'escenarios',
+              pathParameters: {'id': widget.proyectoId.toString()},
+            ),
+          ),
+        ],
       ),
       body: BlocConsumer<PlanosCubit, PlanosState>(
         listener: (context, state) {

@@ -47,6 +47,7 @@ import 'features/heatmap/data/repositories/heatmap_repository_impl.dart';
 import 'features/heatmap/domain/repositories/heatmap_repository.dart';
 import 'features/heatmap/domain/usecases/heatmap_usecases.dart';
 import 'features/heatmap/presentation/cubit/heatmap_cubit.dart';
+import 'features/heatmap/presentation/cubit/escenarios_cubit.dart';
 import 'features/planos/data/repositories/plano_repository_impl.dart';
 import 'features/planos/domain/repositories/plano_repository.dart';
 import 'features/planos/domain/usecases/plano_usecases.dart';
@@ -237,6 +238,15 @@ void _initDependencias() {
   sl.registerFactory<ConfirmarAPUseCase>(
     () => ConfirmarAPUseCase(sl<HeatmapRepository>()),
   );
+  sl.registerFactory<GenerarEscenariosUseCase>(
+    () => GenerarEscenariosUseCase(sl<HeatmapRepository>()),
+  );
+  sl.registerFactory<CompararEscenarioUseCase>(
+    () => CompararEscenarioUseCase(sl<HeatmapRepository>()),
+  );
+  sl.registerFactory<CrearReporteUseCase>(
+    () => CrearReporteUseCase(sl<HeatmapRepository>()),
+  );
   sl.registerFactory<HeatmapCubit>(
     () => HeatmapCubit(
       listarAPs: sl<ListarAPsDisponiblesUseCase>(),
@@ -249,6 +259,13 @@ void _initDependencias() {
       actualizarUbicacionAPConjunto: sl<ActualizarUbicacionAPConjuntoUseCase>(),
       analizarMapa: sl<AnalizarMapaUseCase>(),
       confirmarAP: sl<ConfirmarAPUseCase>(),
+    ),
+  );
+  sl.registerFactory<EscenariosCubit>(
+    () => EscenariosCubit(
+      generar: sl<GenerarEscenariosUseCase>(),
+      comparar: sl<CompararEscenarioUseCase>(),
+      crearReporte: sl<CrearReporteUseCase>(),
     ),
   );
 }

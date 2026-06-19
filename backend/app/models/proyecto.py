@@ -57,3 +57,13 @@ class Proyecto(Base):
         back_populates="proyecto",
         cascade="all, delete-orphan",
     )
+    escenarios = relationship(
+        "EscenarioOptimizado",
+        back_populates="proyecto",
+        cascade="all, delete-orphan",
+    )
+    reportes = relationship(
+        "Reporte",
+        back_populates="proyecto",
+        cascade="save-update, merge",
+    )
