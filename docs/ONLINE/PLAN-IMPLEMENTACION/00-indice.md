@@ -43,7 +43,7 @@ Este directorio contiene la documentación operativa del proceso Scrum aplicado 
 | 14  | [14-trazabilidad-rp-hu.md](14-trazabilidad-rp-hu.md)                                 | Matriz de trazabilidad RP ↔ HU ↔ Sprint ↔ UC                                            |
 | 15  | [15-gestion-riesgos.md](15-gestion-riesgos.md)                                       | Riesgos del plan de implementación y plan de mitigación por sprint                      |
 | 16  | [16-plan-validacion-sprint-1.md](16-plan-validacion-sprint-1.md)                     | Plan de validación exhaustivo del Sprint 1: tests, DoD, brechas y pruebas de aceptación |
-| 17  | [17-especificacion-optimizacion-rf/](17-especificacion-optimizacion-rf/00-indice.md) | Propuesta revisable: optimización por AP físico/radio, 2,4/5 GHz y escenarios RF        |
+| 17  | [17-especificacion-optimizacion-rf/](17-especificacion-optimizacion-rf/00-indice.md) | Especificación aprobada: optimización por AP físico/radio, 2,4/5 GHz y escenarios RF   |
 
 ---
 

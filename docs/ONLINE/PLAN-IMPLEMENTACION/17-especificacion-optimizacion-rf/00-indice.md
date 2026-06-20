@@ -1,6 +1,6 @@
 # 17 — Especificación de Optimización RF por Escenarios
 
-**Estado:** Propuesta para revisión del Product Owner
+**Estado:** Aprobada para implementación por el Product Owner — 20-jun-2026
 
 **Alcance:** Refinamiento de RP5, PB-07 y PB-12
 
@@ -8,7 +8,7 @@
 
 Este paquete define cómo evolucionar el módulo de recomendación para que produzca un **plan RF completo**, no solamente coordenadas de APs. La propuesta distingue AP físico, radio y BSSID; contempla instalaciones nuevas y redes existentes; optimiza 2,4 GHz y 5 GHz; y conserva por separado las mediciones reales y las predicciones.
 
-Hasta que el Product Owner apruebe esta especificación, los documentos vigentes de Sprint 5 continúan describiendo el comportamiento implementado. La aprobación deberá preceder cualquier cambio de código, migración o contrato REST.
+Esta especificación complementa el alcance de Sprint 5 y es la referencia técnica vigente para la evolución de PB-07/PB-12. Los documentos normativos enlazan este paquete para evitar duplicar sus contratos y reglas detalladas.
 
 ## Documentos
 

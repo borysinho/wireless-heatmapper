@@ -270,6 +270,7 @@ void _initDependencias() {
       comparar: sl<CompararEscenarioUseCase>(),
       crearReporte: sl<CrearReporteUseCase>(),
       descargarReporte: sl<DescargarReporteUseCase>(),
+      repositorio: sl<HeatmapRepository>(),
     ),
   );
 }

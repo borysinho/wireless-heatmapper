@@ -10,6 +10,7 @@ import '../../domain/usecases/heatmap_usecases.dart';
 import 'escenarios_state.dart';
 
 class EscenariosCubit extends Cubit<EscenariosState> {
+  final HeatmapRepository _repositorio;
   final GenerarEscenariosUseCase _generar;
   final CompararEscenarioUseCase _comparar;
   final CrearReporteUseCase _crearReporte;
@@ -20,17 +21,47 @@ class EscenariosCubit extends Cubit<EscenariosState> {
     CompararEscenarioUseCase? comparar,
     CrearReporteUseCase? crearReporte,
     DescargarReporteUseCase? descargarReporte,
-  })  : _generar = generar ?? GetIt.I<GenerarEscenariosUseCase>(),
+    HeatmapRepository? repositorio,
+  })  : _repositorio = repositorio ?? GetIt.I<HeatmapRepository>(),
+        _generar = generar ?? GetIt.I<GenerarEscenariosUseCase>(),
         _comparar = comparar ?? GetIt.I<CompararEscenarioUseCase>(),
         _crearReporte = crearReporte ?? GetIt.I<CrearReporteUseCase>(),
         _descargarReporte = descargarReporte,
         super(const EscenariosState());
+
+  Future<void> cargarInventario(int proyectoId) async {
+    emit(state.copyWith(cargando: true, limpiarError: true));
+    try {
+      final inventario = await _repositorio.obtenerInventarioRF(proyectoId);
+      emit(state.copyWith(cargando: false, inventario: inventario));
+    } catch (e) {
+      emit(state.copyWith(cargando: false, error: e.toString()));
+    }
+  }
+
+  Future<void> crearAPFisico({
+    required int proyectoId,
+    required Map<String, dynamic> datos,
+  }) async {
+    emit(state.copyWith(cargando: true, limpiarError: true));
+    try {
+      await _repositorio.crearAPFisicoRF(proyectoId: proyectoId, datos: datos);
+      final inventario = await _repositorio.obtenerInventarioRF(proyectoId);
+      emit(state.copyWith(cargando: false, inventario: inventario));
+    } catch (e) {
+      emit(state.copyWith(cargando: false, error: e.toString()));
+    }
+  }
 
   Future<void> generar({
     required int proyectoId,
     int maxAps = 3,
     double? presupuesto,
     String bandaPreferida = '5',
+    List<String> bandas = const ['2.4', '5'],
+    String tipoNegocio = 'INSTALACION_NUEVA',
+    String perfil = 'COBERTURA_EQUILIBRADA',
+    String politicaCombinacion = 'PREFERIR_5_GHZ_SI_CUMPLE_UMBRAL',
     String modeloAp = 'AP empresarial de potencia ajustable',
     double costoUnitario = 1,
   }) async {
@@ -41,6 +72,10 @@ class EscenariosCubit extends Cubit<EscenariosState> {
         maxAps: maxAps,
         presupuesto: presupuesto,
         bandaPreferida: bandaPreferida,
+        bandas: bandas,
+        tipoNegocio: tipoNegocio,
+        perfil: perfil,
+        politicaCombinacion: politicaCombinacion,
         modeloAp: modeloAp,
         costoUnitario: costoUnitario,
       );

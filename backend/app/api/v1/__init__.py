@@ -17,6 +17,7 @@ from app.api.v1 import (
     clientes,
     escenarios,
     heatmaps,
+    inventario_rf,
     mediciones,
     planos,
     proyectos,
@@ -37,6 +38,7 @@ api_router.include_router(heatmaps.router_planos_heatmap)
 api_router.include_router(heatmaps.router_conjuntos_ap)
 api_router.include_router(heatmaps.router_mapas)
 api_router.include_router(heatmaps.router_aps)
+api_router.include_router(inventario_rf.router)
 api_router.include_router(escenarios.router_proyectos_escenarios)
 api_router.include_router(escenarios.router_escenarios)
 api_router.include_router(escenarios.router_reportes)

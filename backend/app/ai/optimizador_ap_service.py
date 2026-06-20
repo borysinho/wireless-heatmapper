@@ -22,6 +22,10 @@ class AlternativaOptimizada:
     metricas: dict
     recomendaciones: list[dict]
     matriz: list[list[float]]
+    mapas_por_banda: dict[str, list[list[float]]]
+    valores_proyectados: list[dict]
+    supuestos: list[str]
+    confianza: str
 
 
 class OptimizadorAPService:
@@ -44,11 +48,23 @@ class OptimizadorAPService:
         modelo_ap: str,
         costo_unitario: float,
         resolucion: int,
+        bandas: list[str] | None = None,
+        tipo_negocio: str = "INSTALACION_NUEVA",
+        perfil: str = "COBERTURA_EQUILIBRADA",
+        politica_combinacion: str = "PREFERIR_5_GHZ_SI_CUMPLE_UMBRAL",
+        aps_existentes: list[dict] | None = None,
     ) -> list[AlternativaOptimizada]:
         if not puntos_actuales:
             raise ValueError("Se requieren puntos de medición para optimizar.")
 
+        bandas_objetivo = list(dict.fromkeys(bandas or [banda]))
+        if banda not in bandas_objetivo:
+            banda = "5" if "5" in bandas_objetivo else bandas_objetivo[0]
         cantidad_max = max(1, max_aps)
+        if presupuesto is not None:
+            cantidad_max = min(cantidad_max, max(0, int(presupuesto // costo_unitario)))
+        if cantidad_max < 1:
+            raise ValueError("El presupuesto no permite adquirir ningún AP.")
 
         pct_actual = self._pct_cobertura(matriz_actual)
         candidatos = self._candidatos(
@@ -75,16 +91,23 @@ class OptimizadorAPService:
                 banda=banda,
                 resolucion=resolucion,
             )
-            matriz_proyectada = self._matriz_desde_aps(
-                aps=seleccionados,
-                ancho_px=ancho_px,
-                alto_px=alto_px,
-                metros_por_pixel=metros_por_pixel,
-                banda=banda,
-                resolucion=resolucion,
-            )
+            for indice, ap in enumerate((aps_existentes or [])[: len(seleccionados)]):
+                if ap.get("restriccion_movimiento") == "FIJO":
+                    seleccionados[indice] = (float(ap["coord_x"]), float(ap["coord_y"]))
+            mapas_por_banda = {
+                banda_actual: self._matriz_desde_aps(
+                    aps=seleccionados,
+                    ancho_px=ancho_px,
+                    alto_px=alto_px,
+                    metros_por_pixel=metros_por_pixel,
+                    banda=banda_actual,
+                    resolucion=resolucion,
+                )
+                for banda_actual in bandas_objetivo
+            }
+            matriz_proyectada = mapas_por_banda[banda]
             pct = self._pct_cobertura(matriz_proyectada)
-            costo = 0.0
+            costo = round(cantidad * costo_unitario, 2)
             recomendaciones = [
                 self._recomendacion(
                     orden=idx,
@@ -92,17 +115,23 @@ class OptimizadorAPService:
                     y=y,
                     banda=banda,
                     modelo_ap=modelo_ap,
-                    costo_unitario=0,
+                    costo_unitario=costo_unitario,
                     puntos=puntos_actuales,
                     metros_por_pixel=metros_por_pixel,
+                    bandas=bandas_objetivo,
+                    tipo_negocio=tipo_negocio,
+                    ap_existente=(aps_existentes or [None] * cantidad)[idx - 1]
+                    if idx <= len(aps_existentes or [])
+                    else None,
                 )
                 for idx, (x, y) in enumerate(seleccionados, start=1)
             ]
+            costo = round(sum(item["costo_estimado"] for item in recomendaciones), 2)
             alternativas.append(
                 AlternativaOptimizada(
                     nombre=f"Alternativa {cantidad}",
                     banda=banda,
-                    modelo_ap="AP empresarial de potencia ajustable",
+                    modelo_ap=modelo_ap,
                     pct_cobertura_actual=pct_actual,
                     pct_cobertura=pct,
                     costo_estimado=costo,
@@ -115,10 +144,35 @@ class OptimizadorAPService:
                         "pct_cobertura_actual": pct_actual,
                         "pct_cobertura_proyectada": pct,
                         "mejora_pct": round(pct - pct_actual, 2),
-                        "zonas_muertas_proyectadas": self._zonas_muertas(matriz_proyectada),
+                        "zonas_muertas_proyectadas": self._zonas_muertas(
+                            matriz_proyectada
+                        ),
+                        "pct_cobertura_por_banda": {
+                            key: self._pct_cobertura(value)
+                            for key, value in mapas_por_banda.items()
+                        },
+                        "perfil": perfil,
+                        "politica_combinacion": politica_combinacion,
                     },
                     recomendaciones=recomendaciones,
                     matriz=matriz_proyectada,
+                    mapas_por_banda=mapas_por_banda,
+                    valores_proyectados=self._valores_proyectados(
+                        puntos=puntos_actuales,
+                        aps=seleccionados,
+                        bandas=bandas_objetivo,
+                        metros_por_pixel=metros_por_pixel,
+                    ),
+                    supuestos=[
+                        "Antena omnidireccional de 2,14 dBi cuando no existe "
+                        "inventario verificado.",
+                        "Ancho de canal inicial de 20 MHz para favorecer "
+                        "reutilización.",
+                    ],
+                    confianza="ALTA"
+                    if aps_existentes
+                    and all(ap.get("verificado") for ap in aps_existentes)
+                    else "MEDIA",
                 )
             )
         return sorted(
@@ -140,7 +194,10 @@ class OptimizadorAPService:
                 candidatos.append((ancho_px * x_frac, alto_px * y_frac))
         unicos: list[tuple[float, float]] = []
         for x, y in candidatos:
-            coord = (round(max(0, min(ancho_px, x)), 2), round(max(0, min(alto_px, y)), 2))
+            coord = (
+                round(max(0, min(ancho_px, x)), 2),
+                round(max(0, min(alto_px, y)), 2),
+            )
             if coord not in unicos:
                 unicos.append(coord)
         return unicos
@@ -197,7 +254,10 @@ class OptimizadorAPService:
                 (x, y + paso),
             ]
             vecinos = [
-                (round(max(0, min(ancho_px, vx)), 2), round(max(0, min(alto_px, vy)), 2))
+                (
+                    round(max(0, min(ancho_px, vx)), 2),
+                    round(max(0, min(alto_px, vy)), 2),
+                )
                 for vx, vy in vecinos
             ]
             actuales[idx] = max(
@@ -254,22 +314,54 @@ class OptimizadorAPService:
         costo_unitario: float,
         puntos: list[PuntoRSSI],
         metros_por_pixel: float,
+        bandas: list[str],
+        tipo_negocio: str,
+        ap_existente: dict | None,
     ) -> dict:
+        if (
+            tipo_negocio == "RED_EXISTENTE"
+            and ap_existente
+            and ap_existente.get("restriccion_movimiento") == "FIJO"
+        ):
+            x = float(ap_existente["coord_x"])
+            y = float(ap_existente["coord_y"])
         punto_critico = min(puntos, key=lambda p: math.hypot(p.x - x, p.y - y))
-        distancia_m = math.hypot(punto_critico.x - x, punto_critico.y - y) * metros_por_pixel
+        distancia_m = (
+            math.hypot(punto_critico.x - x, punto_critico.y - y) * metros_por_pixel
+        )
         rssi = self._modelo.predecir_rssi(
             distancia_px=math.hypot(punto_critico.x - x, punto_critico.y - y),
             metros_por_pixel=metros_por_pixel,
             banda=banda,
         )
+        radios = [
+            self._configuracion_radio(banda_actual, orden) for banda_actual in bandas
+        ]
+        accion = "AGREGAR"
+        ap_fisico_id = None
+        if tipo_negocio == "RED_EXISTENTE" and ap_existente:
+            ap_fisico_id = ap_existente.get("id")
+            accion = (
+                "RECONFIGURAR"
+                if ap_existente.get("restriccion_movimiento") == "FIJO"
+                else "MOVER"
+            )
         return {
-            "accion": "AGREGAR",
+            "ap_fisico_id": ap_fisico_id,
+            "accion": accion,
             "coord_x": round(x, 2),
             "coord_y": round(y, 2),
             "banda": banda,
-            "modelo_ap": "AP empresarial de potencia ajustable",
-            "costo_estimado": 0,
+            "altura_m": float(ap_existente.get("altura_m", 2.5))
+            if ap_existente
+            else 2.5,
+            "tipo_montaje": str(ap_existente.get("tipo_montaje", "TECHO"))
+            if ap_existente
+            else "TECHO",
+            "modelo_ap": modelo_ap,
+            "costo_estimado": round(0 if accion != "AGREGAR" else costo_unitario, 2),
             "rssi_proyectado": rssi,
+            "radios": radios,
             "justificacion": (
                 f"AP {orden}: ubicar un equipo con potencia TX ajustable y "
                 f"capacidad para mantener RSSI proyectado {rssi:.1f} dBm "
@@ -279,6 +371,71 @@ class OptimizadorAPService:
                 f"soportar gestión centralizada. Objetivo de diseño: >= -70 dBm."
             ),
         }
+
+    def _configuracion_radio(self, banda: str, orden: int) -> dict:
+        if banda == "2.4":
+            canales = [1, 6, 11]
+            potencia = 8.0
+        else:
+            canales = [36, 44, 149, 157]
+            potencia = 14.0
+        return {
+            "banda": banda,
+            "habilitada": True,
+            "canal": canales[(orden - 1) % len(canales)],
+            "ancho_canal_mhz": 20,
+            "potencia_dbm": potencia,
+            "ganancia_dbi": 2.14,
+            "eirp_dbm": round(potencia + 2.14, 2),
+            "tipo_antena": "OMNIDIRECCIONAL",
+            "dfs": False,
+        }
+
+    def _valores_proyectados(
+        self,
+        *,
+        puntos: list[PuntoRSSI],
+        aps: list[tuple[float, float]],
+        bandas: list[str],
+        metros_por_pixel: float,
+    ) -> list[dict]:
+        valores: list[dict] = []
+        for punto in puntos:
+            for banda in bandas:
+                predicciones = sorted(
+                    (
+                        self._modelo.predecir_rssi(
+                            distancia_px=math.hypot(punto.x - x, punto.y - y),
+                            metros_por_pixel=metros_por_pixel,
+                            banda=banda,
+                            potencia_dbm=8.0 if banda == "2.4" else 14.0,
+                        ),
+                        indice,
+                    )
+                    for indice, (x, y) in enumerate(aps, start=1)
+                )
+                mejor, primaria = predicciones[-1]
+                secundaria = predicciones[-2] if len(predicciones) > 1 else None
+                observado = punto.rssi if banda == "5" else None
+                valores.append(
+                    {
+                        "punto_medicion_id": punto.punto_id,
+                        "banda": banda,
+                        "rssi_observado_dbm": observado,
+                        "rssi_proyectado_dbm": mejor,
+                        "diferencia_db": round(mejor - observado, 2)
+                        if observado is not None
+                        else None,
+                        "radio_primaria": f"AP-{primaria}:{banda}",
+                        "radio_secundaria": f"AP-{secundaria[1]}:{banda}"
+                        if secundaria
+                        else None,
+                        "rssi_secundario_dbm": secundaria[0] if secundaria else None,
+                        "snr_proyectado_db": None,
+                        "incertidumbre_db": 6.0,
+                    }
+                )
+        return valores
 
     def _pct_cobertura(self, matriz: list[list[float]]) -> float:
         valores = [valor for fila in matriz for valor in fila]

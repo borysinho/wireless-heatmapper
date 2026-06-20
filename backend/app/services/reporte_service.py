@@ -236,11 +236,12 @@ class ReporteService:
 
         mejora = escenario.pct_cobertura - escenario.pct_cobertura_actual
         ap_plural = self._nombre_aps(escenario.cantidad_aps)
+        bandas = getattr(escenario, "bandas", None) or [escenario.banda]
         conclusion = (
             f"Para el proyecto {proyecto.nombre} se recomienda implementar "
             f"{escenario.cantidad_aps} {ap_plural} empresariales "
-            "con potencia TX ajustable, operando en banda "
-            f"{escenario.banda} GHz. La cobertura proyectada alcanza "
+            "con potencia TX ajustable, operando en las bandas "
+            f"{' y '.join(bandas)} GHz. La cobertura proyectada alcanza "
             f"{escenario.pct_cobertura:.1f}% de area con RSSI >= "
             f"{self.OBJETIVO_COBERTURA} dBm, equivalente a una mejora de "
             f"{mejora:.1f} puntos porcentuales frente a la condicion actual."
@@ -266,6 +267,8 @@ class ReporteService:
             f"Zona muerta: RSSI < {self.UMBRAL_ZONA_MUERTA} dBm.",
             "La recomendacion es orientativa y debe verificarse con "
             "medicion posterior a la instalacion.",
+            "Confianza del escenario: "
+            f"{getattr(escenario, 'confianza', None) or 'MEDIA'}.",
             f"Mediciones consideradas para el reporte: {cantidad_mediciones}.",
             f"Alternativas tecnicas evaluadas en el informe: {len(escenarios)}.",
         ]
@@ -321,6 +324,7 @@ class ReporteService:
 
         y = 116
         ap_plural = self._nombre_aps(escenario.cantidad_aps)
+        bandas = getattr(escenario, "bandas", None) or [escenario.banda]
         self._caja_texto(
             page,
             self.MARGEN_X,
@@ -331,7 +335,7 @@ class ReporteService:
             (
                 f"La alternativa seleccionada incorpora {escenario.cantidad_aps} "
                 f"{ap_plural} con potencia TX ajustable, capacidad de operacion "
-                f"en banda {escenario.banda} GHz, antenas adecuadas al area "
+                f"en bandas {' y '.join(bandas)} GHz, antenas adecuadas al area "
                 "de cobertura y soporte de administracion centralizada. "
                 f"Esta configuracion busca alcanzar RSSI >= "
                 f"{self.OBJETIVO_COBERTURA} dBm en las zonas criticas detectadas."
@@ -340,16 +344,26 @@ class ReporteService:
 
         y = 265
         self._seccion(page, "Ubicaciones sugeridas", self.MARGEN_X, y)
-        filas = [
-            [
-                f"AP {rec.orden}",
-                f"({rec.coord_x:.1f}, {rec.coord_y:.1f})",
-                f"{rec.banda} GHz",
-                f"{rec.rssi_proyectado:.1f} dBm",
-                "Potencia TX ajustable",
-            ]
-            for rec in escenario.recomendaciones
-        ]
+        filas = []
+        for rec in escenario.recomendaciones:
+            radios = getattr(rec, "radios", None) or []
+            configuracion = (
+                "; ".join(
+                    f"{radio['banda']}G C{radio['canal']} "
+                    f"{radio['ancho_canal_mhz']}MHz {radio['potencia_dbm']:.0f}dBm"
+                    for radio in radios
+                )
+                or "Potencia TX ajustable"
+            )
+            filas.append(
+                [
+                    f"AP {rec.orden}",
+                    f"({rec.coord_x:.1f}, {rec.coord_y:.1f})",
+                    "/".join(radio["banda"] for radio in radios) or f"{rec.banda}",
+                    f"{rec.rssi_proyectado:.1f} dBm",
+                    configuracion,
+                ]
+            )
         self._tabla_grid(
             page,
             self.MARGEN_X,
@@ -368,13 +382,20 @@ class ReporteService:
         y = 116
         acciones = []
         for rec in escenario.recomendaciones:
+            radios = getattr(rec, "radios", None) or []
+            detalle_radios = "; ".join(
+                f"{radio['banda']} GHz canal {radio['canal']}, "
+                f"{radio['ancho_canal_mhz']} MHz, {radio['potencia_dbm']:.0f} dBm"
+                for radio in radios
+            )
             acciones.append(
                 (
-                    f"Instalar o reubicar AP {rec.orden}",
+                    f"{rec.accion.title()} AP {rec.orden}",
                     (
                         "Ubicar un punto de acceso en la coordenada "
                         f"({rec.coord_x:.1f}, {rec.coord_y:.1f}), operando "
-                        f"en banda {rec.banda} GHz. El equipo debe permitir "
+                        f"con configuracion {detalle_radios or rec.banda + ' GHz'}. "
+                        "El equipo debe permitir "
                         "ajuste de potencia TX, control de solapamiento, "
                         "antenas acordes al ambiente y gestion centralizada."
                     ),

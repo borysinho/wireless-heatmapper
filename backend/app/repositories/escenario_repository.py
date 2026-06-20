@@ -2,7 +2,12 @@
 
 from sqlalchemy.orm import Session
 
-from app.models.escenario import EscenarioOptimizado, RecomendacionAP, Reporte
+from app.models.escenario import (
+    EscenarioOptimizado,
+    RecomendacionAP,
+    Reporte,
+    ValorProyectadoPunto,
+)
 
 
 class EscenarioRepository:
@@ -46,6 +51,16 @@ class EscenarioRepository:
         restricciones: dict,
         metricas: dict,
         recomendaciones: list[dict],
+        tipo_negocio: str = "INSTALACION_NUEVA",
+        perfil: str = "COBERTURA_EQUILIBRADA",
+        politica_combinacion: str = "PREFERIR_5_GHZ_SI_CUMPLE_UMBRAL",
+        bandas: list[str] | None = None,
+        mapas_por_banda: dict | None = None,
+        mapas_actuales_por_banda: dict | None = None,
+        supuestos: list[str] | None = None,
+        confianza: str = "MEDIA",
+        version_motor: str = "rf-hibrido-1.0",
+        valores_proyectados: list[dict] | None = None,
     ) -> EscenarioOptimizado:
         escenario = EscenarioOptimizado(
             proyecto_id=proyecto_id,
@@ -53,7 +68,11 @@ class EscenarioRepository:
             mapa_actual_id=mapa_actual_id,
             mapa_proyectado_id=mapa_proyectado_id,
             nombre=nombre,
+            tipo_negocio=tipo_negocio,
+            perfil=perfil,
+            politica_combinacion=politica_combinacion,
             banda=banda,
+            bandas=bandas or [banda],
             modelo_ap=modelo_ap,
             pct_cobertura_actual=pct_cobertura_actual,
             pct_cobertura=pct_cobertura,
@@ -62,6 +81,11 @@ class EscenarioRepository:
             resumen=resumen,
             restricciones=restricciones,
             metricas=metricas,
+            mapas_por_banda=mapas_por_banda or {},
+            mapas_actuales_por_banda=mapas_actuales_por_banda or {},
+            supuestos=supuestos or [],
+            confianza=confianza,
+            version_motor=version_motor,
         )
         self._db.add(escenario)
         self._db.flush()
@@ -73,6 +97,8 @@ class EscenarioRepository:
                     **data,
                 )
             )
+        for data in valores_proyectados or []:
+            self._db.add(ValorProyectadoPunto(escenario_id=escenario.id, **data))
         self._db.commit()
         self._db.refresh(escenario)
         return escenario

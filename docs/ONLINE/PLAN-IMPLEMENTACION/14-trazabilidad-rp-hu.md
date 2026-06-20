@@ -24,7 +24,7 @@
 
 > RP8 es transversal: además de PB-09/PB-01/PB-10 (HU principales del Sprint 1), se materializa en cada endpoint REST que persiste dominio en PostgreSQL desde el Sprint 1 en adelante.
 
-> **Refinamiento propuesto de RP5:** el paquete [17 — Especificación de Optimización RF por Escenarios](17-especificacion-optimizacion-rf/00-indice.md) amplía, pendiente de aprobación del Product Owner, el diseño de PB-07/PB-12 para distinguir AP físico, radio y BSSID; recomendar configuración por banda; y proyectar valores sin modificar mediciones reales. No altera los identificadores ni la asignación de Sprint de esta matriz.
+> **Refinamiento aprobado de RP5 (20-jun-2026):** el paquete [17 — Especificación de Optimización RF por Escenarios](17-especificacion-optimizacion-rf/00-indice.md) amplía PB-07/PB-12 para distinguir AP físico, radio y BSSID; recomendar configuración por banda; y proyectar valores sin modificar mediciones reales. No altera los identificadores ni la asignación de Sprint de esta matriz.
 
 ---
 
@@ -127,8 +127,8 @@
 | Heatmap por APs de interés (BSSID; ubicación AP referencial; puntos de lectura como fuente de interpolación) | PB-20, PB-05, PB-06 | S4                   |
 | CCI / ACI (canales 2.4 GHz Δ ≤ 4)             | PB-06               | S4                   |
 | Solapamiento de áreas con RSSI ≥ −70 dBm      | PB-06               | S4                   |
-| Configuración y predicción separadas para 2,4/5 GHz | PB-07, PB-12 | S5 · refinamiento propuesto |
-| Medición observada inmutable vs valor proyectado | PB-07, PB-12 | S5 · refinamiento propuesto |
+| Configuración y predicción separadas para 2,4/5 GHz | PB-07, PB-12 | S5 · implementada |
+| Medición observada inmutable vs valor proyectado | PB-07, PB-12 | S5 · implementada |
 
 ---
 

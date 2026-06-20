@@ -42,7 +42,17 @@ class EscenarioOptimizado(Base):
         index=True,
     )
     nombre = Column(String(120), nullable=False)
+    tipo_negocio = Column(String(30), nullable=False, default="INSTALACION_NUEVA")
+    perfil = Column(String(40), nullable=False, default="COBERTURA_EQUILIBRADA")
+    politica_combinacion = Column(
+        String(50),
+        nullable=False,
+        default="PREFERIR_5_GHZ_SI_CUMPLE_UMBRAL",
+    )
     banda = Column(String(10), nullable=False, default="5")
+    bandas = Column(
+        sa.JSON().with_variant(sa.JSON, "sqlite"), nullable=False, default=list
+    )
     modelo_ap = Column(String(120), nullable=False)
     pct_cobertura_actual = Column(Float, nullable=False, default=0)
     pct_cobertura = Column(Float, nullable=False)
@@ -51,6 +61,17 @@ class EscenarioOptimizado(Base):
     resumen = Column(Text, nullable=False)
     restricciones = Column(sa.JSON().with_variant(sa.JSON, "sqlite"), nullable=False)
     metricas = Column(sa.JSON().with_variant(sa.JSON, "sqlite"), nullable=False)
+    mapas_por_banda = Column(
+        sa.JSON().with_variant(sa.JSON, "sqlite"), nullable=False, default=dict
+    )
+    mapas_actuales_por_banda = Column(
+        sa.JSON().with_variant(sa.JSON, "sqlite"), nullable=False, default=dict
+    )
+    supuestos = Column(
+        sa.JSON().with_variant(sa.JSON, "sqlite"), nullable=False, default=list
+    )
+    confianza = Column(String(15), nullable=False, default="MEDIA")
+    version_motor = Column(String(30), nullable=False, default="rf-hibrido-1.0")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     proyecto = relationship("Proyecto", back_populates="escenarios")
@@ -62,6 +83,12 @@ class EscenarioOptimizado(Base):
         back_populates="escenario",
         cascade="all, delete-orphan",
         order_by="RecomendacionAP.orden.asc()",
+    )
+    valores_proyectados = relationship(
+        "ValorProyectadoPunto",
+        back_populates="escenario",
+        cascade="all, delete-orphan",
+        order_by="ValorProyectadoPunto.punto_medicion_id.asc()",
     )
 
 
@@ -78,16 +105,69 @@ class RecomendacionAP(Base):
         index=True,
     )
     orden = Column(Integer, nullable=False, default=1)
+    ap_fisico_id = Column(
+        Integer,
+        ForeignKey("ap_fisico.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     accion = Column(String(30), nullable=False)
     coord_x = Column(Float, nullable=False)
     coord_y = Column(Float, nullable=False)
+    altura_m = Column(Float, nullable=False, default=2.5)
+    tipo_montaje = Column(String(30), nullable=False, default="TECHO")
     banda = Column(String(10), nullable=False, default="5")
     modelo_ap = Column(String(120), nullable=False)
     costo_estimado = Column(Float, nullable=False, default=0)
     rssi_proyectado = Column(Float, nullable=False)
+    radios = Column(
+        sa.JSON().with_variant(sa.JSON, "sqlite"), nullable=False, default=list
+    )
     justificacion = Column(Text, nullable=False)
 
     escenario = relationship("EscenarioOptimizado", back_populates="recomendaciones")
+
+
+class ValorProyectadoPunto(Base):
+    """Predicción por escenario, punto real y banda; no altera la medición."""
+
+    __tablename__ = "valor_proyectado_punto"
+
+    id = Column(Integer, primary_key=True, index=True)
+    escenario_id = Column(
+        Integer,
+        ForeignKey("escenario_optimizado.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    punto_medicion_id = Column(
+        Integer,
+        ForeignKey("punto_medicion.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    banda = Column(String(10), nullable=False)
+    rssi_observado_dbm = Column(Float, nullable=True)
+    rssi_proyectado_dbm = Column(Float, nullable=False)
+    diferencia_db = Column(Float, nullable=True)
+    radio_primaria = Column(String(80), nullable=False)
+    radio_secundaria = Column(String(80), nullable=True)
+    rssi_secundario_dbm = Column(Float, nullable=True)
+    snr_proyectado_db = Column(Float, nullable=True)
+    incertidumbre_db = Column(Float, nullable=False, default=6.0)
+
+    escenario = relationship(
+        "EscenarioOptimizado", back_populates="valores_proyectados"
+    )
+
+    __table_args__ = (
+        sa.UniqueConstraint(
+            "escenario_id",
+            "punto_medicion_id",
+            "banda",
+            name="uq_valor_proyectado_escenario_punto_banda",
+        ),
+    )
 
 
 class Reporte(Base):

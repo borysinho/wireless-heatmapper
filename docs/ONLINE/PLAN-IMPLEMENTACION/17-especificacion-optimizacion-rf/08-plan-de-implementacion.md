@@ -99,7 +99,8 @@ No implementar hasta que el Product Owner apruebe:
 | DR-06  | ¿Se permiten antenas externas en el alcance inicial?                      | Sí, mediante catálogo acotado                      |
 | DR-07  | ¿El informe proyectado exige siempre survey de validación para cierre?    | Sí, para marcarlo como validado                    |
 
+**Decisión del Product Owner — 20-jun-2026:** se aprueban las propuestas iniciales DR-01..DR-07 para esta iteración.
+
 ## 7. Resultado de la revisión
 
-Al aprobar este paquete se debe registrar fecha, responsable y decisiones DR-01..DR-07. Las observaciones del Product Owner se incorporarán aquí antes de modificar PAPS, backlog o código.
-
+Paquete aprobado por el Product Owner el 20-jun-2026. La implementación mantiene 6 GHz fuera del alcance, usa Bolivia como dominio inicial parametrizable y exige survey posterior para declarar un escenario validado.

@@ -16,8 +16,10 @@ from app.api.v1.heatmaps import _mapa_out
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.escenario import EscenarioOptimizado, Reporte
+from app.models.escenario import EscenarioOptimizado, Reporte, ValorProyectadoPunto
 from app.models.heatmap import MapaCalor
+from app.models.inventario_rf import APFisico
+from app.models.medicion import MedicionWifi, PuntoMedicion
 from app.models.plano import Plano
 from app.models.proyecto import Proyecto
 from app.models.usuario import Usuario
@@ -31,8 +33,9 @@ from app.schemas.escenario import (
     EscenariosGeneradosOut,
     ReporteCrearIn,
     ReporteOut,
-    ResumenComparacionOut,
     RestriccionesEscenarioIn,
+    ResumenComparacionOut,
+    ValorProyectadoPuntoOut,
 )
 from app.services.interpolacion_service import (
     ESCALA_CWNA,
@@ -136,10 +139,7 @@ def _mapa_actual(
         ),
         None,
     )
-    bssids = [
-        ap["bssid"]
-        for ap in med_repo.listar_aps_por_plano(plano_id=plano.id)
-    ]
+    bssids = [ap["bssid"] for ap in med_repo.listar_aps_por_plano(plano_id=plano.id)]
     if not bssids:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -201,10 +201,41 @@ def generar_escenarios(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ) -> EscenariosGeneradosOut:
-    proyecto = _proyecto_tecnico(proyecto_id=proyecto_id, current_user=current_user, db=db)
+    proyecto = _proyecto_tecnico(
+        proyecto_id=proyecto_id, current_user=current_user, db=db
+    )
     plano = _plano_base(proyecto)
     mapa_actual, puntos = _mapa_actual(plano=plano, db=db)
+    mapas_actuales_por_banda = _mapas_actuales_por_banda(
+        plano=plano,
+        bandas=body.bandas,
+        resolucion=body.resolucion,
+        db=db,
+    )
     optimizador = OptimizadorAPService()
+    aps_existentes = [
+        {
+            "id": ap.id,
+            "coord_x": ap.coord_x,
+            "coord_y": ap.coord_y,
+            "altura_m": ap.altura_m,
+            "tipo_montaje": ap.tipo_montaje,
+            "restriccion_movimiento": ap.restriccion_movimiento,
+            "verificado": ap.verificado,
+        }
+        for ap in db.query(APFisico)
+        .filter(APFisico.plano_id == plano.id)
+        .order_by(APFisico.id.asc())
+        .all()
+    ]
+    if body.tipo_negocio == "RED_EXISTENTE" and not aps_existentes:
+        raise HTTPException(
+            status_code=status.HTTP_424_FAILED_DEPENDENCY,
+            detail=(
+                "La optimización de red existente requiere inventario "
+                "de APs físicos."
+            ),
+        )
     alternativas = optimizador.optimizar(
         puntos_actuales=puntos,
         matriz_actual=mapa_actual.matriz,
@@ -217,11 +248,27 @@ def generar_escenarios(
         modelo_ap=body.modelo_ap,
         costo_unitario=body.costo_unitario,
         resolucion=body.resolucion,
+        bandas=body.bandas,
+        tipo_negocio=body.tipo_negocio,
+        perfil=body.perfil,
+        politica_combinacion=body.politica_combinacion,
+        aps_existentes=aps_existentes,
     )
+    observados_por_banda = _observados_por_punto_y_banda(db=db, plano_id=plano.id)
     mapa_repo = MapaCalorRepository(db)
     escenario_repo = EscenarioRepository(db)
     escenarios: list[EscenarioOptimizado] = []
     for idx, alternativa in enumerate(alternativas, start=1):
+        for valor in alternativa.valores_proyectados:
+            observado = observados_por_banda.get(
+                (valor["punto_medicion_id"], valor["banda"])
+            )
+            valor["rssi_observado_dbm"] = observado
+            valor["diferencia_db"] = (
+                round(valor["rssi_proyectado_dbm"] - observado, 2)
+                if observado is not None
+                else None
+            )
         ruta = f"heatmaps/sp5_proyectado_{proyecto.id}_{idx}_{secrets.token_hex(8)}.png"
         _storage().save(HeatmapImageService().render_png(alternativa.matriz), ruta)
         firma = hashlib.sha1(
@@ -278,6 +325,15 @@ def generar_escenarios(
             restricciones=body.model_dump(),
             metricas=alternativa.metricas,
             recomendaciones=alternativa.recomendaciones,
+            tipo_negocio=body.tipo_negocio,
+            perfil=body.perfil,
+            politica_combinacion=body.politica_combinacion,
+            bandas=body.bandas,
+            mapas_por_banda=alternativa.mapas_por_banda,
+            mapas_actuales_por_banda=mapas_actuales_por_banda,
+            supuestos=alternativa.supuestos,
+            confianza=alternativa.confianza,
+            valores_proyectados=alternativa.valores_proyectados,
         )
         escenarios.append(escenario)
     return EscenariosGeneradosOut(
@@ -285,16 +341,22 @@ def generar_escenarios(
     )
 
 
-@router_escenarios.get("/{escenario_id}/comparacion", response_model=ComparacionEscenarioOut)
+@router_escenarios.get(
+    "/{escenario_id}/comparacion", response_model=ComparacionEscenarioOut
+)
 def comparar_escenario(
     escenario_id: int,
     request: Request,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ) -> ComparacionEscenarioOut:
-    escenario = _escenario_tecnico(escenario_id=escenario_id, current_user=current_user, db=db)
+    escenario = _escenario_tecnico(
+        escenario_id=escenario_id, current_user=current_user, db=db
+    )
     if escenario.mapa_actual is None or escenario.mapa_proyectado is None:
-        raise HTTPException(status_code=409, detail="El escenario no tiene mapas asociados.")
+        raise HTTPException(
+            status_code=409, detail="El escenario no tiene mapas asociados."
+        )
     actual = escenario.mapa_actual.matriz
     proyectado = escenario.mapa_proyectado.matriz
     filas = min(len(actual), len(proyectado))
@@ -304,11 +366,39 @@ def comparar_escenario(
         for y in range(filas)
     ]
     delta_muertas = _contar_zonas_muertas(proyectado) - _contar_zonas_muertas(actual)
+    comparacion_por_banda = {}
+    for banda, matriz in (escenario.mapas_por_banda or {}).items():
+        actual_banda = (escenario.mapas_actuales_por_banda or {}).get(banda)
+        filas_banda = min(len(actual_banda or []), len(matriz))
+        cols_banda = (
+            min(len(actual_banda[0]), len(matriz[0]))
+            if filas_banda and actual_banda
+            else 0
+        )
+        comparacion_por_banda[banda] = {
+            "matriz_actual": actual_banda,
+            "matriz_proyectada": matriz,
+            "matriz_diferencia": (
+                [
+                    [
+                        round(matriz[y][x] - actual_banda[y][x], 2)
+                        for x in range(cols_banda)
+                    ]
+                    for y in range(filas_banda)
+                ]
+                if actual_banda
+                else None
+            ),
+            "pct_cobertura_proyectada": escenario.metricas.get(
+                "pct_cobertura_por_banda", {}
+            ).get(banda),
+        }
     return ComparacionEscenarioOut(
         escenario=EscenarioOptimizadoOut.model_validate(escenario),
         heatmap_actual=_mapa_out(escenario.mapa_actual, request),
         heatmap_proyectado=_mapa_out(escenario.mapa_proyectado, request),
         matriz_diferencia=diferencia,
+        comparacion_por_banda=comparacion_por_banda,
         resumen=ResumenComparacionOut(
             delta_pct_cobertura=round(
                 escenario.pct_cobertura - escenario.pct_cobertura_actual,
@@ -322,14 +412,41 @@ def comparar_escenario(
     )
 
 
-@router_proyectos_escenarios.post("/{proyecto_id}/reportes", response_model=ReporteOut, status_code=201)
+@router_escenarios.get(
+    "/{escenario_id}/puntos-proyectados",
+    response_model=list[ValorProyectadoPuntoOut],
+)
+def listar_puntos_proyectados(
+    escenario_id: int,
+    banda: str | None = Query(default=None, pattern=r"^(2\.4|5)$"),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> list[ValorProyectadoPuntoOut]:
+    _escenario_tecnico(escenario_id=escenario_id, current_user=current_user, db=db)
+    query = db.query(ValorProyectadoPunto).filter(
+        ValorProyectadoPunto.escenario_id == escenario_id
+    )
+    if banda:
+        query = query.filter(ValorProyectadoPunto.banda == banda)
+    valores = query.order_by(
+        ValorProyectadoPunto.punto_medicion_id.asc(),
+        ValorProyectadoPunto.banda.asc(),
+    ).all()
+    return [ValorProyectadoPuntoOut.model_validate(item) for item in valores]
+
+
+@router_proyectos_escenarios.post(
+    "/{proyecto_id}/reportes", response_model=ReporteOut, status_code=201
+)
 def crear_reporte(
     proyecto_id: int,
     body: ReporteCrearIn,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ) -> ReporteOut:
-    proyecto = _proyecto_tecnico(proyecto_id=proyecto_id, current_user=current_user, db=db)
+    proyecto = _proyecto_tecnico(
+        proyecto_id=proyecto_id, current_user=current_user, db=db
+    )
     escenario = None
     if body.escenario_id is not None:
         escenario = _escenario_tecnico(
@@ -338,10 +455,18 @@ def crear_reporte(
             db=db,
         )
     repo = ReporteRepository(db)
-    reporte = repo.crear_procesando(proyecto_id=proyecto.id, escenario_id=body.escenario_id)
+    reporte = repo.crear_procesando(
+        proyecto_id=proyecto.id, escenario_id=body.escenario_id
+    )
     try:
-        escenarios = EscenarioRepository(db).listar_por_proyecto(proyecto_id=proyecto.id)
-        cantidad_mediciones = sum(len(p.mediciones) for plano in proyecto.planos for p in plano.puntos_medicion)
+        escenarios = EscenarioRepository(db).listar_por_proyecto(
+            proyecto_id=proyecto.id
+        )
+        cantidad_mediciones = sum(
+            len(p.mediciones)
+            for plano in proyecto.planos
+            for p in plano.puntos_medicion
+        )
         generado = ReporteService().generar(
             proyecto=proyecto,
             escenarios=escenarios,
@@ -383,7 +508,9 @@ def descargar_reporte_firmado(
     return Response(
         content=storage.read(ruta_relativa),
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{Path(ruta_relativa).name}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{Path(ruta_relativa).name}"'
+        },
     )
 
 
@@ -410,12 +537,74 @@ def descargar_reporte(
     return Response(
         content=contenido,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="reporte-{reporte.id}.pdf"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="reporte-{reporte.id}.pdf"'
+        },
     )
 
 
 def _contar_zonas_muertas(matriz: list[list[float]]) -> int:
     return sum(1 for fila in matriz for valor in fila if valor < -90)
+
+
+def _observados_por_punto_y_banda(
+    *, db: Session, plano_id: int
+) -> dict[tuple[int, str], float]:
+    """Promedia lecturas reales por punto y banda sin alterar su persistencia."""
+    filas = (
+        db.query(MedicionWifi)
+        .join(PuntoMedicion, MedicionWifi.punto_id == PuntoMedicion.id)
+        .filter(PuntoMedicion.plano_id == plano_id)
+        .all()
+    )
+    acumulados: dict[tuple[int, str], list[float]] = {}
+    for medicion in filas:
+        if medicion.frecuencia_mhz is None:
+            continue
+        banda = "2.4" if medicion.frecuencia_mhz < 3000 else "5"
+        acumulados.setdefault((medicion.punto_id, banda), []).append(
+            float(medicion.rssi)
+        )
+    return {
+        clave: round(sum(valores) / len(valores), 2)
+        for clave, valores in acumulados.items()
+    }
+
+
+def _mapas_actuales_por_banda(
+    *,
+    plano: Plano,
+    bandas: list[str],
+    resolucion: int,
+    db: Session,
+) -> dict[str, list[list[float]] | None]:
+    """Construye baselines observados independientes por banda."""
+    repo = MedicionRepository(db)
+    aps = repo.listar_aps_por_plano(plano_id=plano.id)
+    resultado: dict[str, list[list[float]] | None] = {}
+    for banda in bandas:
+        bssids = [
+            ap["bssid"]
+            for ap in aps
+            if ap.get("frecuencia_mhz") is not None
+            and (
+                (banda == "2.4" and ap["frecuencia_mhz"] < 3000)
+                or (banda == "5" and ap["frecuencia_mhz"] >= 3000)
+            )
+        ]
+        puntos = repo.listar_puntos_rssi_heatmap(plano_id=plano.id, bssids=bssids)
+        resultado[banda] = (
+            InterpolacionService().interpolar(
+                puntos=puntos,
+                ancho_px=plano.ancho_px,
+                alto_px=plano.alto_px,
+                resolucion=resolucion,
+                algoritmo="IDW",
+            )
+            if len(puntos) >= 5
+            else None
+        )
+    return resultado
 
 
 def _reporte_out(reporte: Reporte) -> ReporteOut:

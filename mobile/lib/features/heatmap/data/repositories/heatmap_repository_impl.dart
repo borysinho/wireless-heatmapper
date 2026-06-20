@@ -4,6 +4,7 @@ import '../../domain/entities/ap_detectado.dart';
 import '../../domain/entities/conjunto_ap.dart';
 import '../../domain/entities/escenario_optimizado.dart';
 import '../../domain/entities/mapa_calor.dart';
+import '../../domain/entities/inventario_rf.dart';
 import '../../domain/repositories/heatmap_repository.dart';
 import '../datasources/heatmap_remote_datasource.dart';
 
@@ -11,6 +12,19 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
   final HeatmapRemoteDatasource _datasource;
 
   const HeatmapRepositoryImpl(this._datasource);
+
+  @override
+  Future<InventarioRF> obtenerInventarioRF(int proyectoId) {
+    return _datasource.obtenerInventarioRF(proyectoId);
+  }
+
+  @override
+  Future<APFisicoRF> crearAPFisicoRF({
+    required int proyectoId,
+    required Map<String, dynamic> datos,
+  }) {
+    return _datasource.crearAPFisicoRF(proyectoId: proyectoId, datos: datos);
+  }
 
   @override
   Future<List<APDisponible>> listarAPsDisponibles(int planoId) async {
@@ -138,6 +152,10 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
     required int maxAps,
     double? presupuesto,
     required String bandaPreferida,
+    required List<String> bandas,
+    required String tipoNegocio,
+    required String perfil,
+    required String politicaCombinacion,
     required String modeloAp,
     required double costoUnitario,
     int resolucion = 64,
@@ -147,6 +165,10 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
       maxAps: maxAps,
       presupuesto: presupuesto,
       bandaPreferida: bandaPreferida,
+      bandas: bandas,
+      tipoNegocio: tipoNegocio,
+      perfil: perfil,
+      politicaCombinacion: politicaCombinacion,
       modeloAp: modeloAp,
       costoUnitario: costoUnitario,
       resolucion: resolucion,

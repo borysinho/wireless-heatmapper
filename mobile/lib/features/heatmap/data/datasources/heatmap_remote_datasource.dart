@@ -5,6 +5,7 @@ import '../models/ap_disponible_model.dart';
 import '../models/ap_detectado_model.dart';
 import '../models/conjunto_ap_model.dart';
 import '../models/escenario_optimizado_model.dart';
+import '../models/inventario_rf_model.dart';
 import '../models/mapa_calor_model.dart';
 
 class HeatmapRemoteDatasource {
@@ -221,6 +222,10 @@ class HeatmapRemoteDatasource {
     required int maxAps,
     double? presupuesto,
     required String bandaPreferida,
+    required List<String> bandas,
+    required String tipoNegocio,
+    required String perfil,
+    required String politicaCombinacion,
     required String modeloAp,
     required double costoUnitario,
     int resolucion = 64,
@@ -232,6 +237,10 @@ class HeatmapRemoteDatasource {
           'max_aps': maxAps,
           if (presupuesto != null) 'presupuesto': presupuesto,
           'banda_preferida': bandaPreferida,
+          'bandas': bandas,
+          'tipo_negocio': tipoNegocio,
+          'perfil': perfil,
+          'politica_combinacion': politicaCombinacion,
           'modelo_ap': modeloAp,
           'costo_unitario': costoUnitario,
           'resolucion': resolucion,
@@ -292,6 +301,38 @@ class HeatmapRemoteDatasource {
     try {
       await _dio.download(urlDescarga, rutaDestino);
       return rutaDestino;
+    } on DioException catch (e) {
+      throw HeatmapApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  Future<InventarioRFModel> obtenerInventarioRF(int proyectoId) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/proyectos/$proyectoId/inventario-rf',
+      );
+      return InventarioRFModel.fromJson(response.data!);
+    } on DioException catch (e) {
+      throw HeatmapApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  Future<APFisicoRFModel> crearAPFisicoRF({
+    required int proyectoId,
+    required Map<String, dynamic> datos,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/proyectos/$proyectoId/inventario-rf/aps',
+        data: datos,
+      );
+      return APFisicoRFModel.fromJson(response.data!);
     } on DioException catch (e) {
       throw HeatmapApiException(
         _mensajeDesdeError(e),
