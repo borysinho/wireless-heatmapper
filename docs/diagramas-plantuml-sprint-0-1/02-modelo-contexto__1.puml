@@ -1,0 +1,103 @@
+@startuml
+title Modelo de Contexto — Wireless HeatMapper (modalidad 100 % en línea)\nDiagrama de Casos de Uso (UML 2.5)
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorBackgroundColor #EBF5FB
+skinparam actorBorderColor #2980B9
+skinparam usecaseBackgroundColor #FDFEFE
+skinparam usecaseBorderColor #2980B9
+skinparam rectangleBackgroundColor #FAFAFA
+skinparam rectangleBorderColor #BDC3C7
+skinparam arrowColor #5D6D7E
+skinparam noteBackgroundColor #FFFDE7
+
+actor "Técnico\nde Campo" as tech #LightBlue
+actor "Administrador\n(Bulldog Tech.)" as admin #LightSteelBlue
+actor "Cliente /\nStakeholder" as client #LightCoral
+actor "Android\nWifiManager API" as wifi #LightGreen
+actor "Servicio IA\n(backend)" as ia #LightYellow
+
+rectangle "Wireless HeatMapper (Backend FastAPI + App móvil + Web)" {
+  usecase "UC01\nGestionar Proyecto\nde Survey" as UC01
+  usecase "UC02\nImportar Plano\n(subida al backend)" as UC02
+  usecase "UC03\nCalibrar Escala\ndel Plano" as UC03
+  usecase "UC04\nMarcar Punto\nde Medición" as UC04
+  usecase "UC05\nCapturar Señales WiFi\n(envío en línea)" as UC05
+  usecase "UC06\nGenerar Mapa de Calor\n(interpolación en backend)" as UC06
+  usecase "UC07\nAnalizar Cobertura\n(zonas muertas, CCI/ACI)" as UC07
+  usecase "UC08\nObtener Recomendaciones\nde APs (IA)" as UC08
+  usecase "UC09\nComparar Escenario\nActual vs Propuesto" as UC09
+  usecase "UC10\nExportar Reporte\nTécnico (PDF)" as UC10
+  usecase "UC11\nAutenticar\nUsuario" as UC11
+  usecase "UC12\nVer Historial\nde Proyectos" as UC12
+  usecase "UC13\nGestionar Usuarios\n(Admin Web)" as UC13
+  usecase "UC15\nGenerar Enlace\nde Cliente" as UC15
+  usecase "UC16\nVer Heatmap\nInteractivo (Web)" as UC16
+  usecase "UC17\nVer Análisis y\nPlan AP (Web)" as UC17
+  usecase "UC18\nVer Proyectos de\nla Organización" as UC18
+  usecase "UC19\nGestionar Clientes\n(Admin Web)" as UC19
+}
+
+tech --> UC11
+tech --> UC01
+tech --> UC02
+tech --> UC03
+tech --> UC04
+tech --> UC06
+tech --> UC07
+tech --> UC08
+tech --> UC09
+tech --> UC10
+tech --> UC12
+tech --> UC15
+
+admin --> UC11
+admin --> UC13
+admin --> UC18
+admin --> UC19
+
+client --> UC16
+client --> UC17
+
+UC01 ..> UC19 : <<uses>>\n(selector de cliente)
+UC04 ..> UC05 : <<include>>
+UC05 ..> wifi : <<include>>
+UC08 ..> ia : <<include>>
+UC09 ..> UC08 : <<extend>>
+UC15 ..> UC16 : <<include>>
+UC16 ..> UC17 : <<include>>
+
+note bottom of UC05
+  Cada lote de escaneo viaja por
+  HTTPS al backend (POST /mediciones).
+  El cliente móvil NO almacena las
+  muestras entre sesiones.
+end note
+
+note bottom of UC06
+  La interpolación se ejecuta en el
+  backend (FastAPI). El cliente sólo
+  solicita y renderiza el resultado.
+end note
+
+note bottom of UC13
+  El Administrador crea, activa y
+  desactiva cuentas de Técnicos.
+  Resuelve la dependencia de
+  pre-aprovisionamiento de UC11 (RP7).
+end note
+
+note bottom of UC19
+  El Administrador gestiona el
+  catálogo de Clientes (RP7) que
+  el Técnico consume al crear/editar
+  un Proyecto (UC01).
+end note
+
+note bottom of UC15
+  Token UUID v4 firmado con expiración
+  configurable. Acceso del cliente al
+  portal sin instalar la app móvil (RP9).
+end note
+
+@enduml

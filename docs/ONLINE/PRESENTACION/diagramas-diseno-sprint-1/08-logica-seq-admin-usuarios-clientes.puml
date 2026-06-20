@@ -1,0 +1,136 @@
+' ============================================================
+' SECCIÓN DEL DOCUMENTO: § 8. R-3 — Ejecución del Sprint 1 › Diseño de Lógica — PB-13 Gestionar Usuarios + PB-19 Gestionar Clientes
+' Archivo: docs/ONLINE/PRESENTACION/presentacion-scrum-s0-s1.md
+' Perspectiva de diseño: (c) Diseño de Lógica — HU: PB-13 (admin web) + PB-19 (admin web)
+' ============================================================
+
+@startuml
+title Diseño de Lógica — Diagrama de Secuencia\nPB-13: Gestionar Usuarios (Panel Admin Web)\nPB-19: Gestionar Clientes (Panel Admin Web)\nWireless HeatMapper (modalidad 100 % en línea)
+skinparam sequenceArrowColor #2980B9
+skinparam participantBackgroundColor #EBF5FB
+skinparam participantBorderColor #2980B9
+skinparam sequenceLifeLineBorderColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+skinparam sequenceGroupBackgroundColor #F0F8FF
+skinparam sequenceGroupBorderColor #2980B9
+
+actor "Administrador" as admin
+participant "GestionUsuarios.tsx\n(React — admin panel)" as web_u
+participant "GestionClientes.tsx\n(React — admin panel)" as web_c
+participant "axiosClient\n(TanStack Query + interceptor)" as axios
+participant "Nginx" as nginx
+participant "POST|GET|PATCH\n/api/admin/usuarios\n(FastAPI — UsuarioService)" as be_u
+participant "POST|GET|PATCH\n/api/admin/clientes\n(FastAPI)" as be_c
+database "PostgreSQL\n(tabla usuario)" as db_u
+database "PostgreSQL\n(tabla cliente)" as db_c
+
+' ═══════════════════════════════════════════════════════
+' PB-13 — GESTIÓN DE USUARIOS
+' ═══════════════════════════════════════════════════════
+
+== PB-13 — Listar usuarios ==
+admin -> web_u : accede a /admin/usuarios
+web_u -> axios : GET /api/admin/usuarios\nAuthorization: Bearer <access_token_admin>
+axios -> nginx : HTTPS
+nginx -> be_u : proxy_pass (require_admin valida rol=ADMIN)
+be_u -> db_u : SELECT * FROM usuario ORDER BY created_at DESC
+db_u --> be_u : lista de usuarios
+be_u --> axios : 200 [UsuarioOut, ...]
+web_u -> admin : tabla paginada con nombre, email, rol, estado
+
+group técnico intenta acceder [CA-4]
+  nginx -> be_u : proxy_pass
+  be_u -> be_u : require_admin → rol=TECNICO → 403
+  be_u --> axios : 403 {detail: "No autorizado"}
+  web_u -> admin : redirect a /admin/login (o 403)
+end
+
+== PB-13 — Crear técnico nuevo (CA-1) ==
+admin -> web_u : abre modal "Nuevo técnico"
+admin -> web_u : completa nombre, email, contraseña inicial, rol=TECNICO
+web_u -> axios : POST /api/admin/usuarios\n{nombre, email, password, rol}
+axios -> nginx : HTTPS
+nginx -> be_u : proxy_pass
+be_u -> db_u : SELECT usuario WHERE email=:email
+group email disponible [CA-3 inverso]
+  be_u -> be_u : bcrypt.hashpw(password, salt)\n[contraseña NUNCA en texto plano — CA-5]
+  be_u -> db_u : INSERT INTO usuario (nombre, email, password_hash, rol, activo=TRUE)
+  db_u --> be_u : nuevo registro
+  be_u --> axios : 201 {UsuarioOut}
+  web_u -> admin : nuevo técnico aparece en lista (ACTIVO)
+end
+group email duplicado [CA-3]
+  db_u --> be_u : UNIQUE constraint violation
+  be_u --> axios : 409 {detail: "El email ya está registrado."}
+  web_u -> admin : mostrar error "Email ya registrado"
+end
+
+== PB-13 — Desactivar usuario (CA-2) ==
+admin -> web_u : toggle activo → OFF en fila del técnico
+web_u -> axios : PATCH /api/admin/usuarios/{id}\n{activo: false}
+axios -> nginx : HTTPS
+nginx -> be_u : proxy_pass
+be_u -> db_u : UPDATE usuario SET activo=FALSE WHERE id=:id
+db_u --> be_u : actualizado
+be_u --> axios : 200 {UsuarioOut activo=false}
+web_u -> admin : badge cambia a INACTIVO
+
+note right of be_u
+  CA-2: en el siguiente request del técnico
+  desactivado, get_current_user detecta
+  activo=False → 403 "Cuenta desactivada".
+  Los refresh_tokens quedan en BD pero
+  cualquier uso genera 403.
+end note
+
+' ═══════════════════════════════════════════════════════
+' PB-19 — GESTIÓN DE CLIENTES
+' ═══════════════════════════════════════════════════════
+
+== PB-19 — Listar clientes ==
+admin -> web_c : accede a /admin/clientes
+web_c -> axios : GET /api/clientes\nAuthorization: Bearer <access_token>
+axios -> nginx : HTTPS
+nginx -> be_c : proxy_pass (cualquier usuario autenticado)
+be_c -> db_c : SELECT * FROM cliente ORDER BY nombre
+db_c --> be_c : lista completa
+be_c --> axios : 200 [ClienteOut, ...]
+web_c -> admin : tabla con nombre y badge activo/inactivo
+
+== PB-19 — Crear cliente (CA-1) ==
+admin -> web_c : abre modal "Nuevo cliente"
+admin -> web_c : ingresa nombre del cliente
+web_c -> axios : POST /api/admin/clientes\n{nombre}
+axios -> nginx : HTTPS
+nginx -> be_c : proxy_pass (require_admin)
+be_c -> db_c : SELECT cliente WHERE nombre=:nombre
+group nombre disponible
+  be_c -> db_c : INSERT INTO cliente (nombre, activo=TRUE)
+  db_c --> be_c : nuevo registro
+  be_c --> axios : 201 {ClienteOut activo=true}
+  web_c -> admin : cliente aparece en lista ACTIVO
+end
+group nombre duplicado [CA-2]
+  be_c --> axios : 409 {detail: "El nombre del cliente ya existe."}
+  web_c -> admin : mostrar error "Nombre duplicado"
+end
+
+== PB-19 — Desactivar cliente (CA-4) ==
+admin -> web_c : toggle activo → OFF en fila del cliente
+web_c -> axios : PATCH /api/admin/clientes/{id}\n{activo: false}
+axios -> nginx : HTTPS
+nginx -> be_c : proxy_pass
+be_c -> db_c : UPDATE cliente SET activo=FALSE WHERE id=:id
+db_c --> be_c : actualizado
+be_c --> axios : 200 {ClienteOut activo=false}
+web_c -> admin : badge cambia a INACTIVO
+
+note right of be_c
+  CA-4: el selector de proyectos en la app
+  solo consume GET /api/clientes?solo_activos=true,
+  por lo que el cliente desactivado deja de
+  aparecer en la lista del técnico.
+  Los proyectos históricos conservan la FK
+  y muestran el nombre (CA-5 — join LEFT JOIN).
+end note
+@enduml

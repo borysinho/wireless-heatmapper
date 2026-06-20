@@ -244,6 +244,36 @@ class HeatmapImageService:
         image.save(buffer, format="PNG", optimize=True)
         return buffer.getvalue()
 
+    def render_diferencia_png(
+        self,
+        matriz: list[list[float]],
+        *,
+        alpha: int = 180,
+    ) -> bytes:
+        """Renderiza deltas RSSI con paleta divergente rojo-blanco-verde."""
+        alto = len(matriz)
+        ancho = len(matriz[0]) if alto else 0
+        image = Image.new("RGBA", (ancho, alto), (0, 0, 0, 0))
+        pix = image.load()
+        for y, fila in enumerate(matriz):
+            for x, delta in enumerate(fila):
+                intensidad = min(1.0, abs(delta) / 20.0)
+                if delta >= 0:
+                    base = (255, 255, 255)
+                    destino = (11, 122, 59)
+                else:
+                    base = (255, 255, 255)
+                    destino = (215, 38, 61)
+                color = tuple(
+                    round(base[canal] + (destino[canal] - base[canal]) * intensidad)
+                    for canal in range(3)
+                )
+                pix[x, y] = (*color, alpha)
+
+        buffer = BytesIO()
+        image.save(buffer, format="PNG", optimize=True)
+        return buffer.getvalue()
+
     def _color_para_rssi(self, rssi: float) -> tuple[int, int, int]:
         paradas = [
             (-120.0, (215, 38, 61)),

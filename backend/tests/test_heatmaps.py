@@ -7,11 +7,12 @@ import pytest
 from fastapi import HTTPException
 
 from app.api.v1.heatmaps import (
-    crear_conjunto_ap,
     _resolver_aps_interes,
-    analizar_mapa,
+    actualizar_conjunto_ap,
     actualizar_ubicacion_ap_conjunto,
+    analizar_mapa,
     confirmar_ap,
+    crear_conjunto_ap,
     generar_heatmap,
     generar_heatmap_conjunto,
     listar_aps_disponibles,
@@ -21,8 +22,13 @@ from app.core.config import settings
 from app.models.plano import Plano
 from app.models.proyecto import Proyecto
 from app.repositories.medicion_repository import MedicionRepository
-from app.schemas.heatmap import ActualizarUbicacionAPConjuntoIn, ConfirmarAPIn
-from app.schemas.heatmap import ConjuntoAPCrearIn, GenerarHeatmapConjuntoIn
+from app.schemas.heatmap import (
+    ActualizarUbicacionAPConjuntoIn,
+    ConfirmarAPIn,
+    ConjuntoAPActualizarIn,
+    ConjuntoAPCrearIn,
+    GenerarHeatmapConjuntoIn,
+)
 from app.schemas.medicion import MedicionItemIn
 from app.services.interpolacion_service import (
     ESCALA_CWNA,
@@ -154,7 +160,11 @@ def test_listar_aps_disponibles_para_seleccion(db_session, tecnico_usuario):
     assert all(not ap.seleccionado for ap in aps)
 
 
-def test_crear_conjunto_ap_y_generar_heatmaps_por_modo(db_session, tecnico_usuario):
+def test_crear_conjunto_ap_y_generar_heatmaps_por_modo(
+    db_session,
+    tecnico_usuario,
+    admin_usuario,
+):
     plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
     _insertar_puntos_sinteticos(db_session, plano_id, cantidad=5)
 
@@ -170,6 +180,9 @@ def test_crear_conjunto_ap_y_generar_heatmaps_por_modo(db_session, tecnico_usuar
     )
 
     assert conjunto.nombre == "Red corporativa"
+    assert conjunto.origen == "manual_movil"
+    assert conjunto.estado_gobernanza == "borrador_tecnico"
+    assert conjunto.creado_por_id == tecnico_usuario.id
     assert conjunto.cantidad_aps == 2
     assert [item.bssid for item in conjunto.items] == [
         "aa:bb:cc:dd:ee:01",
@@ -180,6 +193,23 @@ def test_crear_conjunto_ap_y_generar_heatmaps_por_modo(db_session, tecnico_usuar
         db=db_session,
         current_user=tecnico_usuario,
     )[0].id == conjunto.id
+
+    with pytest.raises(HTTPException) as exc:
+        actualizar_conjunto_ap(
+            conjunto_id=conjunto.id,
+            body=ConjuntoAPActualizarIn(estado_gobernanza="aprobado_interno"),
+            db=db_session,
+            current_user=tecnico_usuario,
+        )
+    assert exc.value.status_code == 403
+
+    revisado = actualizar_conjunto_ap(
+        conjunto_id=conjunto.id,
+        body=ConjuntoAPActualizarIn(estado_gobernanza="aprobado_interno"),
+        db=db_session,
+        current_user=admin_usuario,
+    )
+    assert revisado.estado_gobernanza == "aprobado_interno"
 
     mapa_completo = generar_heatmap_conjunto(
         conjunto_id=conjunto.id,

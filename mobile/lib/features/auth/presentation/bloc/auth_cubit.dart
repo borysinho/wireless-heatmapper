@@ -7,6 +7,7 @@ import '../../domain/usecases/login_usecase.dart';
 import '../../domain/usecases/logout_usecase.dart';
 import '../../domain/usecases/get_usuario_activo_usecase.dart';
 import '../../../../core/network/connectivity_monitor.dart';
+import '../../../../core/notifications/servicio_notificaciones_push.dart';
 import 'auth_state.dart';
 
 /// Cubit de autenticación. Gestiona el ciclo de vida de la sesión.
@@ -16,6 +17,7 @@ class AuthCubit extends Cubit<AuthState> {
   final LogoutUseCase _logoutUseCase;
   final GetUsuarioActivoUseCase _getUsuarioActivoUseCase;
   final ConnectivityMonitor _connectivityMonitor;
+  final ServicioNotificacionesPush? _notificacionesPush;
 
   StreamSubscription<bool>? _conectividadSub;
 
@@ -24,10 +26,12 @@ class AuthCubit extends Cubit<AuthState> {
     required LogoutUseCase logoutUseCase,
     required GetUsuarioActivoUseCase getUsuarioActivoUseCase,
     required ConnectivityMonitor connectivityMonitor,
+    ServicioNotificacionesPush? notificacionesPush,
   })  : _loginUseCase = loginUseCase,
         _logoutUseCase = logoutUseCase,
         _getUsuarioActivoUseCase = getUsuarioActivoUseCase,
         _connectivityMonitor = connectivityMonitor,
+        _notificacionesPush = notificacionesPush,
         super(const AuthInitial());
 
   /// Verifica al iniciar la app si ya existe una sesión persistida (CA-3).
@@ -37,6 +41,7 @@ class AuthCubit extends Cubit<AuthState> {
     final usuario = await _getUsuarioActivoUseCase();
     if (usuario != null) {
       emit(AuthAuthenticated(usuario));
+      await _notificacionesPush?.activarParaSesion();
     } else {
       final conectado = await _connectivityMonitor.estaConectado();
       emit(conectado ? const AuthUnauthenticated() : const AuthSinConexion());
@@ -73,6 +78,7 @@ class AuthCubit extends Cubit<AuthState> {
     try {
       final usuario = await _loginUseCase(email, password);
       emit(AuthAuthenticated(usuario));
+      await _notificacionesPush?.activarParaSesion();
     } on CredencialesInvalidasException {
       emit(const AuthError('Credenciales inválidas'));
     } on CuentaDesactivadaException {
@@ -102,6 +108,7 @@ class AuthCubit extends Cubit<AuthState> {
     _conectividadSub?.cancel();
     emit(const AuthLoading());
     try {
+      await _notificacionesPush?.desactivarParaSesion();
       await _logoutUseCase();
       emit(const AuthUnauthenticated());
     } catch (_) {

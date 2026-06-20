@@ -1,0 +1,35 @@
+@startuml
+title PB-02 — Subida y persistencia del plano (online)
+skinparam sequenceArrowColor #2980B9
+skinparam participantBackgroundColor #EBF5FB
+
+actor "Técnico" as tech
+participant "App Móvil\n(PlanoEditorPage)" as app
+participant "file_picker" as fp
+participant "ApiClient\n(Dio)" as api
+participant "Nginx" as ng
+participant "Backend\n/api/proyectos/{id}/planos" as be
+participant "PlanoService" as svc
+database "PostgreSQL" as db
+participant "Storage\n(filesystem / S3)" as st
+
+tech -> app : tocar "Importar plano"
+app -> fp : pickFiles(['png','jpg','pdf'])
+fp --> app : File (≤ 20 MB)
+app -> api : POST /proyectos/{id}/planos (multipart)
+api -> ng : HTTPS
+ng -> be : proxy_pass
+be -> svc : crear_plano(proyecto_id, archivo)
+alt archivo > 20 MB o formato no soportado
+  svc --> be : ValidationError
+  be --> app : 400 {detail: "..."}
+else PDF multipágina
+  svc -> svc : renderizar primera página a PNG (PyMuPDF)
+end
+svc -> st : guardar archivo
+svc -> db : INSERT plano(proyecto_id, ruta, formato, ...)
+db --> svc : id_plano
+svc --> be : Plano
+be --> app : 201 {id, urlFirmada, formato, anchoPx, altoPx}
+app -> tech : renderiza plano en Canvas con zoom/pan
+@enduml

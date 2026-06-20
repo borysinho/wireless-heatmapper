@@ -1,0 +1,12 @@
+flowchart LR
+  subgraph SG_ACTUAL["SITUACIÓN ACTUAL"]
+    direction LR
+    r1("Reportes de falla Wi-Fi") --> r2("Diagnóstico informal") --> r3("Sin registro ni historial") --> r4("Decisiones empíricas") --> r5("Problemas recurrentes") -->|ciclo vicioso| r1
+  end
+
+  subgraph SG_DESEADA["SITUACIÓN DESEADA"]
+    direction LR
+    d1("Técnico realiza levantamiento con app móvil") --> d2("Backend genera heatmap georreferenciado") --> d3("IA analiza y recomienda mejoras") --> d4("Panel web muestra resultados y reportes") --> d5("Decisiones técnicas basadas en datos") --> d6("Historial y comparativa temporal")
+  end
+
+  r3 -.->|Wireless HeatMapper| d3

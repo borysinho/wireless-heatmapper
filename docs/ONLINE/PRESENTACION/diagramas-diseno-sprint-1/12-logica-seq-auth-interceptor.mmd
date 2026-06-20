@@ -1,0 +1,50 @@
+%% PB-09: AuthInterceptor — Renovación Automática de JWT
+%% Wireless HeatMapper — modalidad 100% en línea
+%% Compatibilidad StarUML: solo ->> y -->>, sin box/rect/link/estilos
+
+sequenceDiagram
+    participant cubit as Cualquier Cubit
+    participant inter as AuthInterceptor
+    participant ss as SecureStorage
+    participant nginx as Nginx
+    participant be as Backend FastAPI
+    participant be_ref as API auth-refresh
+    participant auth_cubit as AuthCubit
+    participant login as LoginPage
+
+    Note over inter: Se registra en DioClient y se ejecuta en cada request y cada 401. Implementa silent refresh
+
+    %% Interceptor de request: inyectar access_token
+    cubit->>inter: request a /api/proyectos sin header auth
+    inter->>ss: leer access_token
+    ss-->>inter: token válido o expirado
+    inter->>inter: agregar header Authorization Bearer
+    inter->>nginx: request con header inyectado
+    nginx->>be: proxy_pass
+
+    alt respuesta exitosa 200
+        be-->>inter: 200 datos
+        inter-->>cubit: datos correctos
+
+    else access_token expirado 401
+        be-->>inter: 401 Token expirado o inválido
+        inter->>ss: leer refresh_token
+        ss-->>inter: refresh_token 7 días
+        inter->>be_ref: POST /api/auth/refresh
+
+        alt refresh_token válido
+            be_ref-->>inter: 200 nuevo access_token
+            inter->>ss: guardar nuevo access_token
+            inter->>inter: reintentar request original con nuevo token
+            inter-->>cubit: datos correctos - transparente para el Cubit
+        else refresh_token expirado o revocado
+            be_ref-->>inter: 401 Refresh token inválido
+            inter->>ss: eliminar access_token + refresh_token
+            inter->>auth_cubit: AuthCubit.forceLogout()
+            auth_cubit->>login: navegar a LoginPage
+            login->>cubit: sesión terminada
+        end
+    end
+
+    Note right of inter: El Cubit NO necesita conocer el ciclo de renovación. Máximo 1 reintento por request para evitar bucles
+    Note right of be_ref: refresh_token verificado en PostgreSQL. Si cuenta INACTIVA devuelve 403

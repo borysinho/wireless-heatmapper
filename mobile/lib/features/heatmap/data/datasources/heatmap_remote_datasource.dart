@@ -4,6 +4,7 @@ import '../models/analisis_cobertura_model.dart';
 import '../models/ap_disponible_model.dart';
 import '../models/ap_detectado_model.dart';
 import '../models/conjunto_ap_model.dart';
+import '../models/inventario_rf_model.dart';
 import '../models/mapa_calor_model.dart';
 
 class HeatmapRemoteDatasource {
@@ -207,6 +208,38 @@ class HeatmapRemoteDatasource {
         data: {'pos_x': posX, 'pos_y': posY, 'confirmado': true},
       );
       return APDetectadoModel.fromJson(response.data!);
+    } on DioException catch (e) {
+      throw HeatmapApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  Future<InventarioRFModel> obtenerInventarioRF(int proyectoId) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/proyectos/$proyectoId/inventario-rf',
+      );
+      return InventarioRFModel.fromJson(response.data!);
+    } on DioException catch (e) {
+      throw HeatmapApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  Future<APFisicoRFModel> crearAPFisicoRF({
+    required int proyectoId,
+    required Map<String, dynamic> datos,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/proyectos/$proyectoId/inventario-rf/aps',
+        data: datos,
+      );
+      return APFisicoRFModel.fromJson(response.data!);
     } on DioException catch (e) {
       throw HeatmapApiException(
         _mensajeDesdeError(e),

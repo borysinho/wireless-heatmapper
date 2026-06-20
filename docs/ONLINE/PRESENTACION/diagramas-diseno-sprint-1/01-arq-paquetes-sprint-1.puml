@@ -1,0 +1,158 @@
+' ============================================================
+' SECCIÓN DEL DOCUMENTO: § 9. Modelos de Diseño › § 9.2 Modelo de Arquitectura — Diagrama de Paquetes
+' Archivo: docs/ONLINE/PRESENTACION/presentacion-scrum-s0-s1.md
+' Perspectiva de diseño: (a) Diseño de Arquitectura — Sprint 1
+' ============================================================
+
+@startuml
+title Diseño de Arquitectura — Diagrama de Paquetes (UML 2.5)\nSprint 1: Backend Base + Admin Web + Auth Móvil + CRUD Proyectos\nWireless HeatMapper (modalidad 100 % en línea)
+skinparam packageStyle rectangle
+skinparam packageBackgroundColor #EBF5FB
+skinparam packageBorderColor #2980B9
+skinparam componentBackgroundColor #FDFEFE
+skinparam componentBorderColor #5D6D7E
+skinparam arrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+
+' ─── App Móvil Flutter ───────────────────────────────────────
+package "mobile/ — App Móvil Flutter / Dart" as MOBILE {
+  package "presentation (PB-09, PB-01, PB-10)" as MOB_PRES {
+    [SplashPage]
+    [LoginPage]
+    [ProyectosPage]
+    [ProyectoFormPage]
+  }
+  package "bloc" as MOB_BLOC {
+    [AuthCubit]
+    [ProyectosCubit]
+  }
+  package "domain (casos de uso)" as MOB_DOM {
+    [LoginUseCase]
+    [LogoutUseCase]
+    [ListarProyectosUseCase]
+    [GestionarProyectoUseCase]
+  }
+  package "data (repositorios + fuentes)" as MOB_DATA {
+    [ApiClient (Dio)]
+    [AuthInterceptor (JWT Bearer)]
+    [SecureStorage\n(solo tokens JWT)]
+    [ConnectivityMonitor]
+    [AuthRemoteDataSource]
+    [ProyectoRemoteDataSource]
+  }
+  note bottom of MOB_DATA
+    Sin persistencia de dominio local.
+    SecureStorage: únicamente access_token
+    y refresh_token (no password_hash).
+  end note
+}
+
+' ─── Plataforma Web React + TS ───────────────────────────────
+package "web/ — Plataforma Web React + TypeScript + Vite" as WEB {
+  package "features/auth (PB-13 prerequisito)" as WEB_AUTH {
+    [LoginAdmin.tsx]
+    [useAuth hook]
+  }
+  package "features/admin (PB-13, PB-19, PB-18)" as WEB_ADMIN {
+    [AdminLayout.tsx]
+    [GestionUsuarios.tsx]
+    [GestionClientes.tsx]
+    [ListadoProyectosOrg.tsx]
+  }
+  package "shared" as WEB_SHARED {
+    [api/axiosClient\n(axios + interceptors)]
+    [TanStack Query\n(cache y mutaciones)]
+    [React Router v6\n(/admin/*)]
+  }
+  package "types (TypeScript)" as WEB_TYPES {
+    [UsuarioDto]
+    [ClienteDto]
+    [ProyectoDto]
+  }
+}
+
+' ─── Backend FastAPI ─────────────────────────────────────────
+package "backend/ — FastAPI / Python 3.12" as BACKEND {
+  package "api/v1 (routers REST)" as B_API {
+    [auth_router\nPOST /api/auth/login\nPOST /api/auth/refresh\nPOST /api/auth/logout]
+    [admin_usuarios_router\nPOST|GET|PATCH /api/admin/usuarios]
+    [clientes_router\nGET|POST|PATCH /api/clientes\n(y /api/admin/clientes)]
+    [proyectos_router\nGET|POST|PUT|PATCH|DELETE /api/proyectos]
+    [admin_proyectos_router\nGET /api/admin/proyectos]
+  }
+  package "services" as B_SVC {
+    [AuthService\n(JWT + bcrypt)]
+    [UsuarioService]
+  }
+  package "repositories" as B_REPO {
+    [UsuarioRepository]
+    [RefreshTokenRepository]
+    [ClienteRepository]
+    [ProyectoRepository]
+  }
+  package "models (SQLAlchemy ORM)" as B_MOD {
+    [Usuario]
+    [RefreshToken]
+    [Cliente]
+    [Proyecto]
+  }
+  package "schemas (Pydantic v2)" as B_SCH {
+    ' Paquete hoja: sin dependencias salientes por diseño.
+    ' Los schemas son DTOs puros; no importan modelos ORM ni servicios.
+    ' La conversión ORM→schema ocurre en api/v1 (capa de entrada).
+    [LoginRequest / TokenResponse]
+    [UsuarioCreate / UsuarioOut]
+    [ClienteIn / ClienteOut]
+    [ProyectoIn / ProyectoTecnicoOut]
+  }
+  package "alembic/versions" as B_MIG {
+    [0001_initial_usuario_refresh_token]
+    [0002_cliente_y_proyecto]
+  }
+  package "core" as B_CORE {
+    [config (Settings / pydantic-settings)]
+    [database (SessionLocal)]
+    [security (JWT decode, require_admin)]
+  }
+}
+
+' ─── Infraestructura ─────────────────────────────────────────
+package "PostgreSQL 15\nheatmapper_db" <<database>> as DB
+
+package "Nginx (reverse proxy)" <<subsystem>> as NGINX {
+  note right
+    /api/* → backend:8000
+    /admin/* → web SPA
+    / → portal (Sprint 6)
+  end note
+}
+
+' ─── Relaciones (todas son «Dependency» en UML 2.5) ──────────
+' StarUML: usar la herramienta "Dependency" del toolbox para cada flecha.
+' PlantUML: ..> = flecha punteada = Dependency.
+' El anidado de paquetes equivale a "Containment" (StarUML: herramienta "Containment").
+
+MOB_PRES ..> MOB_BLOC
+MOB_BLOC ..> MOB_DOM
+MOB_DOM ..> MOB_DATA
+MOB_DATA ..down..> NGINX : <<use>>\nHTTPS REST
+
+WEB_AUTH ..> WEB_SHARED
+WEB_AUTH ..> WEB_TYPES
+WEB_ADMIN ..> WEB_SHARED
+WEB_ADMIN ..> WEB_TYPES
+WEB_ADMIN ..> WEB_AUTH
+WEB_SHARED ..down..> NGINX : <<use>>\nHTTPS REST
+
+NGINX ..down..> B_API : <<use>>\nproxy_pass :8000
+B_API ..> B_SVC
+B_API ..> B_REPO
+B_SVC ..> B_REPO
+B_REPO ..> B_MOD
+B_MOD ..down..> DB
+B_API ..> B_SCH
+B_API ..> B_CORE
+B_CORE ..> DB
+
+B_MIG ..down..> DB : <<use>>\nAlembic apply
+@enduml

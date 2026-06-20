@@ -94,6 +94,7 @@ class ProyectoRepository:
         tecnico_id: int,
         cliente_id: int | None = None,
         descripcion: str | None = None,
+        estado: str = "nuevo",
     ) -> Proyecto:
         """Crea un nuevo proyecto y lo persiste. PB-01 — CA-1."""
         proyecto = Proyecto(
@@ -101,7 +102,7 @@ class ProyectoRepository:
             tecnico_id=tecnico_id,
             cliente_id=cliente_id,
             descripcion=descripcion,
-            estado="en_progreso",
+            estado=estado,
         )
         self._db.add(proyecto)
         self._db.commit()
@@ -144,6 +145,12 @@ class ProyectoRepository:
     def reasignar_tecnico(self, *, proyecto: Proyecto, nuevo_tecnico_id: int) -> Proyecto:
         """Reasigna el proyecto a otro técnico activo. Solo admin. PB-18."""
         proyecto.tecnico_id = nuevo_tecnico_id
+        self._db.commit()
+        self._db.refresh(proyecto)
+        return self.obtener_por_id_admin(proyecto_id=proyecto.id)  # type: ignore[return-value]
+
+    def guardar_admin(self, *, proyecto: Proyecto) -> Proyecto:
+        """Persiste cambios hechos por el administrador y recarga relaciones."""
         self._db.commit()
         self._db.refresh(proyecto)
         return self.obtener_por_id_admin(proyecto_id=proyecto.id)  # type: ignore[return-value]

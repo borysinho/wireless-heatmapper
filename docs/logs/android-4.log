@@ -1,0 +1,109 @@
+$ flutter run --dart-define-from-file=dart-defines/debug-ip.json
+Launching lib/main.dart on 2201116TG in debug mode...
+WARNING: Your Android app project: app located at: /home/bquiroga/Documentos/dev/taller/proyecto-final/mobile/android/app/build.gradle.kts
+applies the Kotlin Gradle Plugin, which will cause build failures in future versions of Flutter. 
+Please migrate your app to Built-in Kotlin using this guide: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers
+
+WARNING: Your app uses the following plugins that apply Kotlin Gradle Plugin (KGP): file_picker, pdfx, wifi_scan
+Future versions of Flutter will fail to build if your app uses plugins that apply KGP.
+
+Please check the changelogs of these plugins and upgrade to a version that supports Built-in Kotlin.
+If no such version exists, report the issue to the plugin. If necessary, here is a guide on filing 
+an issue against a plugin: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers#report-incompatible-kotlin-gradle-plugin-usage-to-plugin-authors
+
+If you are a plugin author, please migrate your plugin to Built-in Kotlin using this guide: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-plugin-authors
+Running Gradle task 'assembleDebug'...                             17,2s
+✓ Built build/app/outputs/flutter-apk/app-debug.apk
+Installing build/app/outputs/flutter-apk/app-debug.apk...           5,4s
+I/FlutterActivityAndFragmentDelegate(28793): If you are attempting to set --enable-dart-profiling via Intent extras to launch a Flutter component outside of using the Flutter CLI, note that support for setting engine flags on Android via Intent will soon be dropped; see https://github.com/flutter/flutter/issues/180686 for more information on this breaking change. To migrate, set --enable-dart-profiling or any other flags specified via Intent extras on the command line instead or see https://github.com/flutter/flutter/blob/main/docs/engine/Flutter-Android-Engine-Flags.md for alternative methods.
+D/FlutterJNI(28793): Beginning load of flutter...
+D/FlutterJNI(28793): flutter (null) was loaded normally!
+I/flutter (28793): [IMPORTANT:flutter/shell/platform/android/android_context_vk_impeller.cc(62)] Using the Impeller rendering backend (Vulkan).
+D/FlutterRenderer(28793): Width is zero. 0,0
+Syncing files to device 2201116TG...                               136ms
+
+Flutter run key commands.
+r Hot reload. 🔥🔥🔥
+R Hot restart.
+h List all available interactive commands.
+d Detach (terminate "flutter run" but leave application running).
+c Clear the screen
+q Quit (terminate the application on the device).
+
+A Dart VM Service on 2201116TG is available at:
+http://127.0.0.1:41951/8VZi1xE_v0I=/
+The Flutter DevTools debugger and profiler on 2201116TG is available at:
+http://127.0.0.1:41951/8VZi1xE_v0I=/devtools/?uri=ws://127.0.0.1:41951/8VZi
+1xE_v0I=/ws
+W/Looper  (28793): PerfMonitor looperActivity : package=com.bulldogtech.heatmapper/.MainActivity time=0ms latency=3785ms  procState=-1  historyMsgCount=4 (msgIndex=4 wall=1611ms seq=4 late=297ms h=android.app.ActivityThread$H w=159)
+D/FramePredict(28793): FramePredict init: false
+I/Choreographer(28793): Skipped 223 frames!  The application may be doing too much work on its main thread.
+D/FlutterRenderer(28793): Width is zero. 0,0
+I/tech.heatmapper(28793): Compiler allocated 5101KB to compile void android.view.ViewRootImpl.performTraversals()
+D/BufferQueueConsumer(28793): [](id:707900000000,api:0,p:-1,c:28793) connect: controlledByApp=false
+D/FlutterJNI(28793): Sending viewport metrics to the engine.
+D/libMEOW (28793): meow new tls: 0xb400007717274e80
+D/libMEOW (28793): applied 1 plugins for [com.bulldogtech.heatmapper]:
+D/libMEOW (28793):   plugin 1: [libMEOW_gift.so]: 0xb4000077a90fb8c0
+D/libMEOW (28793): rebuild call chain: 0xb400007717283400
+D/VRI[MainActivity](28793): vri.reportNextDraw android.view.ViewRootImpl.performTraversals:3953 android.view.ViewRootImpl.doTraversal:2674 android.view.ViewRootImpl$TraversalRunnable.run:9867 android.view.Choreographer$CallbackRecord.run:1431 android.view.Choreographer$CallbackRecord.run:1439 
+D/SurfaceView(28793): UPDATE null, mIsCastMode = false
+D/BufferQueueConsumer(28793): [](id:707900000001,api:0,p:-1,c:28793) connect: controlledByApp=false
+W/libc    (28793): Access denied finding property "vendor.migl.debug"
+E/libMiGL (28793): libmigl:This GPU version is note support Variable Shading Rate
+E/libEGL  (28793): pre_cache appList: com.android.contacts,com.android.mms,com.android.settings,com.mi.android.globalFileexplorer,com.android.thememanager,com.miui.videoplayer,com.miui.weather2,com.xiaomi.calendar,com.miui.notes,com.miui.gallery,com.miui.securitycenter
+E/gralloc4(28793): ERROR: Format allocation info not found for format: 38
+E/gralloc4(28793): ERROR: Format allocation info not found for format: 0
+E/gralloc4(28793): Invalid base format! req_base_format = 0x0, req_format = 0x38, type = 0x0
+E/gralloc4(28793): ERROR: Unrecognized and/or unsupported format 0x38 and usage 0xb00
+E/Gralloc4(28793): isSupported(1, 1, 56, 1, ...) failed with 5
+E/GraphicBufferAllocator(28793): Failed to allocate (4 x 4) layerCount 1 format 56 usage b00: 5
+E/AHardwareBuffer(28793): GraphicBuffer(w=4, h=4, lc=1) failed (Unknown error -5), handle=0x0
+E/gralloc4(28793): ERROR: Format allocation info not found for format: 38
+E/gralloc4(28793): ERROR: Format allocation info not found for format: 0
+E/gralloc4(28793): Invalid base format! req_base_format = 0x0, req_format = 0x38, type = 0x0
+E/gralloc4(28793): ERROR: Unrecognized and/or unsupported format 0x38 and usage 0xb00
+E/Gralloc4(28793): isSupported(1, 1, 56, 1, ...) failed with 5
+E/GraphicBufferAllocator(28793): Failed to allocate (4 x 4) layerCount 1 format 56 usage b00: 5
+E/AHardwareBuffer(28793): GraphicBuffer(w=4, h=4, lc=1) failed (Unknown error -5), handle=0x0
+W/libc    (28793): Access denied finding property "ro.vendor.magt.mtk_magt_support"
+D/hw-ProcessState(28793): Binder ioctl to enable oneway spam detection failed: Invalid argument
+W/Looper  (28793): PerfMonitor doFrame : time=145ms vsyncFrame=0 latency=3723ms procState=-1 historyMsgCount=4 (msgIndex=2 wall=1611ms seq=4 late=297ms h=android.app.ActivityThread$H w=159)
+D/SurfaceView(28793): UPDATE Surface(name=SurfaceView[com.bulldogtech.heatmapper/com.bulldogtech.heatmapper.MainActivity])/@0x59f00a0, mIsProjectionMode = false
+D/FlutterJNI(28793): Sending viewport metrics to the engine.
+W/libc    (28793): Access denied finding property "persist.vendor.debug.gpud.enable"
+E/tech.heatmapper(28793): FI open fail: No such file or directory
+W/libc    (28793): Access denied finding property "ro.vendor.display.iris_x7.support"
+I/gralloc4(28793): @set_metadata: update dataspace from GM (0x08010000 -> 0x00000000)
+W/libc    (28793): Access denied finding property "ro.vendor.display.iris_x7.support"
+D/BLASTBufferQueue(28793): [SurfaceView[com.bulldogtech.heatmapper/com.bulldogtech.heatmapper.MainActivity]#1](f:0,a:1) acquireNextBufferLocked size=1080x2270 mFrameNumber=1 applyTransaction=true mTimestamp=107759038452344(auto) mPendingTransactions.size=0 graphicBufferId=123664993353738 transform=0
+I/gralloc4(28793): @set_metadata: update dataspace from GM (0x08010000 -> 0x00000000)
+D/VRI[MainActivity](28793): vri.Setup new sync id=0 syncSeqId=0
+D/tech.heatmapper(28793): MiuiProcessManagerServiceStub setSchedFifo
+I/MiuiProcessManagerImpl(28793): setSchedFifo pid:28793, mode:3
+W/libc    (28793): Access denied finding property "ro.vendor.display.iris_x7.support"
+E/libEGL  (28793): pre_cache appList: com.android.contacts,com.android.mms,com.android.settings,com.mi.android.globalFileexplorer,com.android.thememanager,com.miui.videoplayer,com.miui.weather2,com.xiaomi.calendar,com.miui.notes,com.miui.gallery,com.miui.securitycenter
+D/BLASTBufferQueue(28793): [VRI[MainActivity]#0](f:0,a:1) acquireNextBufferLocked size=1080x2400 mFrameNumber=1 applyTransaction=true mTimestamp=107759088897267(auto) mPendingTransactions.size=0 graphicBufferId=123664993353746 transform=0
+W/Parcel  (28793): Expecting binder but got null!
+I/gralloc4(28793): @set_metadata: update dataspace from GM (0x08010000 -> 0x00000000)
+D/VRI[MainActivity](28793): vri.reportDrawFinished syncSeqId=0 android.view.ViewRootImpl.lambda$createSyncIfNeeded$4$android-view-ViewRootImpl:4021 android.view.ViewRootImpl$$ExternalSyntheticLambda1.run:6 android.os.Handler.handleCallback:942 android.os.Handler.dispatchMessage:99 android.os.Looper.loopOnce:211 
+I/gralloc4(28793): @set_metadata: update dataspace from GM (0x08010000 -> 0x00000000)
+W/OnBackInvokedCallback(28793): OnBackInvokedCallback is not enabled for the application.
+W/OnBackInvokedCallback(28793): Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+I/gralloc4(28793): @set_metadata: update dataspace from GM (0x08010000 -> 0x00000000)
+D/DecorView[](28793): onWindowFocusChanged hasWindowFocus true
+I/HandWritingStubImpl(28793): refreshLastKeyboardType: 1
+I/HandWritingStubImpl(28793): getCurrentKeyboardType: 1
+I/gralloc4(28793): @set_metadata: update dataspace from GM (0x08010000 -> 0x00000000)
+W/libc    (28793): Access denied finding property "ro.vendor.display.iris_x7.support"
+I/HandWritingStubImpl(28793): getCurrentKeyboardType: 1
+I/gralloc4(28793): @set_metadata: update dataspace from GM (0x08010000 -> 0x00000000)
+I/gralloc4(28793): @set_metadata: update dataspace from GM (0x08010000 -> 0x00000000)
+D/FlutterJNI(28793): Sending viewport metrics to the engine.
+D/ProfileInstaller(28793): Installing profile for com.bulldogtech.heatmapper
+W/MirrorManager(28793): this model don't Support
+W/OnBackInvokedCallback(28793): OnBackInvokedCallback is not enabled for the application.
+W/OnBackInvokedCallback(28793): Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+W/OnBackInvokedCallback(28793): OnBackInvokedCallback is not enabled for the application.
+W/OnBackInvokedCallback(28793): Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.
+I/ScrollIdentify(28793): on fling

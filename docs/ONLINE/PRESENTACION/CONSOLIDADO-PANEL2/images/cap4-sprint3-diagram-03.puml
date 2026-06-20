@@ -1,0 +1,42 @@
+@startuml
+title CapturaCubit — Estados de la sesión de captura WiFi
+skinparam stateBackgroundColor #EBF5FB
+skinparam stateBorderColor #2980B9
+skinparam arrowColor #5D6D7E
+skinparam noteBackgroundColor #FFFDE7
+
+[*] --> CapturaInicial : abrirPlano()
+
+CapturaInicial --> PuntoCreado : marcarPuntoEnPlano()\n[plano calibrado]
+CapturaInicial --> ErrorCalibracion : marcarPuntoEnPlano()\n[plano sin calibrar]
+
+PuntoCreado --> CapturaEsperando : throttling activo
+PuntoCreado --> CapturandoScan : throttling libre
+
+CapturaEsperando --> CapturandoScan : timer expirado
+CapturandoScan --> MedicionRegistrada : POST exitoso
+CapturandoScan --> ErrorCaptura : 3 reintentos agotados
+
+MedicionRegistrada --> CapturandoScan : continuar captura
+MedicionRegistrada --> CapturaInicial : marcarOtroPunto()
+MedicionRegistrada --> CapturaPuntoDetalle : abrirDetallePunto(puntoId)
+
+CapturaPuntoDetalle --> MedicionRegistrada : cerrarDetalle()
+CapturaPuntoDetalle --> PuntoEliminado : confirmarEliminacion()
+
+ErrorCaptura --> CapturandoScan : reintentar manualmente
+ErrorCaptura --> CapturaInicial : cancelar
+
+PuntoEliminado --> CapturaInicial : [*]
+
+note right of CapturaEsperando
+  UI muestra cuenta regresiva:
+  "Próximo scan en Xs"
+end note
+
+note right of ErrorCaptura
+  SnackBar: "Sin conexión.
+  Medición no registrada."
+  SIN datos locales
+end note
+@enduml

@@ -71,3 +71,11 @@ tests/
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `60`                                                       | Expiración del token          |
 | `DEBUG`                       | `false`                                                    | Modo debug                    |
 | `CORS_ORIGINS`                | `["http://localhost","http://localhost:5173"]`             | Orígenes CORS permitidos      |
+| `FIREBASE_PROJECT_ID`         | vacío                                                      | Id del proyecto Firebase para FCM |
+| `FIREBASE_CREDENTIALS_PATH`   | vacío                                                      | Ruta al JSON de cuenta de servicio Firebase |
+| `FIREBASE_CREDENTIALS_JSON`   | vacío                                                      | JSON de cuenta de servicio (útil en contenedores/CI) |
+
+La configuración generada por FlutterFire habilita el cliente Android, pero el
+backend necesita además credenciales de Firebase Admin. En desarrollo puede
+definirse `GOOGLE_APPLICATION_CREDENTIALS` o `FIREBASE_CREDENTIALS_PATH`; no se
+debe versionar el JSON de la cuenta de servicio.

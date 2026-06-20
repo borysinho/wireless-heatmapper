@@ -1,0 +1,19 @@
+flowchart TB
+  subgraph SG_ANDROID["Dispositivo Android - Tecnico"]
+    ANDROID_APP["App Flutter APK"]
+  end
+
+  subgraph SG_SERVER["Servidor de Produccion - VPS/Docker"]
+    NGINX["Contenedor Nginx - Reverse Proxy"]
+    API["Contenedor FastAPI - Backend REST + IA"]
+    WEBAPP["Contenedor React App - Panel Web"]
+    DB["Contenedor PostgreSQL - Base de Datos"]
+    NGINX -->|"/api/*"| API
+    NGINX -->|"/*"| WEBAPP
+    API -->|"TCP 5432"| DB
+  end
+
+  ANDROID_APP -->|"HTTPS / REST"| NGINX
+
+  NOTA["Orquestacion: Docker Compose -- CI/CD: GitHub Actions"]
+  NOTA -.-> NGINX

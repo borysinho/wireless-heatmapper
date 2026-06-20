@@ -3,8 +3,16 @@ import '../entities/ap_disponible.dart';
 import '../entities/ap_detectado.dart';
 import '../entities/conjunto_ap.dart';
 import '../entities/mapa_calor.dart';
+import '../entities/inventario_rf.dart';
 
 abstract class HeatmapRepository {
+  Future<InventarioRF> obtenerInventarioRF(int proyectoId);
+
+  Future<APFisicoRF> crearAPFisicoRF({
+    required int proyectoId,
+    required Map<String, dynamic> datos,
+  });
+
   Future<List<APDisponible>> listarAPsDisponibles(int planoId);
 
   Future<List<ConjuntoAP>> listarConjuntosAP(int planoId);
@@ -60,4 +68,5 @@ abstract class HeatmapRepository {
     required double posX,
     required double posY,
   });
+
 }

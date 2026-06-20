@@ -1,0 +1,18 @@
+sequenceDiagram
+  actor TEC as Tecnico
+  participant APP as CapturaPage
+  participant SCANNER as WifiScanner
+  participant CUBIT as CapturaCubit
+  participant BACKEND as Backend /mediciones
+  participant DB as PostgreSQL
+
+  TEC->>APP: tocar punto en plano
+  APP->>SCANNER: iniciar escaneo
+  SCANNER-->>APP: resultados WiFi
+  APP->>CUBIT: enviar lote
+  CUBIT->>BACKEND: POST /api/mediciones
+  BACKEND->>DB: insertar punto y mediciones
+  DB-->>BACKEND: ids y nivel
+  BACKEND-->>CUBIT: 201 Created
+  CUBIT-->>APP: actualizar plano
+  APP-->>TEC: mostrar badge por nivel

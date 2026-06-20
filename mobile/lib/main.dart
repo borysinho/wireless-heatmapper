@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:get_it/get_it.dart';
 import 'app.dart';
 import 'core/network/connectivity_monitor.dart';
 import 'core/network/dio_client.dart';
 import 'core/navigation/app_router.dart';
+import 'core/notifications/servicio_notificaciones_push.dart';
+import 'firebase_options.dart';
 
 // PB-09: Autenticación
 import 'features/auth/data/datasources/auth_remote_datasource.dart';
@@ -56,11 +61,24 @@ final GetIt sl = GetIt.instance;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   _initDependencias();
+
+  final notificaciones = sl<ServicioNotificacionesPush>();
+  notificaciones.alAbrirProyecto = (proyectoId, proyectoNombre) {
+    AppRouter.router.go(
+      '/proyectos/$proyectoId',
+      extra: {'proyectoNombre': proyectoNombre},
+    );
+  };
+  await notificaciones.inicializar();
 
   // Sp1-19: cuando el AuthInterceptor detecta que la sesión expiró,
   // redirige al usuario a la pantalla de login.
   DioClient.onSessionExpired = () {
+    unawaited(sl<ServicioNotificacionesPush>().invalidarTokenLocal());
     AppRouter.router.go('/login');
   };
 
@@ -81,6 +99,9 @@ void _initDependencias() {
   sl.registerLazySingleton<Connectivity>(() => Connectivity());
   sl.registerLazySingleton<ConnectivityMonitor>(
     () => ConnectivityMonitor(sl<Connectivity>()),
+  );
+  sl.registerLazySingleton<ServicioNotificacionesPush>(
+    () => ServicioNotificacionesPush(sl<Dio>()),
   );
 
   // PB-09: Autenticación ─────────────────────────────────────────────────────
@@ -111,6 +132,7 @@ void _initDependencias() {
       logoutUseCase: sl<LogoutUseCase>(),
       getUsuarioActivoUseCase: sl<GetUsuarioActivoUseCase>(),
       connectivityMonitor: sl<ConnectivityMonitor>(),
+      notificacionesPush: sl<ServicioNotificacionesPush>(),
     ),
   );
 

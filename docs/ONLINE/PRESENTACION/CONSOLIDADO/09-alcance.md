@@ -1,0 +1,23 @@
+# 7. Alcance
+
+A continuación se describen los módulos funcionales que componen el alcance del sistema, organizados por dominio y por requerimiento principal (RP) asociado.
+
+**Módulo de captura de señal WiFi en línea (RP1).** La aplicación móvil escanea automáticamente las redes WiFi disponibles en cada punto del recorrido del técnico y registra los parámetros RSSI, SSID, BSSID, canal y frecuencia, asociándolos a la posición actual del usuario sobre el plano del edificio. Cada lote de muestras se transmite _en línea_ al backend mediante un endpoint REST autenticado con JWT, sin almacenamiento local persistente. Ante una pérdida temporal de conectividad la aplicación pausa explícitamente la captura, muestra al técnico un banner de estado de red y reanuda la operación cuando el backend confirma disponibilidad.
+
+**Módulo de gestión de proyectos y planos (RP2).** El técnico crea proyectos asociados a un cliente del catálogo, sube el plano del edificio en formato PNG/JPG/PDF al backend y calibra su escala dibujando una línea de referencia con su longitud real conocida. El plano queda asociado al proyecto en la base de datos central PostgreSQL y se sirve al cliente móvil por URL bajo demanda. Toda operación es un request HTTPS contra el backend; no existe edición offline.
+
+**Módulo de generación de mapa de calor (RP3).** A partir de los puntos de medición persistidos, el servicio de interpolación espacial del backend genera un mapa de calor continuo y lo devuelve al cliente para su visualización con escala de color graduada (verde para señal excelente, rojo para zona muerta o señal nula). El cliente móvil sólo solicita el heatmap actualizado y lo renderiza, liberándose de la carga computacional de la interpolación.
+
+**Módulo de análisis automatizado de cobertura (RP4).** El backend analiza el heatmap generado para identificar zonas muertas (RSSI < −90 dBm), puntos de solapamiento excesivo entre APs e interferencias por canal (CCI/ACI), entregando los resultados al cliente como una colección estructurada de hallazgos categorizados por severidad y referenciados sobre el plano.
+
+**Módulo de inteligencia artificial para optimización de APs (RP5).** A partir del análisis de cobertura, un modelo de aprendizaje automático hospedado en el backend sugiere la cantidad mínima de APs necesarios y sus posiciones óptimas sobre el plano para garantizar cobertura objetivo ≥ −70 dBm. El módulo entrega adicionalmente un mapa de calor _proyectado_ del escenario optimizado para comparación visual con el escenario actual.
+
+**Módulo de generación de reportes (RP6).** El sistema permite la exportación de reportes técnicos en PDF que documentan el estado actual de la cobertura, las zonas problemáticas identificadas, las recomendaciones de la IA y el plan de implementación propuesto, en un formato adecuado para entregar al cliente como cierre del proyecto.
+
+**Módulo de administración web (RP7).** El panel web provee al administrador de Bulldog Tech. cuatro funciones principales: (i) gestión de cuentas de técnicos (alta, baja y activación), (ii) administración del catálogo de clientes, (iii) listado consolidado de todos los proyectos de la organización con filtros por técnico, estado y rango de fechas, y (iv) operaciones administrativas sobre los proyectos (archivar, reasignar entre técnicos).
+
+**Persistencia centralizada en línea (RP8).** Todas las entidades del dominio (proyectos, planos calibrados, puntos de medición, mediciones WiFi, análisis y heatmaps) residen exclusivamente en la base de datos central PostgreSQL. La aplicación móvil opera como cliente REST autenticado con JWT y no mantiene estado de dominio entre ejecuciones; al iniciar sesión, el técnico recupera del backend el listado de sus proyectos y todas las operaciones posteriores se realizan en línea.
+
+**Portal de cliente web (RP9).** El técnico genera al cierre del proyecto un enlace único (token UUID firmado, expiración configurable, contador de accesos auditable) que permite al cliente acceder a un portal web sin instalar la aplicación móvil. El portal muestra el heatmap actual, el heatmap proyectado, el análisis de cobertura y el plan de APs recomendado de forma interactiva.
+
+> **Nota sobre exclusiones del alcance:** El sistema **no implementa** un modo desconectado ni mecanismos de sincronización diferida (modalidad 100 % en línea por diseño); **no implementa** medición activa de ancho de banda con `iperf3` (a diferencia de python-wifi-survey-heatmap); **no implementa** posicionamiento automático del técnico por SLAM o triangulación inercial (la posición se marca manualmente sobre el plano); y **no contempla** despliegue multi-tenant con múltiples organizaciones (Bulldog Tech. es la única organización en la primera versión).

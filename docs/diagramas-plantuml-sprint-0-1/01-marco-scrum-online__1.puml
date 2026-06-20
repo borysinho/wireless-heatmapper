@@ -1,0 +1,48 @@
+@startuml
+title Equipo Scrum — Wireless HeatMapper (modalidad online)
+skinparam classBackgroundColor #EBF5FB
+skinparam classBorderColor #2980B9
+skinparam classHeaderBackgroundColor #2980B9
+skinparam classHeaderFontColor white
+skinparam arrowColor #2980B9
+hide circle
+
+class EquipoScrum {
+  +tamaño : 2
+  +modalidad : "100 % en línea"
+  +duracionSprint : "2 semanas"
+}
+
+class ScrumMaster {
+  +nombre = "Jhasmany Fernandez"
+  +facilitar()
+  +removerImpedimentos()
+}
+
+class ProductOwner {
+  +nombre = "Herland Borys Quiroga"
+  +gestionarBacklog()
+  +validarConCliente()
+}
+
+class Desarrollador {
+  +autogestionado : Boolean
+  +multifuncional : Boolean
+  +seleccionarTarea()
+  +implementar()
+  +probar()
+}
+
+EquipoScrum *-- ScrumMaster
+EquipoScrum *-- ProductOwner
+EquipoScrum *-- "2" Desarrollador
+
+ScrumMaster --|> Desarrollador
+ProductOwner --|> Desarrollador
+
+note right of Desarrollador
+  En este proyecto SM y PO también
+  cumplen rol de Dev: el equipo
+  efectivo de desarrollo es 2 personas.
+end note
+@enduml

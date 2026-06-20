@@ -1,0 +1,54 @@
+%% PB-19: Gestionar Clientes (Panel Admin Web)
+%% Wireless HeatMapper — modalidad 100% en línea
+%% Compatibilidad StarUML: solo ->> y -->>, sin box/rect/link/estilos
+
+sequenceDiagram
+    actor admin as Administrador
+    participant web as GestionClientes.tsx
+    participant axios as axiosClient
+    participant nginx as Nginx
+    participant be as API admin-clientes
+    participant db as PostgreSQL cliente
+
+    %% Listar clientes (CA-3)
+    admin->>web: accede a /admin/clientes
+    web->>axios: GET /api/clientes Bearer token
+    axios->>nginx: HTTPS
+    nginx->>be: proxy_pass - cualquier usuario autenticado
+    be->>db: SELECT * FROM cliente ORDER BY nombre
+    db-->>be: lista completa
+    be-->>axios: 200 lista ClienteOut
+    axios-->>web: datos clientes
+    web->>admin: tabla con nombre y badge activo/inactivo
+
+    %% Crear cliente (CA-1)
+    admin->>web: abre modal Nuevo cliente
+    admin->>web: ingresa nombre del cliente
+    web->>axios: POST /api/admin/clientes
+    axios->>nginx: HTTPS
+    nginx->>be: proxy_pass - require_admin
+    be->>db: SELECT cliente WHERE nombre=:nombre
+    alt nombre disponible
+        be->>db: INSERT INTO cliente nombre, activo=TRUE
+        db-->>be: nuevo registro
+        be-->>axios: 201 ClienteOut activo=true
+        axios-->>web: datos cliente creado
+        web->>admin: cliente aparece ACTIVO
+    else CA-2 nombre duplicado
+        be-->>axios: 409 El nombre del cliente ya existe
+        axios-->>web: error 409
+        web->>admin: error Nombre duplicado
+    end
+
+    %% Desactivar cliente (CA-4)
+    admin->>web: toggle activo OFF en fila del cliente
+    web->>axios: PATCH /api/admin/clientes/:id activo=false
+    axios->>nginx: HTTPS
+    nginx->>be: proxy_pass
+    be->>db: UPDATE cliente SET activo=FALSE WHERE id=:id
+    db-->>be: actualizado
+    be-->>axios: 200 ClienteOut activo=false
+    axios-->>web: datos cliente actualizado
+    web->>admin: badge cambia a INACTIVO
+
+    Note right of be: Selector de proyectos solo muestra clientes activos. Proyectos historicos conservan FK via LEFT JOIN

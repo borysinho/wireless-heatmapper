@@ -29,6 +29,7 @@ dependencies:
 
   # Renderizado PDF
   pdfx: ^2.9.0
+  path_provider: ^2.1.5
 
   # Formularios con validación (Sp1-17)
   flutter_form_builder: ^10.3.0+2
@@ -50,6 +51,10 @@ dependencies:
 
   # Permisos en tiempo de ejecución (Sprint 3 — ACCESS_FINE_LOCATION)
   permission_handler: ^12.0.0
+  share_plus: ^12.0.2
+  firebase_core: ^4.11.0
+  firebase_messaging: ^16.4.0
+  flutter_local_notifications: ^22.0.1
 
 dev_dependencies:
   flutter_test:

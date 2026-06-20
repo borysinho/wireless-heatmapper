@@ -155,6 +155,9 @@ class ConjuntoAPRepository:
         descripcion: str | None,
         es_principal: bool,
         items: list[dict],
+        origen: str = "manual_movil",
+        estado_gobernanza: str = "borrador_tecnico",
+        creado_por_id: int | None = None,
     ) -> ConjuntoAP:
         conjunto = ConjuntoAP(
             plano_id=plano_id,
@@ -162,6 +165,9 @@ class ConjuntoAPRepository:
             proposito=proposito,
             descripcion=descripcion,
             es_principal=es_principal,
+            origen=origen,
+            estado_gobernanza=estado_gobernanza,
+            creado_por_id=creado_por_id,
         )
         self._db.add(conjunto)
         self._db.flush()
@@ -179,6 +185,7 @@ class ConjuntoAPRepository:
         descripcion: str | None = None,
         es_principal: bool | None = None,
         items: list[dict] | None = None,
+        estado_gobernanza: str | None = None,
     ) -> ConjuntoAP:
         if nombre is not None:
             conjunto.nombre = nombre
@@ -188,6 +195,8 @@ class ConjuntoAPRepository:
             conjunto.descripcion = descripcion
         if es_principal is not None:
             conjunto.es_principal = es_principal
+        if estado_gobernanza is not None:
+            conjunto.estado_gobernanza = estado_gobernanza
         if items is not None:
             self._reemplazar_items(conjunto=conjunto, items=items)
         self._db.commit()

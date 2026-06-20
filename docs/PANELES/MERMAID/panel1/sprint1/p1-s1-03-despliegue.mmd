@@ -1,0 +1,21 @@
+flowchart TB
+  subgraph SG_ANDROID["Dispositivo Android"]
+    ANDROID_APP["App Flutter"]
+  end
+
+  subgraph SG_BROWSER["PC / Navegador Web"]
+    BROWSER["Navegador Web"]
+  end
+
+  subgraph SG_SERVER["Servidor (Docker Compose)"]
+    NGINX["nginx:alpine<br/>Reverse Proxy"]
+    API["backend:python<br/>FastAPI App"]
+    REACT_APP["react-app<br/>Panel Admin React"]
+    DB["db:postgres15<br/>PostgreSQL"]
+  end
+
+  ANDROID_APP -->|HTTPS :443 /api| NGINX
+  BROWSER -->|HTTPS :443| NGINX
+  NGINX -->|:8000 /api/v1| API
+  NGINX -->|:80 /*| REACT_APP
+  API -->|:5432| DB

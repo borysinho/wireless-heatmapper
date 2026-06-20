@@ -1,0 +1,94 @@
+' ============================================================
+' SECCIÓN DEL DOCUMENTO: § 9. Modelos de Diseño › § 9.2.b Modelo de Arquitectura — Diagrama de Despliegue
+' Archivo: docs/ONLINE/PRESENTACION/presentacion-scrum-s0-s1.md
+' Perspectiva de diseño: (a) Diseño de Arquitectura — Sprint 1
+' ============================================================
+
+@startuml
+title Diseño de Arquitectura — Diagrama de Despliegue (UML 2.5)\nSprint 1: Backend Base + Admin Web + Auth Móvil + CRUD Proyectos\nWireless HeatMapper (modalidad 100 % en línea)
+skinparam nodeBackgroundColor #EBF5FB
+skinparam nodeBorderColor #2980B9
+skinparam artifactBackgroundColor #FDFEFE
+skinparam artifactBorderColor #5D6D7E
+skinparam componentBackgroundColor #FDFEFE
+skinparam componentBorderColor #5D6D7E
+skinparam arrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+
+' ─── Servidor de producción (Docker Compose) ─────────────────
+' Node = entorno de ejecución / dispositivo físico
+' Component = servicio/aplicación en ejecución con interfaces
+' Artifact = archivo físico desplegable (conf, bundle, volumen)
+
+node "Servidor Linux / VPS\n(Docker Compose host)" as HOST {
+
+  node "Contenedor: nginx\n(puerto 80/443 públicos)\nnginx:1.27-alpine" as CTR_NGINX {
+    component "Nginx Reverse Proxy\n/api/* → backend:8000\n/admin/* → web:80\n/ → web:80 (portal S6)" as COMP_NGINX
+    artifact "nginx.conf" as CONF
+  }
+
+  node "Contenedor: web\n(puerto 80 interno)\nnginx:1.27-alpine + dist/" as CTR_WEB {
+    component "Nginx SPA Server\n(sirve archivos estáticos)" as COMP_WEB
+    artifact "dist/ (Vite bundle)\n- LoginAdmin\n- GestionUsuarios (PB-13)\n- GestionClientes (PB-19)\n- ListadoProyectosOrg (PB-18)" as ART_WEB
+    artifact "nginx-spa.conf\n(try_files SPA fallback)" as CONF_SPA
+  }
+
+  node "Contenedor: backend\n(puerto 8000 interno)\npython:3.12-slim + uvicorn" as CTR_BACK {
+    component "FastAPI + Uvicorn\n- api/v1/auth (PB-09)\n- api/v1/admin_usuarios (PB-13)\n- api/v1/clientes (PB-19)\n- api/v1/proyectos (PB-01, PB-10)\n- api/v1/admin_proyectos (PB-18)" as COMP_BACK
+    artifact "alembic/versions/\n- 0001 initial (usuario + refresh_token)\n- 0002 cliente_y_proyecto" as ART_MIG
+  }
+
+  node "Contenedor: db\n(puerto 5432 interno)\npostgres:15-alpine" as CTR_DB {
+    component "PostgreSQL 15\nheatmapper_db\n  tabla: usuario\n  tabla: refresh_token\n  tabla: cliente\n  tabla: proyecto\n  tipo ENUM: estado_proyecto" as COMP_DB
+    artifact "volumen Docker\nheatmapper_pgdata\n(persistencia entre reinicios)" as VOL
+  }
+}
+
+' ─── Dispositivos externos ───────────────────────────────────
+node "Dispositivo Móvil Android\n(Android 8+ / API 26+)" as ANDROID {
+  component "App Flutter\n- SplashPage\n- LoginPage (PB-09)\n- ProyectosPage (PB-10)\n- ProyectoFormPage (PB-01)" as COMP_APP
+  artifact "flutter_secure_storage\n(solo access_token + refresh_token)\nSin SQLite / drift / sqflite" as SS
+}
+
+node "Navegador Web\n(Chrome / Firefox — técnico o admin)" as BROWSER {
+  component "React SPA\n- /admin/login\n- /admin/usuarios\n- /admin/clientes\n- /admin/proyectos" as COMP_SPA
+}
+
+node "GitHub Actions CI/CD" as CI {
+  artifact "workflow: .github/workflows/ci.yml\npytest → ruff → build Docker\n→ push imagen (sprint en main)" as CI_ART
+}
+
+' ─── Relaciones ─────────────────────────────────────────────
+' StarUML Deployment Diagram toolbox:
+'   Communication Path → línea sólida (--) entre nodos
+'   Deployment         → flecha punteada «deploy» (..>)
+'   Dependency         → flecha punteada genérica (..>)
+
+' Communication Path: conectividad de red entre nodos
+ANDROID -- CTR_NGINX : HTTPS :443\n(REST /api/auth, /api/proyectos,\n/api/clientes)
+BROWSER -- CTR_NGINX : HTTPS :443\n(GET /admin/* SPA +\nREST /api/admin/*)
+CTR_NGINX -- CTR_WEB : HTTP :80\n(proxy /admin/* y /)
+CTR_NGINX -- CTR_BACK : HTTP :8000\n(proxy /api/*)
+CTR_BACK -- CTR_DB : TCP :5432\n(SQLAlchemy SessionLocal)
+
+' Deployment: CI entrega el artefacto al entorno de ejecución
+CI ..> HOST : <<deploy>>\ndocker compose up --build\n(push a main)
+
+note bottom of ANDROID
+  flutter_secure_storage: SOLO tokens JWT.
+  No hay base de datos local de dominio.
+  Modalidad 100 % en línea.
+end note
+
+note bottom of CTR_DB
+  Única fuente de verdad del proyecto.
+  No existe réplica local en ningún cliente.
+  Volumen Docker persiste datos entre reinicios.
+end note
+
+note right of CTR_BACK
+  Uvicorn en modo single-worker (dev).
+  Variables de entorno vía .env / Docker secret.
+  Secrets: DB_URL, SECRET_KEY, CORS_ORIGINS.
+end note
+@enduml

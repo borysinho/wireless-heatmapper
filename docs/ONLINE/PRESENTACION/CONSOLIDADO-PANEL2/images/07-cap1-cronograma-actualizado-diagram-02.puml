@@ -1,0 +1,31 @@
+@startuml
+@startgantt
+title Sprint 0 — Definición Inicial (R-1)\n13 abr – 17 abr 2026
+skinparam backgroundColor #FAFAFA
+scale 1.5
+Project starts 2026-04-13
+saturday are closed
+sunday are closed
+
+[Sp0-01..05 Roles y backlog] lasts 1 day
+[Sp0-06 Modelos UML] lasts 2 days
+[Sp0-07..08 Repo + Docker] lasts 1 day
+[Sp0-09..11 Backend + Alembic] lasts 1 day
+[Sp0-12 Init Flutter] lasts 1 day
+[Sp0-13 Init Web (Vite)] lasts 1 day
+[Sp0-14 Nginx] lasts 1 day
+[Sp0-15 CI/CD] lasts 1 day
+[Sp0-16 Pre-commit] lasts 1 day
+[Sp0-17 READMEs] lasts 1 day
+
+[Sp0-06 Modelos UML] starts at [Sp0-01..05 Roles y backlog]'s end
+[Sp0-07..08 Repo + Docker] starts at [Sp0-06 Modelos UML]'s end
+[Sp0-09..11 Backend + Alembic] starts at [Sp0-07..08 Repo + Docker]'s end
+[Sp0-12 Init Flutter] starts at [Sp0-09..11 Backend + Alembic]'s end
+[Sp0-13 Init Web (Vite)] starts at [Sp0-09..11 Backend + Alembic]'s end
+[Sp0-14 Nginx] starts at [Sp0-13 Init Web (Vite)]'s end
+[Sp0-15 CI/CD] starts at [Sp0-14 Nginx]'s end
+[Sp0-16 Pre-commit] starts at [Sp0-15 CI/CD]'s end
+[Sp0-17 READMEs] starts at [Sp0-16 Pre-commit]'s end
+@endgantt
+@enduml

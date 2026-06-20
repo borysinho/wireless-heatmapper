@@ -1,0 +1,84 @@
+@startuml
+!pragma layout smetana
+title Notación Crow's Foot — Referencia de Conectores ERD\nWireless HeatMapper (sección 3)
+
+skinparam entityBackgroundColor #EBF5FB
+skinparam entityBorderColor #2980B9
+skinparam entityFontColor #1A252F
+skinparam entityHeaderBackgroundColor #2980B9
+skinparam entityHeaderFontColor white
+skinparam arrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteFontColor #1A252F
+
+' ── 1. Uno a cero-o-muchos ───────────────────────────────────────
+entity "PADRE_1" as PA1 {
+  * id <<PK>>
+}
+entity "HIJO_A" as HI1 {
+  * id <<PK>>
+  * padre_id <<FK>>
+}
+PA1 ||--o{ HI1 : "||--o{"
+note right of HI1
+  ||--o{  →  uno a cero-o-muchos
+  Izquierda  ||  = exactamente uno (obligatorio)
+  Derecha    o{  = cero o muchos  (opcional)
+  Un PADRE_1 puede tener ninguno o varios HIJO_A.
+  Usado en: CLIENTE→PROYECTO, PROYECTO→PLANO,
+  PLANO→PUNTO, PLANO→MAPA, ANALISIS→APDET,
+  APDET→REC, PROYECTO→ESC, PROYECTO→REP,
+  PROYECTO→TOKEN, ANALISIS→ESC.
+end note
+
+' ── 2. Uno a cero-o-uno ──────────────────────────────────────────
+entity "PADRE_2" as PA2 {
+  * id <<PK>>
+}
+entity "HIJO_B" as HI2 {
+  * id <<PK>>
+  * padre_id <<FK, UNIQUE>>
+}
+PA2 ||--o| HI2 : "||--o|"
+note right of HI2
+  ||--o|  →  uno a cero-o-uno
+  Izquierda  ||  = exactamente uno (obligatorio)
+  Derecha    o|  = cero o uno    (opcional)
+  Un PADRE_2 tiene como máximo un HIJO_B,
+  pero puede no tener ninguno.
+  Usado en: MAPA→ANALISIS, ESC→MAPA.
+end note
+
+' ── 3. Uno a uno-o-muchos ────────────────────────────────────────
+entity "PADRE_3" as PA3 {
+  * id <<PK>>
+}
+entity "HIJO_C" as HI3 {
+  * id <<PK>>
+  * padre_id <<FK, NOT NULL>>
+}
+PA3 ||--|{ HI3 : "||--|{"
+note right of HI3
+  ||--|{  →  uno a uno-o-muchos
+  Izquierda  ||  = exactamente uno (obligatorio)
+  Derecha    |{  = uno o muchos  (obligatorio)
+  Un PADRE_3 tiene al menos un HIJO_C;
+  no puede estar vacío.
+  Usado en: PUNTO→MEDICION, ESC→REC.
+end note
+
+note as RESUMEN
+  Resumen de los 3 conectores del modelo:
+
+  Conector  Cardinalidad     Ejemplos en el modelo
+  ||--o{    1 : 0..N (opt)   CLIENTE->PROYECTO, PROYECTO->PLANO, PLANO->PUNTO...
+  ||--o|    1 : 0..1 (opt)   MAPA->ANALISIS, ESC->MAPA...
+  ||--|{    1 : 1..N (obl)   PUNTO->MEDICION, ESC->REC
+
+  Descomposición del símbolo (izq → der):
+    |   línea vertical  = obligatorio / exactamente uno
+    o   círculo         = opcional (puede ser cero)
+    {   pata de gallo   = muchos (sin límite superior)
+    --  línea central   = separa ambos extremos
+end note
+@enduml
