@@ -15,10 +15,10 @@ from app.ai.optimizador_ap_service import OptimizadorAPService
 from app.api.v1.heatmaps import _mapa_out
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import require_admin
 from app.models.escenario import EscenarioOptimizado, Reporte, ValorProyectadoPunto
-from app.models.heatmap import MapaCalor
-from app.models.inventario_rf import APFisico
+from app.models.heatmap import ConjuntoAP, MapaCalor
+from app.models.inventario_rf import APFisico, BSSIDRadio, RadioAP
 from app.models.medicion import MedicionWifi, PuntoMedicion
 from app.models.plano import Plano
 from app.models.proyecto import Proyecto
@@ -28,6 +28,7 @@ from app.repositories.heatmap_repository import MapaCalorRepository
 from app.repositories.medicion_repository import MedicionRepository
 from app.repositories.proyecto_repository import ProyectoRepository
 from app.schemas.escenario import (
+    CambiarEstadoEscenarioIn,
     ComparacionEscenarioOut,
     EscenarioOptimizadoOut,
     EscenariosGeneradosOut,
@@ -79,6 +80,23 @@ def _proyecto_tecnico(
     return proyecto
 
 
+def _proyecto_admin(
+    *,
+    proyecto_id: int,
+    current_user: Usuario,
+    db: Session,
+) -> Proyecto:
+    if current_user.rol != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="La generación IA está restringida al panel web admin.",
+        )
+    proyecto = ProyectoRepository(db).obtener_por_id_admin(proyecto_id=proyecto_id)
+    if proyecto is None:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado.")
+    return proyecto
+
+
 def _escenario_tecnico(
     *,
     escenario_id: int,
@@ -89,6 +107,28 @@ def _escenario_tecnico(
     if escenario is None:
         raise HTTPException(status_code=404, detail="Escenario no encontrado.")
     _proyecto_tecnico(
+        proyecto_id=escenario.proyecto_id,
+        current_user=current_user,
+        db=db,
+    )
+    return escenario
+
+
+def _escenario_admin(
+    *,
+    escenario_id: int,
+    current_user: Usuario,
+    db: Session,
+) -> EscenarioOptimizado:
+    if current_user.rol != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Los escenarios IA están restringidos al panel web admin.",
+        )
+    escenario = EscenarioRepository(db).obtener_por_id(escenario_id=escenario_id)
+    if escenario is None:
+        raise HTTPException(status_code=404, detail="Escenario no encontrado.")
+    _proyecto_admin(
         proyecto_id=escenario.proyecto_id,
         current_user=current_user,
         db=db,
@@ -113,6 +153,28 @@ def _reporte_tecnico(
     return reporte
 
 
+def _reporte_admin(
+    *,
+    reporte_id: int,
+    current_user: Usuario,
+    db: Session,
+) -> Reporte:
+    if current_user.rol != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Los reportes IA están restringidos al panel web admin.",
+        )
+    reporte = ReporteRepository(db).obtener_por_id(reporte_id=reporte_id)
+    if reporte is None:
+        raise HTTPException(status_code=404, detail="Reporte no encontrado.")
+    _proyecto_admin(
+        proyecto_id=reporte.proyecto_id,
+        current_user=current_user,
+        db=db,
+    )
+    return reporte
+
+
 def _plano_base(proyecto: Proyecto) -> Plano:
     planos = sorted(proyecto.planos, key=lambda p: p.created_at or p.id, reverse=True)
     plano = next((p for p in planos if p.calibrado), None)
@@ -124,10 +186,153 @@ def _plano_base(proyecto: Proyecto) -> Plano:
     return plano
 
 
+def _plano_escenario(
+    *,
+    proyecto: Proyecto,
+    plano_id: int | None,
+    db: Session,
+) -> Plano:
+    if plano_id is None:
+        return _plano_base(proyecto)
+    plano = (
+        db.query(Plano)
+        .filter(Plano.id == plano_id, Plano.proyecto_id == proyecto.id)
+        .first()
+    )
+    if plano is None:
+        raise HTTPException(status_code=404, detail="Plano no encontrado.")
+    if not plano.calibrado:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El plano seleccionado debe estar calibrado.",
+        )
+    return plano
+
+
+def _aps_existentes_para_ia(
+    *,
+    plano_id: int,
+    body: RestriccionesEscenarioIn,
+    db: Session,
+) -> list[dict]:
+    query = db.query(APFisico).filter(APFisico.plano_id == plano_id)
+    fuente = body.fuente_entrada
+    if fuente is not None and fuente.tipo == "SELECCION_APS_MAPA":
+        if fuente.bssids:
+            return []
+        ap_ids = list(dict.fromkeys(fuente.ap_ids))
+        if not ap_ids:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Debe seleccionar al menos un AP del mapa.",
+            )
+        query = query.filter(APFisico.id.in_(ap_ids))
+    elif fuente is not None and fuente.tipo == "CONJUNTO_EXISTENTE":
+        conjunto = _conjunto_fuente_entrada(
+            plano_id=plano_id,
+            body=body,
+            db=db,
+        )
+        bssids = [item.bssid.lower() for item in conjunto.items]
+        query = (
+            query.join(RadioAP, RadioAP.ap_fisico_id == APFisico.id)
+            .join(BSSIDRadio, BSSIDRadio.radio_id == RadioAP.id)
+            .filter(BSSIDRadio.bssid.in_(bssids))
+            .distinct()
+        )
+    aps = query.order_by(APFisico.id.asc()).all()
+    if fuente is not None and fuente.tipo == "SELECCION_APS_MAPA":
+        encontrados = {ap.id for ap in aps}
+        faltantes = [
+            ap_id for ap_id in dict.fromkeys(fuente.ap_ids) if ap_id not in encontrados
+        ]
+        if faltantes:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="La selección contiene APs que no pertenecen al plano.",
+            )
+    return [
+        {
+            "id": ap.id,
+            "coord_x": ap.coord_x,
+            "coord_y": ap.coord_y,
+            "altura_m": ap.altura_m,
+            "tipo_montaje": ap.tipo_montaje,
+            "restriccion_movimiento": ap.restriccion_movimiento,
+            "verificado": ap.verificado,
+        }
+        for ap in aps
+    ]
+
+
+def _bssids_fuente_entrada(
+    *,
+    plano: Plano,
+    body: RestriccionesEscenarioIn,
+    db: Session,
+) -> list[str] | None:
+    fuente = body.fuente_entrada
+    if fuente is not None and fuente.tipo == "CONJUNTO_EXISTENTE":
+        conjunto = _conjunto_fuente_entrada(
+            plano_id=plano.id,
+            body=body,
+            db=db,
+        )
+        solicitados = [item.bssid.lower() for item in conjunto.items]
+    elif fuente is not None and fuente.tipo == "SELECCION_APS_MAPA" and fuente.bssids:
+        solicitados = [bssid.lower() for bssid in dict.fromkeys(fuente.bssids)]
+    else:
+        return None
+    disponibles = {
+        ap["bssid"]
+        for ap in MedicionRepository(db).listar_aps_por_plano(plano_id=plano.id)
+    }
+    faltantes = [bssid for bssid in solicitados if bssid not in disponibles]
+    if faltantes:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La selección contiene APs que no pertenecen al plano.",
+        )
+    return solicitados
+
+
+def _conjunto_fuente_entrada(
+    *, plano_id: int, body: RestriccionesEscenarioIn, db: Session
+) -> ConjuntoAP:
+    fuente = body.fuente_entrada
+    if fuente is None or fuente.tipo != "CONJUNTO_EXISTENTE":
+        raise HTTPException(
+            status_code=422,
+            detail="La fuente no es un conjunto existente.",
+        )
+    if fuente.conjunto_id is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Debe seleccionar un conjunto de APs existente.",
+        )
+    conjunto = (
+        db.query(ConjuntoAP)
+        .filter(ConjuntoAP.id == fuente.conjunto_id, ConjuntoAP.plano_id == plano_id)
+        .first()
+    )
+    if conjunto is None:
+        raise HTTPException(
+            status_code=422,
+            detail="El conjunto seleccionado no pertenece al plano.",
+        )
+    if not conjunto.items:
+        raise HTTPException(
+            status_code=422,
+            detail="El conjunto seleccionado no contiene APs.",
+        )
+    return conjunto
+
+
 def _mapa_actual(
     *,
     plano: Plano,
     db: Session,
+    bssids_seleccionados: list[str] | None = None,
 ) -> tuple[MapaCalor, list[PuntoRSSI]]:
     mapa_repo = MapaCalorRepository(db)
     med_repo = MedicionRepository(db)
@@ -139,7 +344,8 @@ def _mapa_actual(
         ),
         None,
     )
-    bssids = [ap["bssid"] for ap in med_repo.listar_aps_por_plano(plano_id=plano.id)]
+    aps = med_repo.listar_aps_por_plano(plano_id=plano.id)
+    bssids = bssids_seleccionados or [ap["bssid"] for ap in aps]
     if not bssids:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -151,7 +357,7 @@ def _mapa_actual(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Se requieren al menos 5 puntos de medición para IA.",
         )
-    if mapa is not None:
+    if mapa is not None and bssids_seleccionados is None:
         return mapa, puntos
 
     matriz = InterpolacionService().interpolar(
@@ -167,17 +373,17 @@ def _mapa_actual(
         f"sp5-actual:{plano.id}:{med_repo.firma_mediciones_plano(plano_id=plano.id)}".encode(),
         usedforsecurity=False,
     ).hexdigest()
-    aps = med_repo.listar_aps_por_plano(plano_id=plano.id)
+    aps_interes = [ap for ap in aps if ap["bssid"] in set(bssids)]
     mapa = mapa_repo.crear(
         plano_id=plano.id,
         modo_generacion="SUBCONJUNTO",
         algoritmo="IDW",
         resolucion=64,
-        bssid=aps[0]["bssid"],
-        ssid=aps[0]["ssid"],
-        ap_pos_x=aps[0]["pos_x"],
-        ap_pos_y=aps[0]["pos_y"],
-        aps_interes=aps,
+        bssid=aps_interes[0]["bssid"],
+        ssid=aps_interes[0]["ssid"],
+        ap_pos_x=aps_interes[0]["pos_x"],
+        ap_pos_y=aps_interes[0]["pos_y"],
+        aps_interes=aps_interes,
         bssids_generacion=bssids,
         matriz=matriz,
         escala=ESCALA_CWNA,
@@ -199,43 +405,34 @@ def generar_escenarios(
     proyecto_id: int,
     body: RestriccionesEscenarioIn,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(require_admin),
 ) -> EscenariosGeneradosOut:
-    proyecto = _proyecto_tecnico(
+    proyecto = _proyecto_admin(
         proyecto_id=proyecto_id, current_user=current_user, db=db
     )
-    plano = _plano_base(proyecto)
-    mapa_actual, puntos = _mapa_actual(plano=plano, db=db)
+    plano = _plano_escenario(proyecto=proyecto, plano_id=body.plano_id, db=db)
+    conjunto_fuente = (
+        _conjunto_fuente_entrada(plano_id=plano.id, body=body, db=db)
+        if body.fuente_entrada is not None
+        and body.fuente_entrada.tipo == "CONJUNTO_EXISTENTE"
+        else None
+    )
+    bssids_seleccionados = _bssids_fuente_entrada(plano=plano, body=body, db=db)
+    mapa_actual, puntos = _mapa_actual(
+        plano=plano,
+        db=db,
+        bssids_seleccionados=bssids_seleccionados,
+    )
     mapas_actuales_por_banda = _mapas_actuales_por_banda(
         plano=plano,
         bandas=body.bandas,
         resolucion=body.resolucion,
         db=db,
+        bssids_seleccionados=bssids_seleccionados,
     )
     optimizador = OptimizadorAPService()
-    aps_existentes = [
-        {
-            "id": ap.id,
-            "coord_x": ap.coord_x,
-            "coord_y": ap.coord_y,
-            "altura_m": ap.altura_m,
-            "tipo_montaje": ap.tipo_montaje,
-            "restriccion_movimiento": ap.restriccion_movimiento,
-            "verificado": ap.verificado,
-        }
-        for ap in db.query(APFisico)
-        .filter(APFisico.plano_id == plano.id)
-        .order_by(APFisico.id.asc())
-        .all()
-    ]
-    if body.tipo_negocio == "RED_EXISTENTE" and not aps_existentes:
-        raise HTTPException(
-            status_code=status.HTTP_424_FAILED_DEPENDENCY,
-            detail=(
-                "La optimización de red existente requiere inventario "
-                "de APs físicos."
-            ),
-        )
+    aps_existentes = _aps_existentes_para_ia(plano_id=plano.id, body=body, db=db)
+    banda_objetivo = "5" if "5" in body.bandas else body.bandas[0]
     alternativas = optimizador.optimizar(
         puntos_actuales=puntos,
         matriz_actual=mapa_actual.matriz,
@@ -243,15 +440,10 @@ def generar_escenarios(
         alto_px=plano.alto_px,
         metros_por_pixel=plano.escala_m_por_px or 1.0,
         max_aps=body.max_aps,
-        presupuesto=body.presupuesto,
-        banda=body.banda_preferida,
-        modelo_ap=body.modelo_ap,
-        costo_unitario=body.costo_unitario,
+        banda=banda_objetivo,
         resolucion=body.resolucion,
+        umbral_objetivo_dbm=body.umbral_objetivo_dbm,
         bandas=body.bandas,
-        tipo_negocio=body.tipo_negocio,
-        perfil=body.perfil,
-        politica_combinacion=body.politica_combinacion,
         aps_existentes=aps_existentes,
     )
     observados_por_banda = _observados_por_punto_y_banda(db=db, plano_id=plano.id)
@@ -314,6 +506,8 @@ def generar_escenarios(
             plano_id=plano.id,
             mapa_actual_id=mapa_actual.id,
             mapa_proyectado_id=mapa_proyectado.id,
+            conjunto_base_id=conjunto_fuente.id if conjunto_fuente else None,
+            generado_por_id=current_user.id,
             nombre=alternativa.nombre,
             banda=alternativa.banda,
             modelo_ap=alternativa.modelo_ap,
@@ -325,9 +519,9 @@ def generar_escenarios(
             restricciones=body.model_dump(),
             metricas=alternativa.metricas,
             recomendaciones=alternativa.recomendaciones,
-            tipo_negocio=body.tipo_negocio,
-            perfil=body.perfil,
-            politica_combinacion=body.politica_combinacion,
+            tipo_negocio="OPTIMIZACION_COBERTURA",
+            perfil="MAXIMIZAR_COBERTURA",
+            politica_combinacion="COBERTURA_POR_BANDA",
             bandas=body.bandas,
             mapas_por_banda=alternativa.mapas_por_banda,
             mapas_actuales_por_banda=mapas_actuales_por_banda,
@@ -341,6 +535,39 @@ def generar_escenarios(
     )
 
 
+@router_proyectos_escenarios.get(
+    "/{proyecto_id}/escenarios",
+    response_model=list[EscenarioOptimizadoOut],
+)
+def listar_escenarios_proyecto(
+    proyecto_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin),
+) -> list[EscenarioOptimizadoOut]:
+    proyecto = _proyecto_admin(
+        proyecto_id=proyecto_id, current_user=current_user, db=db
+    )
+    escenarios = EscenarioRepository(db).listar_por_proyecto(proyecto_id=proyecto.id)
+    return [EscenarioOptimizadoOut.model_validate(e) for e in escenarios]
+
+
+@router_proyectos_escenarios.delete("/{proyecto_id}/escenarios")
+def eliminar_escenarios_proyecto(
+    proyecto_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin),
+) -> dict[str, int]:
+    proyecto = _proyecto_admin(
+        proyecto_id=proyecto_id,
+        current_user=current_user,
+        db=db,
+    )
+    eliminados = EscenarioRepository(db).eliminar_por_proyecto(
+        proyecto_id=proyecto.id,
+    )
+    return {"eliminados": eliminados}
+
+
 @router_escenarios.get(
     "/{escenario_id}/comparacion", response_model=ComparacionEscenarioOut
 )
@@ -348,9 +575,9 @@ def comparar_escenario(
     escenario_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(require_admin),
 ) -> ComparacionEscenarioOut:
-    escenario = _escenario_tecnico(
+    escenario = _escenario_admin(
         escenario_id=escenario_id, current_user=current_user, db=db
     )
     if escenario.mapa_actual is None or escenario.mapa_proyectado is None:
@@ -420,9 +647,9 @@ def listar_puntos_proyectados(
     escenario_id: int,
     banda: str | None = Query(default=None, pattern=r"^(2\.4|5)$"),
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(require_admin),
 ) -> list[ValorProyectadoPuntoOut]:
-    _escenario_tecnico(escenario_id=escenario_id, current_user=current_user, db=db)
+    _escenario_admin(escenario_id=escenario_id, current_user=current_user, db=db)
     query = db.query(ValorProyectadoPunto).filter(
         ValorProyectadoPunto.escenario_id == escenario_id
     )
@@ -435,6 +662,41 @@ def listar_puntos_proyectados(
     return [ValorProyectadoPuntoOut.model_validate(item) for item in valores]
 
 
+@router_escenarios.patch(
+    "/{escenario_id}/estado", response_model=EscenarioOptimizadoOut
+)
+def cambiar_estado_escenario(
+    escenario_id: int,
+    body: CambiarEstadoEscenarioIn,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin),
+) -> EscenarioOptimizadoOut:
+    escenario = _escenario_admin(
+        escenario_id=escenario_id, current_user=current_user, db=db
+    )
+    actualizado = EscenarioRepository(db).cambiar_estado(
+        escenario=escenario,
+        estado_gobernanza=body.estado_gobernanza,
+        usuario_id=current_user.id,
+    )
+    return EscenarioOptimizadoOut.model_validate(actualizado)
+
+
+@router_escenarios.delete("/{escenario_id}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_escenario(
+    escenario_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin),
+) -> Response:
+    escenario = _escenario_admin(
+        escenario_id=escenario_id,
+        current_user=current_user,
+        db=db,
+    )
+    EscenarioRepository(db).eliminar(escenario=escenario)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router_proyectos_escenarios.post(
     "/{proyecto_id}/reportes", response_model=ReporteOut, status_code=201
 )
@@ -442,14 +704,14 @@ def crear_reporte(
     proyecto_id: int,
     body: ReporteCrearIn,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(require_admin),
 ) -> ReporteOut:
-    proyecto = _proyecto_tecnico(
+    proyecto = _proyecto_admin(
         proyecto_id=proyecto_id, current_user=current_user, db=db
     )
     escenario = None
     if body.escenario_id is not None:
-        escenario = _escenario_tecnico(
+        escenario = _escenario_admin(
             escenario_id=body.escenario_id,
             current_user=current_user,
             db=db,
@@ -486,6 +748,25 @@ def crear_reporte(
     return _reporte_out(reporte)
 
 
+@router_proyectos_escenarios.get(
+    "/{proyecto_id}/reportes", response_model=list[ReporteOut]
+)
+def listar_reportes_proyecto(
+    proyecto_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin),
+) -> list[ReporteOut]:
+    proyecto = _proyecto_admin(
+        proyecto_id=proyecto_id, current_user=current_user, db=db
+    )
+    return [
+        _reporte_out(reporte)
+        for reporte in ReporteRepository(db).listar_por_proyecto(
+            proyecto_id=proyecto.id
+        )
+    ]
+
+
 @router_reportes.get("/archivo/{ruta:path}")
 def descargar_reporte_firmado(
     ruta: str,
@@ -518,9 +799,9 @@ def descargar_reporte_firmado(
 def obtener_reporte(
     reporte_id: int,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(require_admin),
 ) -> ReporteOut:
-    reporte = _reporte_tecnico(reporte_id=reporte_id, current_user=current_user, db=db)
+    reporte = _reporte_admin(reporte_id=reporte_id, current_user=current_user, db=db)
     return _reporte_out(reporte)
 
 
@@ -528,9 +809,9 @@ def obtener_reporte(
 def descargar_reporte(
     reporte_id: int,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(require_admin),
 ) -> Response:
-    reporte = _reporte_tecnico(reporte_id=reporte_id, current_user=current_user, db=db)
+    reporte = _reporte_admin(reporte_id=reporte_id, current_user=current_user, db=db)
     if reporte.estado != "LISTO" or not reporte.ruta_pdf:
         raise HTTPException(status_code=409, detail="El reporte aun no esta listo.")
     contenido = _storage().read(reporte.ruta_pdf)
@@ -577,6 +858,7 @@ def _mapas_actuales_por_banda(
     bandas: list[str],
     resolucion: int,
     db: Session,
+    bssids_seleccionados: list[str] | None = None,
 ) -> dict[str, list[list[float]] | None]:
     """Construye baselines observados independientes por banda."""
     repo = MedicionRepository(db)
@@ -586,6 +868,7 @@ def _mapas_actuales_por_banda(
         bssids = [
             ap["bssid"]
             for ap in aps
+            if (bssids_seleccionados is None or ap["bssid"] in bssids_seleccionados)
             if ap.get("frecuencia_mhz") is not None
             and (
                 (banda == "2.4" and ap["frecuencia_mhz"] < 3000)

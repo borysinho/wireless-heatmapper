@@ -1,5 +1,7 @@
 """Repositorios de Sprint 5: escenarios IA y reportes."""
 
+from datetime import UTC, datetime
+
 from sqlalchemy.orm import Session
 
 from app.models.escenario import (
@@ -40,6 +42,7 @@ class EscenarioRepository:
         plano_id: int,
         mapa_actual_id: int | None,
         mapa_proyectado_id: int | None,
+        conjunto_base_id: int | None = None,
         nombre: str,
         banda: str,
         modelo_ap: str,
@@ -61,12 +64,19 @@ class EscenarioRepository:
         confianza: str = "MEDIA",
         version_motor: str = "rf-hibrido-1.0",
         valores_proyectados: list[dict] | None = None,
+        origen: str = "ia",
+        estado_gobernanza: str = "pendiente_revision",
+        generado_por_id: int | None = None,
     ) -> EscenarioOptimizado:
         escenario = EscenarioOptimizado(
             proyecto_id=proyecto_id,
             plano_id=plano_id,
             mapa_actual_id=mapa_actual_id,
             mapa_proyectado_id=mapa_proyectado_id,
+            conjunto_base_id=conjunto_base_id,
+            origen=origen,
+            estado_gobernanza=estado_gobernanza,
+            generado_por_id=generado_por_id,
             nombre=nombre,
             tipo_negocio=tipo_negocio,
             perfil=perfil,
@@ -102,6 +112,53 @@ class EscenarioRepository:
         self._db.commit()
         self._db.refresh(escenario)
         return escenario
+
+    def cambiar_estado(
+        self,
+        *,
+        escenario: EscenarioOptimizado,
+        estado_gobernanza: str,
+        usuario_id: int,
+    ) -> EscenarioOptimizado:
+        escenario.estado_gobernanza = estado_gobernanza
+        ahora = datetime.now(UTC)
+        if estado_gobernanza == "aprobado_interno":
+            escenario.aprobado_por_id = usuario_id
+            escenario.aprobado_at = ahora
+        elif estado_gobernanza == "publicado_cliente":
+            escenario.publicado_por_id = usuario_id
+            escenario.publicado_at = ahora
+            if escenario.aprobado_por_id is None:
+                escenario.aprobado_por_id = usuario_id
+                escenario.aprobado_at = ahora
+        self._db.commit()
+        self._db.refresh(escenario)
+        return escenario
+
+    def eliminar(self, *, escenario: EscenarioOptimizado) -> None:
+        (
+            self._db.query(Reporte)
+            .filter(Reporte.escenario_id == escenario.id)
+            .update({Reporte.escenario_id: None}, synchronize_session=False)
+        )
+        self._db.delete(escenario)
+        self._db.commit()
+
+    def eliminar_por_proyecto(self, *, proyecto_id: int) -> int:
+        escenarios = self.listar_por_proyecto(proyecto_id=proyecto_id)
+        cantidad = len(escenarios)
+        if cantidad == 0:
+            return 0
+        escenario_ids = [escenario.id for escenario in escenarios]
+        (
+            self._db.query(Reporte)
+            .filter(Reporte.escenario_id.in_(escenario_ids))
+            .update({Reporte.escenario_id: None}, synchronize_session=False)
+        )
+        for escenario in escenarios:
+            self._db.delete(escenario)
+        self._db.commit()
+        return cantidad
 
 
 class ReporteRepository:

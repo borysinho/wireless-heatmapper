@@ -7,7 +7,8 @@ La validación se realiza en cuatro niveles:
 1. fórmulas y reglas RF;
 2. calidad predictiva con separación espacial;
 3. factibilidad de la optimización;
-4. survey real posterior a la instalación.
+4. gobernanza de acceso, estados y publicación;
+5. survey real posterior a la instalación.
 
 ## 2. Pruebas unitarias RF
 
@@ -69,7 +70,7 @@ El mapa combinado declara política y nunca se confunde con un mapa de banda.
 
 ### CA-RF-06 — Puntos proyectados
 
-Cada punto original devuelve RSSI proyectado, delta cuando exista baseline, radios primaria/secundaria e incertidumbre.
+Cada punto observado o punto generado por IA devuelve RSSI proyectado, delta cuando exista baseline observado, radios primaria/secundaria e incertidumbre.
 
 ### CA-RF-07 — Restricciones
 
@@ -87,11 +88,43 @@ Cada propuesta identifica claramente qué se mantiene, mueve, reconfigura, retir
 
 Si ML no mejora el baseline físico, el motor utiliza el baseline y registra la decisión.
 
+### CA-GOB-01 — Móvil sin generación IA
+
+La app móvil no puede solicitar generación de alternativas IA, aunque el usuario tenga sesión válida.
+
+### CA-GOB-02 — Móvil sin exposición de alternativas IA internas
+
+La app móvil no recibe recomendaciones IA, mapas proyectados IA ni comparaciones IA mientras no exista una publicación explícita orientada al cliente o web.
+
+### CA-GOB-03 — Estados de escenario
+
+Cada escenario IA registra origen, estado de gobernanza, fuente de entrada, fecha de generación y trazabilidad del solicitante. El estado inicial no es publicable automáticamente.
+
+### CA-GOB-04 — Publicación explícita
+
+El portal cliente solo muestra conjuntos, heatmaps, análisis, alternativas o reportes seleccionados y publicados por Bulldog Tech.
+
+### CA-GOB-05 — Separación de canales
+
+Web admin puede generar, revisar y aprobar alternativas IA; móvil solo captura insumos y visualiza heatmaps operativos de conjuntos manuales.
+
+### CA-GOB-06 — Fuente de entrada flexible
+
+La generación IA puede partir de una selección directa de APs del mapa sin exigir un conjunto manual previo. Si se usa un conjunto existente, queda registrado solo como fuente de entrada opcional.
+
+### CA-GOB-07 — Evidencia observada inmutable
+
+Los APs propuestos, posiciones proyectadas, puntos de predicción y lecturas estimadas del escenario IA no modifican `PuntoMedicion`, `MedicionWifi`, `APFisico` ni conjuntos manuales.
+
 ## 6. Pruebas de contrato e integración
 
 - autorización y pertenencia del proyecto en todos los endpoints;
+- bloqueo 403 para generación/comparación IA desde usuarios o canales no autorizados;
+- verificación de que el móvil no tenga contrato público para `POST /escenarios-rf`;
+- escenarios IA creados con estado `pendiente_revision` o equivalente;
+- portal cliente sin acceso a escenarios no publicados;
 - idempotencia de validación y reproducción con la misma versión/semilla;
-- conflicto si cambia el baseline durante el cálculo;
+- conflicto si cambia la fuente de entrada, baseline o inventario durante el cálculo;
 - serialización de matrices y puntos por banda;
 - compatibilidad temporal con mapas y recomendaciones vigentes;
 - reporte PDF con configuración por radio, supuestos e incertidumbre.
@@ -107,4 +140,3 @@ El plan recomendado no se considera confirmado hasta ejecutar un survey de valid
 5. registrar desviaciones y recalibrar el modelo.
 
 El reporte final diferencia “diseño proyectado” de “resultado validado”.
-

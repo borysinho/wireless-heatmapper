@@ -97,6 +97,16 @@ class ConjuntoAP(Base):
     proposito = Column(String(255), nullable=False)
     descripcion = Column(Text, nullable=True)
     es_principal = Column(Boolean, nullable=False, default=False)
+    origen = Column(String(30), nullable=False, default="manual_movil", index=True)
+    estado_gobernanza = Column(
+        String(30), nullable=False, default="borrador_tecnico", index=True
+    )
+    creado_por_id = Column(
+        Integer,
+        ForeignKey("usuario.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True),
@@ -105,6 +115,7 @@ class ConjuntoAP(Base):
     )
 
     plano = relationship("Plano", back_populates="conjuntos_ap")
+    creado_por = relationship("Usuario")
     items = relationship(
         "ConjuntoAPItem",
         back_populates="conjunto",

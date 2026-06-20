@@ -1,0 +1,29 @@
+@startuml
+@startgantt
+title Sprint 2 — Planos en línea: importar + calibrar\n28 abr – 11 may 2026
+skinparam backgroundColor #FAFAFA
+scale 1.5
+Project starts 2026-04-28
+saturday are closed
+sunday are closed
+
+[Sp2-01..02 Modelo + Repository Plano] lasts 1 day
+[Sp2-03..04 Endpoints POST plano + PDF] lasts 2 days
+[Sp2-05..06 GET planos + Tests backend] lasts 2 days
+[Sp2-07..09 PlanoEditorPage Flutter] lasts 3 days
+[Sp2-08..09 file_picker + zoom/pan] lasts 2 days
+[Sp2-11..13 Endpoint calibración + Tests] lasts 2 days
+[Sp2-14..17 Modo calibración Flutter] lasts 3 days
+[Sp2-18..19 Bloqueo recalibración + Aceptación] lasts 1 day
+[R-4 Review + R-5 Retro] lasts 1 day
+
+[Sp2-03..04 Endpoints POST plano + PDF] starts at [Sp2-01..02 Modelo + Repository Plano]'s end
+[Sp2-05..06 GET planos + Tests backend] starts at [Sp2-03..04 Endpoints POST plano + PDF]'s end
+[Sp2-07..09 PlanoEditorPage Flutter] starts at [Sp2-05..06 GET planos + Tests backend]'s end
+[Sp2-08..09 file_picker + zoom/pan] starts at [Sp2-07..09 PlanoEditorPage Flutter]'s start
+[Sp2-11..13 Endpoint calibración + Tests] starts at [Sp2-05..06 GET planos + Tests backend]'s end
+[Sp2-14..17 Modo calibración Flutter] starts at [Sp2-11..13 Endpoint calibración + Tests]'s end
+[Sp2-18..19 Bloqueo recalibración + Aceptación] starts at [Sp2-14..17 Modo calibración Flutter]'s end
+[R-4 Review + R-5 Retro] starts at [Sp2-18..19 Bloqueo recalibración + Aceptación]'s end
+@endgantt
+@enduml

@@ -1,0 +1,59 @@
+classDiagram
+  class Empresa {
+    nombre
+    direccion
+    contacto
+  }
+  class Instalacion {
+    nombre
+    descripcion
+    planoPlanta
+  }
+  class PuntoDeAcceso {
+    identificador
+    marca
+    modelo
+    ubicacionFisica
+  }
+  class ZonaDeCobertura {
+    nombre
+    coordenadasPlano
+  }
+  class Medicion {
+    valorRSSI_dBm
+    frecuencia_GHz
+    fechaHora
+    coordenadaX
+    coordenadaY
+  }
+  class MapaDeCalor {
+    fechaGeneracion
+    algoritmoInterpolacion
+    imagenResultante
+  }
+  class Proyecto {
+    nombre
+    descripcion
+    fechaInicio
+    estado
+  }
+  class Tecnico {
+    nombre
+    apellido
+    rol
+  }
+  class ReporteDeAnalisis {
+    fechaEmision
+    recomendaciones
+    puntajeCobertura
+  }
+
+  Empresa "1" -- "1..*" Instalacion : tiene
+  Instalacion "1" -- "0..*" PuntoDeAcceso : alberga
+  Instalacion "1" -- "1..*" ZonaDeCobertura : se divide en
+  ZonaDeCobertura "1" -- "0..*" Medicion : contiene
+  Proyecto "1" -- "1..*" Medicion : agrupa
+  Proyecto "1" -- "1" MapaDeCalor : genera
+  MapaDeCalor "1" -- "1" ReporteDeAnalisis : sustenta
+  Tecnico "1" -- "1..*" Proyecto : ejecuta
+  Empresa "1" -- "1..*" Proyecto : solicita

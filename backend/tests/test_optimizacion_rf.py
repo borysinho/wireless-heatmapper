@@ -2,11 +2,16 @@
 
 import tempfile
 
+import pytest
+from fastapi import HTTPException
+
 from app.ai.modelo_propagacion import ModeloPropagacion
 from app.ai.optimizador_ap_service import OptimizadorAPService
 from app.api.v1.escenarios import generar_escenarios
 from app.api.v1.inventario_rf import crear_ap, obtener_inventario
 from app.core.config import settings
+from app.models.escenario import EscenarioOptimizado, RecomendacionAP
+from app.models.heatmap import ConjuntoAP, ConjuntoAPItem, MapaCalor
 from app.models.medicion import MedicionWifi
 from app.models.plano import Plano
 from app.models.proyecto import Proyecto
@@ -90,7 +95,7 @@ def test_propagacion_distingue_bandas_y_potencia():
     assert rssi_5_mayor_potencia > rssi_5
 
 
-def test_optimizador_dual_band_respeta_presupuesto_y_ap_fijo():
+def test_optimizador_dual_band_respeta_umbral_y_ap_fijo():
     puntos = [
         PuntoRSSI(i, x, y, -80)
         for i, (x, y) in enumerate(
@@ -104,13 +109,10 @@ def test_optimizador_dual_band_respeta_presupuesto_y_ap_fijo():
         alto_px=300,
         metros_por_pixel=0.1,
         max_aps=3,
-        presupuesto=150,
         banda="5",
         bandas=["2.4", "5"],
-        modelo_ap="AP de prueba",
-        costo_unitario=100,
         resolucion=16,
-        tipo_negocio="RED_EXISTENTE",
+        umbral_objetivo_dbm=-70,
         aps_existentes=[
             {
                 "id": 9,
@@ -123,7 +125,7 @@ def test_optimizador_dual_band_respeta_presupuesto_y_ap_fijo():
             }
         ],
     )
-    assert len(alternativas) == 1
+    assert len(alternativas) <= 3
     escenario = alternativas[0]
     assert set(escenario.mapas_por_banda) == {"2.4", "5"}
     assert escenario.recomendaciones[0]["coord_x"] == 55
@@ -177,7 +179,7 @@ def test_inventario_modela_ap_radio_y_bssid(db_session, tecnico_usuario):
 
 
 def test_generacion_persiste_proyecciones_sin_alterar_mediciones(
-    db_session, tecnico_usuario, monkeypatch
+    db_session, tecnico_usuario, admin_usuario, monkeypatch
 ):
     plano = _plano_con_mediciones(db_session, tecnico_usuario)
     originales = {
@@ -189,24 +191,140 @@ def test_generacion_persiste_proyecciones_sin_alterar_mediciones(
             proyecto_id=plano.proyecto_id,
             body=RestriccionesEscenarioIn(
                 max_aps=1,
-                presupuesto=200,
-                costo_unitario=100,
                 bandas=["2.4", "5"],
-                banda_preferida="5",
                 resolucion=32,
+                umbral_objetivo_dbm=-70,
+                fuente_entrada={
+                    "tipo": "SELECCION_APS_MAPA",
+                    "nombre": "Conjunto IA prueba",
+                    "proposito": "Validar APs detectados del mapa",
+                    "bssids": ["aa:bb:cc:dd:ee:24", "aa:bb:cc:dd:ee:50"],
+                },
             ),
             db=db_session,
-            current_user=tecnico_usuario,
+            current_user=admin_usuario,
         )
     escenario = respuesta.escenarios[0]
+    assert escenario.origen == "ia"
+    assert escenario.estado_gobernanza == "pendiente_revision"
+    assert escenario.generado_por_id == admin_usuario.id
     assert set(escenario.bandas) == {"2.4", "5"}
     assert set(escenario.mapas_por_banda) == {"2.4", "5"}
     assert set(escenario.mapas_actuales_por_banda) == {"2.4", "5"}
     assert escenario.mapas_actuales_por_banda["2.4"] is not None
     assert escenario.mapas_actuales_por_banda["5"] is not None
+    assert escenario.restricciones["fuente_entrada"]["nombre"] == "Conjunto IA prueba"
+    assert set(escenario.restricciones["fuente_entrada"]["bssids"]) == {
+        "aa:bb:cc:dd:ee:24",
+        "aa:bb:cc:dd:ee:50",
+    }
     assert len(escenario.recomendaciones[0].radios) == 2
     db_session.expire_all()
     assert {
         medicion.id: medicion.rssi for medicion in db_session.query(MedicionWifi).all()
     } == originales
     assert len(escenario.mapas_por_banda["5"]) == 32
+
+
+def test_generacion_desde_conjunto_existente_conserva_fuente_y_bssids(
+    db_session, tecnico_usuario, admin_usuario, monkeypatch
+):
+    plano = _plano_con_mediciones(db_session, tecnico_usuario)
+    conjunto = ConjuntoAP(
+        plano_id=plano.id,
+        nombre="Conjunto web 5 GHz",
+        proposito="Optimizar la cobertura de la banda de 5 GHz",
+        origen="manual_web",
+        estado_gobernanza="aprobado_interno",
+        creado_por_id=admin_usuario.id,
+    )
+    conjunto.items.append(
+        ConjuntoAPItem(
+            bssid="aa:bb:cc:dd:ee:50",
+            ssid_snapshot="Bulldog-5",
+            canal_snapshot=44,
+            rssi_promedio_snapshot=-70,
+        )
+    )
+    db_session.add(conjunto)
+    db_session.commit()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        monkeypatch.setattr(settings, "storage_root", tmp)
+        respuesta = generar_escenarios(
+            proyecto_id=plano.proyecto_id,
+            body=RestriccionesEscenarioIn(
+                max_aps=1,
+                bandas=["5"],
+                resolucion=32,
+                fuente_entrada={
+                    "tipo": "CONJUNTO_EXISTENTE",
+                    "conjunto_id": conjunto.id,
+                },
+            ),
+            db=db_session,
+            current_user=admin_usuario,
+        )
+
+    escenario = respuesta.escenarios[0]
+    assert escenario.conjunto_base_id == conjunto.id
+    assert escenario.restricciones["fuente_entrada"]["conjunto_id"] == conjunto.id
+    mapa_actual = (
+        db_session.query(MapaCalor).filter_by(id=escenario.mapa_actual_id).one()
+    )
+    assert mapa_actual.bssids_generacion == ["aa:bb:cc:dd:ee:50"]
+
+
+def test_admin_puede_borrar_permanentemente_escenarios_ia(
+    client,
+    db_session,
+    admin_token,
+    tecnico_usuario,
+    admin_usuario,
+    monkeypatch,
+):
+    plano = _plano_con_mediciones(db_session, tecnico_usuario)
+    with tempfile.TemporaryDirectory() as tmp:
+        monkeypatch.setattr(settings, "storage_root", tmp)
+        generar_escenarios(
+            proyecto_id=plano.proyecto_id,
+            body=RestriccionesEscenarioIn(
+                max_aps=2,
+                bandas=["5"],
+                resolucion=32,
+                umbral_objetivo_dbm=-70,
+                fuente_entrada={
+                    "tipo": "SELECCION_APS_MAPA",
+                    "nombre": "Lote para eliminar",
+                    "bssids": ["aa:bb:cc:dd:ee:50"],
+                },
+            ),
+            db=db_session,
+            current_user=admin_usuario,
+        )
+
+    assert db_session.query(EscenarioOptimizado).count() > 0
+    assert db_session.query(RecomendacionAP).count() > 0
+
+    respuesta = client.delete(
+        f"/proyectos/{plano.proyecto_id}/escenarios",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert respuesta.status_code == 200
+    assert respuesta.json()["eliminados"] > 0
+    db_session.expire_all()
+    assert db_session.query(EscenarioOptimizado).count() == 0
+    assert db_session.query(RecomendacionAP).count() == 0
+
+
+def test_tecnico_no_puede_generar_escenarios_ia(db_session, tecnico_usuario):
+    plano = _plano_con_mediciones(db_session, tecnico_usuario)
+    with pytest.raises(HTTPException) as exc:
+        generar_escenarios(
+            proyecto_id=plano.proyecto_id,
+            body=RestriccionesEscenarioIn(max_aps=1),
+            db=db_session,
+            current_user=tecnico_usuario,
+        )
+    assert exc.value.status_code == 403

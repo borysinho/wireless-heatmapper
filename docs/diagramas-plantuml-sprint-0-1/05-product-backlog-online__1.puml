@@ -1,0 +1,23 @@
+@startuml
+title Estado de las HU en el Product Backlog\nWireless HeatMapper (modalidad online)
+skinparam stateBackgroundColor #EBF5FB
+skinparam stateBorderColor #2980B9
+skinparam arrowColor #2980B9
+
+[*] --> PendienteEstimacion : PO crea HU
+state "Pendiente de Estimación" as PendienteEstimacion
+state "Estimada y Priorizada" as Estimada
+state "Seleccionada para Sprint" as Seleccionada
+state "En Desarrollo" as EnDesarrollo
+state "Done ✅" as Done
+state "Regresada ↩" as Regresada
+state "Eliminada / No aplica" as Eliminada
+
+PendienteEstimacion --> Estimada : Planning Poker
+Estimada --> Seleccionada : R-2 Sprint Planning
+Seleccionada --> EnDesarrollo : Dev toma la HU
+EnDesarrollo --> Done : Aceptada en R-4
+EnDesarrollo --> Regresada : Rechazada en R-4
+Regresada --> Estimada : Re-priorizar
+Estimada --> Eliminada : Decisión PO\n(p.ej. PB-14 en modalidad online)
+@enduml

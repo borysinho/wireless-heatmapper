@@ -1,0 +1,24 @@
+@startuml
+title Estados de la sesión de captura WiFi (móvil)
+skinparam stateBackgroundColor #EBF5FB
+skinparam stateBorderColor #2980B9
+skinparam arrowColor #2980B9
+
+[*] --> Inactiva
+state "Inactiva" as Inactiva
+state "Activa" as Activa
+state "Pausada (sin red)" as Pausada
+state "Throttling" as Throttling
+state "Enviando lote" as Enviando
+
+Inactiva --> Activa : iniciar captura\n(plano calibrado)
+Activa --> Throttling : 4 escaneos / 2 min alcanzados
+Throttling --> Activa : ventana liberada
+Activa --> Enviando : marcar punto
+Enviando --> Activa : 201 OK
+Enviando --> Pausada : red caída tras retries
+Activa --> Pausada : ConnectivityMonitor → red caída
+Pausada --> Activa : red restablecida + confirmación del técnico
+Activa --> Inactiva : detener captura
+Pausada --> Inactiva : detener captura
+@enduml

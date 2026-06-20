@@ -24,7 +24,11 @@
 
 > RP8 es transversal: además de PB-09/PB-01/PB-10 (HU principales del Sprint 1), se materializa en cada endpoint REST que persiste dominio en PostgreSQL desde el Sprint 1 en adelante.
 
-> **Refinamiento aprobado de RP5 (20-jun-2026):** el paquete [17 — Especificación de Optimización RF por Escenarios](17-especificacion-optimizacion-rf/00-indice.md) amplía PB-07/PB-12 para distinguir AP físico, radio y BSSID; recomendar configuración por banda; y proyectar valores sin modificar mediciones reales. No altera los identificadores ni la asignación de Sprint de esta matriz.
+> **Refinamiento aprobado de RP5 (20-jun-2026):** el paquete [17 — Especificación de Optimización RF por Escenarios](17-especificacion-optimizacion-rf/00-indice.md) amplía PB-07/PB-12 para distinguir AP físico, radio y BSSID; recomendar configuración por banda; y proyectar valores sin modificar mediciones reales. El ajuste de gobernanza móvil/web del 20-jun-2026 no altera los identificadores ni la asignación de Sprint de esta matriz.
+
+> **Refinamiento de gobernanza móvil/web:** el documento [18 — Reglas de Gobernanza para Conjuntos de APs, Heatmaps e IA](18-reglas-gobernanza-conjuntos-ap-heatmaps.md) aclara que el móvil puede crear conjuntos manuales y visualizar heatmaps operativos, mientras que la generación IA queda restringida a backend/web y el cliente solo accede a contenido publicado por enlace. Impacta PB-20, PB-05, PB-06, PB-07, PB-12, PB-08, PB-15, PB-16 y PB-17 sin crear nuevas HU ni renombrar RP.
+
+> **Refinamiento de asignaciones (20-jun-2026):** PB-18 amplía la supervisión a un ABM completo de proyectos y PB-09 incorpora el registro del dispositivo Android para avisar mediante FCM cuando el administrador crea o reasigna un proyecto. El token push se persiste en PostgreSQL como dato técnico de sesión; no introduce almacenamiento local de dominio ni modifica la asignación RP7/RP8.
 
 ---
 
@@ -48,9 +52,9 @@
 | PB-07 | Recomendaciones IA de APs                | S5     |  21 | RP5 | ✅ Implementada                 |
 | PB-12 | Comparar escenarios                      | S5     |   8 | RP5 | ✅ Implementada                 |
 | PB-08 | Exportar reporte PDF                     | S5     |  13 | RP6 | ✅ Implementada                 |
-| PB-15 | Generar enlace único para cliente        | S6     |   5 | RP9 | ⏳ Planificada                  |
-| PB-16 | Ver heatmap interactivo (web)            | S6     |  13 | RP9 | ⏳ Planificada                  |
-| PB-17 | Ver análisis y plan de APs (web)         | S6     |   8 | RP9 | ⏳ Planificada                  |
+| PB-15 | Generar enlace único para cliente        | S6     |   5 | RP9 | ✅ Implementada                 |
+| PB-16 | Ver heatmap interactivo (web)            | S6     |  13 | RP9 | ✅ Implementada                 |
+| PB-17 | Ver análisis y plan de APs (web)         | S6     |   8 | RP9 | ✅ Implementada                 |
 | PB-14 | Sincronizar mediciones offline → backend | —      |   — | —   | ❌ Eliminada (modalidad online) |
 
 **Total PHU activos:** 8 + 3 + 5 + 5 + 5 + 3 + 8 + 8 + 13 + 8 + 8 + 13 + 13 + 21 + 8 + 13 + 5 + 13 + 8 = **168 PHU** (19 HU activas)
@@ -69,7 +73,7 @@
 | S3     |                21 | PB-03, PB-04                             | RP1, RP2               | ✅ Implementado |
 | S4     |                34 | PB-20, PB-05, PB-06                      | RP3, RP4               | ✅ Implementado |
 | S5     |                42 | PB-07, PB-12, PB-08                      | RP5, RP6               | ✅ Implementado |
-| S6     |                26 | PB-15, PB-16, PB-17                      | RP9                    | ⏳ Planificado  |
+| S6     |                26 | PB-15, PB-16, PB-17                      | RP9                    | ✅ Implementado |
 | **Σ**  |           **168** | 19 HU activas                            | 9 / 9 RP               |                 |
 
 ---
@@ -127,8 +131,8 @@
 | Heatmap por APs de interés (BSSID; ubicación AP referencial; puntos de lectura como fuente de interpolación) | PB-20, PB-05, PB-06 | S4                   |
 | CCI / ACI (canales 2.4 GHz Δ ≤ 4)             | PB-06               | S4                   |
 | Solapamiento de áreas con RSSI ≥ −70 dBm      | PB-06               | S4                   |
-| Configuración y predicción separadas para 2,4/5 GHz | PB-07, PB-12 | S5 · implementada |
-| Medición observada inmutable vs valor proyectado | PB-07, PB-12 | S5 · implementada |
+| Configuración y predicción separadas para 2,4/5 GHz | PB-07, PB-12 | S5 · aprobado / ajuste gobernanza |
+| Medición observada inmutable vs valor proyectado | PB-07, PB-12 | S5 · aprobado / ajuste gobernanza |
 
 ---
 

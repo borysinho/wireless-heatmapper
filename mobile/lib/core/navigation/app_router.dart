@@ -7,8 +7,6 @@ import '../../features/auth/presentation/pages/splash_page.dart';
 import '../../features/captura/presentation/cubit/captura_cubit.dart';
 import '../../features/captura/presentation/pages/captura_page.dart';
 import '../../features/heatmap/presentation/cubit/heatmap_cubit.dart';
-import '../../features/heatmap/presentation/cubit/escenarios_cubit.dart';
-import '../../features/heatmap/presentation/pages/escenarios_page.dart';
 import '../../features/heatmap/presentation/pages/heatmap_page.dart';
 import '../../features/planos/domain/entities/plano.dart';
 import '../../features/planos/presentation/cubit/planos_cubit.dart';
@@ -117,18 +115,6 @@ class AppRouter {
               );
             },
             routes: [
-              GoRoute(
-                path: 'escenarios',
-                name: 'escenarios',
-                builder: (context, routeState) {
-                  final id =
-                      int.tryParse(routeState.pathParameters['id'] ?? '') ?? 0;
-                  return BlocProvider<EscenariosCubit>(
-                    create: (_) => sl<EscenariosCubit>(),
-                    child: EscenariosPage(proyectoId: id),
-                  );
-                },
-              ),
               // Sprint 2: PB-11 — Editor / Calibrar Escala.
               GoRoute(
                 path: 'planos/:planoId',

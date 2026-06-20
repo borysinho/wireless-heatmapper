@@ -43,15 +43,10 @@ class OptimizadorAPService:
         alto_px: int,
         metros_por_pixel: float,
         max_aps: int,
-        presupuesto: float | None,
         banda: str,
-        modelo_ap: str,
-        costo_unitario: float,
         resolucion: int,
+        umbral_objetivo_dbm: int = -70,
         bandas: list[str] | None = None,
-        tipo_negocio: str = "INSTALACION_NUEVA",
-        perfil: str = "COBERTURA_EQUILIBRADA",
-        politica_combinacion: str = "PREFERIR_5_GHZ_SI_CUMPLE_UMBRAL",
         aps_existentes: list[dict] | None = None,
     ) -> list[AlternativaOptimizada]:
         if not puntos_actuales:
@@ -61,12 +56,11 @@ class OptimizadorAPService:
         if banda not in bandas_objetivo:
             banda = "5" if "5" in bandas_objetivo else bandas_objetivo[0]
         cantidad_max = max(1, max_aps)
-        if presupuesto is not None:
-            cantidad_max = min(cantidad_max, max(0, int(presupuesto // costo_unitario)))
-        if cantidad_max < 1:
-            raise ValueError("El presupuesto no permite adquirir ningún AP.")
 
-        pct_actual = self._pct_cobertura(matriz_actual)
+        pct_actual = self._pct_cobertura(
+            matriz_actual,
+            umbral_objetivo_dbm=umbral_objetivo_dbm,
+        )
         candidatos = self._candidatos(
             puntos=puntos_actuales,
             ancho_px=ancho_px,
@@ -82,6 +76,7 @@ class OptimizadorAPService:
                 metros_por_pixel=metros_por_pixel,
                 banda=banda,
                 resolucion=resolucion,
+                umbral_objetivo_dbm=umbral_objetivo_dbm,
             )
             seleccionados = self._busqueda_local(
                 seleccionados=seleccionados,
@@ -90,6 +85,7 @@ class OptimizadorAPService:
                 metros_por_pixel=metros_por_pixel,
                 banda=banda,
                 resolucion=resolucion,
+                umbral_objetivo_dbm=umbral_objetivo_dbm,
             )
             for indice, ap in enumerate((aps_existentes or [])[: len(seleccionados)]):
                 if ap.get("restriccion_movimiento") == "FIJO":
@@ -106,39 +102,39 @@ class OptimizadorAPService:
                 for banda_actual in bandas_objetivo
             }
             matriz_proyectada = mapas_por_banda[banda]
-            pct = self._pct_cobertura(matriz_proyectada)
-            costo = round(cantidad * costo_unitario, 2)
+            pct = self._pct_cobertura(
+                matriz_proyectada,
+                umbral_objetivo_dbm=umbral_objetivo_dbm,
+            )
             recomendaciones = [
                 self._recomendacion(
                     orden=idx,
                     x=x,
                     y=y,
                     banda=banda,
-                    modelo_ap=modelo_ap,
-                    costo_unitario=costo_unitario,
                     puntos=puntos_actuales,
                     metros_por_pixel=metros_por_pixel,
                     bandas=bandas_objetivo,
-                    tipo_negocio=tipo_negocio,
+                    umbral_objetivo_dbm=umbral_objetivo_dbm,
                     ap_existente=(aps_existentes or [None] * cantidad)[idx - 1]
                     if idx <= len(aps_existentes or [])
                     else None,
                 )
                 for idx, (x, y) in enumerate(seleccionados, start=1)
             ]
-            costo = round(sum(item["costo_estimado"] for item in recomendaciones), 2)
             alternativas.append(
                 AlternativaOptimizada(
                     nombre=f"Alternativa {cantidad}",
                     banda=banda,
-                    modelo_ap=modelo_ap,
+                    modelo_ap="AP propuesto para cobertura",
                     pct_cobertura_actual=pct_actual,
                     pct_cobertura=pct,
-                    costo_estimado=costo,
+                    costo_estimado=0,
                     cantidad_aps=cantidad,
                     resumen=(
                         f"Con {cantidad} AP(s) de potencia ajustable en banda "
-                        f"{banda} GHz se proyecta {pct:.1f}% de cobertura >= -70 dBm."
+                        f"{banda} GHz se proyecta {pct:.1f}% de cobertura "
+                        f">= {umbral_objetivo_dbm} dBm."
                     ),
                     metricas={
                         "pct_cobertura_actual": pct_actual,
@@ -148,11 +144,13 @@ class OptimizadorAPService:
                             matriz_proyectada
                         ),
                         "pct_cobertura_por_banda": {
-                            key: self._pct_cobertura(value)
+                            key: self._pct_cobertura(
+                                value,
+                                umbral_objetivo_dbm=umbral_objetivo_dbm,
+                            )
                             for key, value in mapas_por_banda.items()
                         },
-                        "perfil": perfil,
-                        "politica_combinacion": politica_combinacion,
+                        "umbral_objetivo_dbm": umbral_objetivo_dbm,
                     },
                     recomendaciones=recomendaciones,
                     matriz=matriz_proyectada,
@@ -212,6 +210,7 @@ class OptimizadorAPService:
         metros_por_pixel: float,
         banda: str,
         resolucion: int,
+        umbral_objetivo_dbm: int,
     ) -> list[tuple[float, float]]:
         seleccionados: list[tuple[float, float]] = []
         restantes = candidatos[:]
@@ -226,7 +225,8 @@ class OptimizadorAPService:
                         metros_por_pixel=metros_por_pixel,
                         banda=banda,
                         resolucion=resolucion,
-                    )
+                    ),
+                    umbral_objetivo_dbm=umbral_objetivo_dbm,
                 ),
             )
             seleccionados.append(mejor)
@@ -242,6 +242,7 @@ class OptimizadorAPService:
         metros_por_pixel: float,
         banda: str,
         resolucion: int,
+        umbral_objetivo_dbm: int,
     ) -> list[tuple[float, float]]:
         paso = max(20.0, min(ancho_px, alto_px) * 0.08)
         actuales = seleccionados[:]
@@ -270,7 +271,8 @@ class OptimizadorAPService:
                         metros_por_pixel=metros_por_pixel,
                         banda=banda,
                         resolucion=resolucion,
-                    )
+                    ),
+                    umbral_objetivo_dbm=umbral_objetivo_dbm,
                 ),
             )
         return actuales
@@ -310,17 +312,14 @@ class OptimizadorAPService:
         x: float,
         y: float,
         banda: str,
-        modelo_ap: str,
-        costo_unitario: float,
         puntos: list[PuntoRSSI],
         metros_por_pixel: float,
         bandas: list[str],
-        tipo_negocio: str,
+        umbral_objetivo_dbm: int,
         ap_existente: dict | None,
     ) -> dict:
         if (
-            tipo_negocio == "RED_EXISTENTE"
-            and ap_existente
+            ap_existente
             and ap_existente.get("restriccion_movimiento") == "FIJO"
         ):
             x = float(ap_existente["coord_x"])
@@ -339,7 +338,7 @@ class OptimizadorAPService:
         ]
         accion = "AGREGAR"
         ap_fisico_id = None
-        if tipo_negocio == "RED_EXISTENTE" and ap_existente:
+        if ap_existente:
             ap_fisico_id = ap_existente.get("id")
             accion = (
                 "RECONFIGURAR"
@@ -358,8 +357,8 @@ class OptimizadorAPService:
             "tipo_montaje": str(ap_existente.get("tipo_montaje", "TECHO"))
             if ap_existente
             else "TECHO",
-            "modelo_ap": modelo_ap,
-            "costo_estimado": round(0 if accion != "AGREGAR" else costo_unitario, 2),
+            "modelo_ap": "AP propuesto para cobertura",
+            "costo_estimado": 0,
             "rssi_proyectado": rssi,
             "radios": radios,
             "justificacion": (
@@ -368,7 +367,8 @@ class OptimizadorAPService:
                 f"en una zona crítica a {distancia_m:.1f} m. Debe permitir "
                 f"regular potencia para evitar solapamiento excesivo, operar "
                 f"en banda {banda} GHz, usar antenas adecuadas al área y "
-                f"soportar gestión centralizada. Objetivo de diseño: >= -70 dBm."
+                f"soportar gestión centralizada. Objetivo de diseño: "
+                f">= {umbral_objetivo_dbm} dBm."
             ),
         }
 
@@ -437,11 +437,16 @@ class OptimizadorAPService:
                 )
         return valores
 
-    def _pct_cobertura(self, matriz: list[list[float]]) -> float:
+    def _pct_cobertura(
+        self,
+        matriz: list[list[float]],
+        *,
+        umbral_objetivo_dbm: int = -70,
+    ) -> float:
         valores = [valor for fila in matriz for valor in fila]
         if not valores:
             return 0.0
-        cubiertas = sum(1 for valor in valores if valor >= -70)
+        cubiertas = sum(1 for valor in valores if valor >= umbral_objetivo_dbm)
         return round(cubiertas * 100 / len(valores), 2)
 
     def _zonas_muertas(self, matriz: list[list[float]]) -> int:

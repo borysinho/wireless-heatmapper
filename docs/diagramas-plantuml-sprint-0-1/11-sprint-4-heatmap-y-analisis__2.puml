@@ -1,0 +1,45 @@
+@startuml
+title Componentes del módulo de Heatmap y Análisis (backend)
+skinparam componentBackgroundColor #EBF5FB
+skinparam componentBorderColor #2980B9
+skinparam interfaceBackgroundColor #FDFEFE
+skinparam arrowColor #2980B9
+
+[heatmap_router] as R
+[InterpolacionService] as IS
+[AnalisisCoberturaService] as ACS
+[ImageService] as IMG
+[MedicionRepository] as MR
+[MapaCalorRepository] as MCR
+[AnalisisRepository] as AR
+[APDetectadoRepository] as APR
+database "PostgreSQL" as DB
+
+R --> IS
+R --> ACS
+IS --> MR
+IS --> IMG
+IS --> MCR
+ACS --> MR
+ACS --> APR
+ACS --> AR
+MR --> DB
+MCR --> DB
+AR --> DB
+APR --> DB
+
+note bottom of IS
+  Algoritmos:
+  - IDW (default, scipy.interpolate)
+  - Kriging (pykrige) — opcional
+  Resolución configurable (64/128/256).
+end note
+
+note bottom of ACS
+  Análisis:
+  - Zona muerta: celdas con RSSI < −90 dBm
+  - CCI: APs en mismo canal con RSSI cercano
+  - ACI: APs en canales adyacentes (Δ ≤ 4 en 2.4 GHz)
+  - Solapamiento: intersección de áreas ≥ −70 dBm de 2+ APs
+end note
+@enduml

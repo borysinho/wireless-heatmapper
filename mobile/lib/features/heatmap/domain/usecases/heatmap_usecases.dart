@@ -2,7 +2,6 @@ import '../entities/analisis_cobertura.dart';
 import '../entities/ap_disponible.dart';
 import '../entities/ap_detectado.dart';
 import '../entities/conjunto_ap.dart';
-import '../entities/escenario_optimizado.dart';
 import '../entities/mapa_calor.dart';
 import '../repositories/heatmap_repository.dart';
 
@@ -157,77 +156,5 @@ class ConfirmarAPUseCase {
     required double posY,
   }) {
     return _repo.confirmarAP(apId: apId, posX: posX, posY: posY);
-  }
-}
-
-class GenerarEscenariosUseCase {
-  final HeatmapRepository _repo;
-  const GenerarEscenariosUseCase(this._repo);
-
-  Future<List<EscenarioOptimizado>> call({
-    required int proyectoId,
-    required int maxAps,
-    double? presupuesto,
-    required String bandaPreferida,
-    required List<String> bandas,
-    required String tipoNegocio,
-    required String perfil,
-    required String politicaCombinacion,
-    required String modeloAp,
-    required double costoUnitario,
-    int resolucion = 64,
-  }) {
-    return _repo.generarEscenarios(
-      proyectoId: proyectoId,
-      maxAps: maxAps,
-      presupuesto: presupuesto,
-      bandaPreferida: bandaPreferida,
-      bandas: bandas,
-      tipoNegocio: tipoNegocio,
-      perfil: perfil,
-      politicaCombinacion: politicaCombinacion,
-      modeloAp: modeloAp,
-      costoUnitario: costoUnitario,
-      resolucion: resolucion,
-    );
-  }
-}
-
-class CompararEscenarioUseCase {
-  final HeatmapRepository _repo;
-  const CompararEscenarioUseCase(this._repo);
-
-  Future<ComparacionEscenario> call(int escenarioId) {
-    return _repo.compararEscenario(escenarioId);
-  }
-}
-
-class CrearReporteUseCase {
-  final HeatmapRepository _repo;
-  const CrearReporteUseCase(this._repo);
-
-  Future<ReporteTecnico> call({
-    required int proyectoId,
-    int? escenarioId,
-  }) {
-    return _repo.crearReporte(
-      proyectoId: proyectoId,
-      escenarioId: escenarioId,
-    );
-  }
-}
-
-class DescargarReporteUseCase {
-  final HeatmapRepository _repo;
-  const DescargarReporteUseCase(this._repo);
-
-  Future<String> call({
-    required String urlDescarga,
-    required String rutaDestino,
-  }) {
-    return _repo.descargarReporte(
-      urlDescarga: urlDescarga,
-      rutaDestino: rutaDestino,
-    );
   }
 }

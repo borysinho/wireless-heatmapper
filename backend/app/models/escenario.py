@@ -41,6 +41,36 @@ class EscenarioOptimizado(Base):
         nullable=True,
         index=True,
     )
+    conjunto_base_id = Column(
+        Integer,
+        ForeignKey("conjunto_ap.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    origen = Column(String(30), nullable=False, default="ia")
+    estado_gobernanza = Column(
+        String(30), nullable=False, default="pendiente_revision", index=True
+    )
+    generado_por_id = Column(
+        Integer,
+        ForeignKey("usuario.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    aprobado_por_id = Column(
+        Integer,
+        ForeignKey("usuario.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    publicado_por_id = Column(
+        Integer,
+        ForeignKey("usuario.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    aprobado_at = Column(DateTime(timezone=True), nullable=True)
+    publicado_at = Column(DateTime(timezone=True), nullable=True)
     nombre = Column(String(120), nullable=False)
     tipo_negocio = Column(String(30), nullable=False, default="INSTALACION_NUEVA")
     perfil = Column(String(40), nullable=False, default="COBERTURA_EQUILIBRADA")

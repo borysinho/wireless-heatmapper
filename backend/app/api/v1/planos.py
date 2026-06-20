@@ -68,9 +68,13 @@ def _verificar_ownership(
     db: Session,
 ):
     repo = ProyectoRepository(db)
-    proyecto = repo.obtener_por_id(
-        proyecto_id=proyecto_id,
-        tecnico_id=current_user.id,
+    proyecto = (
+        repo.obtener_por_id_admin(proyecto_id=proyecto_id)
+        if current_user.rol == "admin"
+        else repo.obtener_por_id(
+            proyecto_id=proyecto_id,
+            tecnico_id=current_user.id,
+        )
     )
     if proyecto is None:
         raise HTTPException(

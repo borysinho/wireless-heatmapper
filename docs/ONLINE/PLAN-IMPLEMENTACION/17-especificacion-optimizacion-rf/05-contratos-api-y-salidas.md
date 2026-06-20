@@ -2,6 +2,13 @@
 
 Los contratos siguientes son conceptuales. Los nombres finales deberán mantener las convenciones del backend antes de implementar.
 
+Estos contratos se interpretan bajo la gobernanza del documento 18:
+
+- el inventario RF puede ser alimentado desde móvil o web según permisos del usuario;
+- la generación IA, comparación de escenarios proyectados y publicación se exponen solo a web admin o procesos backend autorizados;
+- el portal cliente consume únicamente contenido publicado explícitamente;
+- el móvil no debe invocar endpoints de generación IA ni recibir alternativas IA no aprobadas.
+
 ## 1. Inventario RF
 
 ```text
@@ -42,6 +49,8 @@ Respuesta resumida:
 POST /api/proyectos/{proyecto_id}/escenarios-rf
 ```
 
+Acceso permitido: web admin o proceso backend autorizado. No debe estar disponible para la app móvil.
+
 Solicitud conceptual:
 
 ```json
@@ -55,7 +64,25 @@ Solicitud conceptual:
   "maximoAps": 8,
   "presupuesto": 9500,
   "moneda": "BOB",
-  "requiereCoberturaSecundaria": true
+  "requiereCoberturaSecundaria": true,
+  "fuenteEntrada": {
+    "tipo": "SELECCION_APS_MAPA",
+    "apIds": [11, 12, 15],
+    "conjuntoId": null
+  }
+}
+```
+
+`fuenteEntrada` puede ser una selección directa de APs del mapa, un conjunto existente opcional, el inventario RF completo o el baseline observado. Un `conjuntoId` no es obligatorio.
+
+Respuesta conceptual mínima:
+
+```json
+{
+  "trabajoId": 91,
+  "estado": "PENDIENTE",
+  "origen": "ia",
+  "estadoGobernanza": "pendiente_revision"
 }
 ```
 
@@ -74,8 +101,11 @@ GET /api/trabajos-optimizacion/{trabajo_id}
 GET /api/escenarios-rf/{escenario_id}
 ```
 
+Acceso permitido: web admin o proceso backend autorizado. El portal cliente usa una vista pública filtrada cuando el escenario está publicado. El móvil no consume este detalle para alternativas IA.
+
 Debe incluir:
 
+- origen, estado de gobernanza, fuente de entrada y fechas de generación/aprobación/publicación;
 - factibilidad, perfil, versión del predictor y confianza;
 - APs propuestos y relación con APs existentes;
 - radios propuestas con banda, canal, ancho, potencia/EIRP y antena;
@@ -95,7 +125,9 @@ GET /api/escenarios-rf/{id}/mapas?tipo=DIFERENCIA&banda=5_GHZ
 
 Cada respuesta declara banda, política, resolución, escala, matriz RSSI, incertidumbre y radios dominantes.
 
-## 6. Valores proyectados en puntos reales
+Los mapas proyectados de origen IA no se devuelven al móvil. Para el portal cliente, solo se devuelven si el escenario o mapa fue publicado explícitamente.
+
+## 6. Valores proyectados en puntos del escenario
 
 ```text
 GET /api/escenarios-rf/{id}/puntos-proyectados?banda=5_GHZ
@@ -105,24 +137,28 @@ Ejemplo:
 
 ```json
 {
-  "puntoMedicionId": 501,
+  "puntoMedicionId": null,
+  "coordX": 184.5,
+  "coordY": 92.0,
   "banda": "5_GHZ",
-  "rssiObservadoDbm": -78.0,
+  "rssiObservadoDbm": null,
   "rssiProyectadoDbm": -66.0,
-  "diferenciaDb": 12.0,
+  "diferenciaDb": null,
   "radioPrimariaId": 301,
   "rssiSecundarioDbm": -70.0,
   "incertidumbreDb": 4.2
 }
 ```
 
-La ausencia de un valor observado se representa con `null`; nunca se inventa un baseline para una instalación nueva.
+La ausencia de un valor observado se representa con `null`; nunca se inventa un baseline para una instalación nueva. Los puntos generados por IA, sus coordenadas y sus lecturas proyectadas pertenecen al escenario y no modifican puntos ni mediciones reales.
 
 ## 7. Comparación PB-12
 
 ```text
 GET /api/escenarios-rf/{id}/comparacion
 ```
+
+Acceso permitido: web admin o proceso backend autorizado. El móvil no compara escenarios IA. El portal cliente visualiza únicamente comparaciones publicadas.
 
 La respuesta ofrece, por banda:
 
@@ -133,12 +169,34 @@ La respuesta ofrece, por banda:
 - puntos con mayor mejora y mayor riesgo;
 - advertencia de que proyectado no equivale a medido.
 
-## 8. Errores relevantes
+## 8. Gobernanza y publicación
+
+Contratos conceptuales para aprobación/publicación:
+
+```text
+PATCH /api/escenarios-rf/{id}/estado
+POST  /api/proyectos/{proyecto_id}/publicaciones-cliente
+PATCH /api/publicaciones-cliente/{id}
+GET   /api/portal/{token}
+```
+
+Estados mínimos:
+
+| Estado               | Uso                                                                              |
+| -------------------- | -------------------------------------------------------------------------------- |
+| `pendiente_revision` | Resultado IA interno; no visible para móvil ni cliente                           |
+| `aprobado_interno`   | Validado por Bulldog Tech.; todavía no visible para cliente                      |
+| `publicado_cliente`  | Disponible en el portal cliente según el enlace y selección de contenido         |
+| `descartado`         | Conservado para auditoría, sin uso como resultado vigente                        |
+
+La publicación selecciona explícitamente conjuntos, heatmaps, análisis, alternativas IA y reportes. No publica el proyecto completo por defecto.
+
+## 9. Errores relevantes
 
 | Código | Caso                                                                  |
 | ------ | --------------------------------------------------------------------- |
-| 409    | Se intenta optimizar mientras cambió el baseline/inventario           |
+| 403    | Usuario/canal no autorizado para generar, comparar o publicar IA      |
+| 409    | Se intenta optimizar mientras cambió la fuente de entrada, baseline o inventario |
 | 422    | Entrada inválida o combinación de banda/canal/modelo no soportada      |
 | 424    | Faltan datos obligatorios para producir un escenario defendible       |
 | 503    | Predictor requerido no disponible; se informa si existe fallback físico |
-

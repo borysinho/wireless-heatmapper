@@ -1,0 +1,38 @@
+@startuml
+title HU del Sprint 1 — Wireless HeatMapper (modalidad online)
+skinparam usecaseBackgroundColor #EBF5FB
+skinparam usecaseBorderColor #2980B9
+skinparam actorBackgroundColor #EBF5FB
+skinparam actorBorderColor #2980B9
+skinparam arrowColor #5D6D7E
+skinparam noteBackgroundColor #FFFDE7
+
+actor "Administrador" as admin
+actor "Técnico\nde Campo" as tech
+
+usecase "PB-13\nGestionar Usuarios\n(panel web)" as UC_USR
+usecase "PB-19\nGestionar Clientes\n(panel web)" as UC_CLI
+usecase "PB-09\nAutenticar Usuario\n(móvil contra backend)" as UC_AUTH
+usecase "PB-18\nVer Proyectos de\nla Organización" as UC_ORG
+usecase "PB-01\nGestionar Proyecto\n(móvil — CRUD)" as UC_PROY
+usecase "PB-10\nVer Historial\nde Proyectos" as UC_HIST
+
+admin --> UC_USR
+admin --> UC_CLI
+admin --> UC_ORG
+tech --> UC_AUTH
+tech --> UC_PROY
+tech --> UC_HIST
+
+UC_AUTH ..> UC_USR : <<requires>>\n(prerrequisito: cuenta creada)
+UC_ORG ..> UC_USR : <<requires>>\n(usuarios listados)
+UC_PROY ..> UC_AUTH : <<requires>>\n(sesión activa)
+UC_PROY ..> UC_CLI : <<uses>>\n(selector de cliente)
+UC_HIST ..> UC_PROY : <<extends>>\n(listado y búsqueda)
+
+note bottom of UC_USR
+  Sin cuentas pre-aprovisionadas
+  no es posible iniciar sesión
+  desde la app móvil (RP7).
+end note
+@enduml

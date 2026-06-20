@@ -19,8 +19,10 @@ from app.api.v1 import (
     heatmaps,
     inventario_rf,
     mediciones,
+    notificaciones,
     planos,
     proyectos,
+    share,
 )
 
 api_router = APIRouter()
@@ -29,6 +31,7 @@ api_router.include_router(admin_usuarios.router)
 api_router.include_router(admin_proyectos.router)
 api_router.include_router(clientes.router)
 api_router.include_router(proyectos.router)
+api_router.include_router(notificaciones.router)
 api_router.include_router(planos.router_proyectos)
 api_router.include_router(planos.router_planos)
 api_router.include_router(mediciones.router_mediciones)
@@ -42,3 +45,4 @@ api_router.include_router(inventario_rf.router)
 api_router.include_router(escenarios.router_proyectos_escenarios)
 api_router.include_router(escenarios.router_escenarios)
 api_router.include_router(escenarios.router_reportes)
+api_router.include_router(share.router)

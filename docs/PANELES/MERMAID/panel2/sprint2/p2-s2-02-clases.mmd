@@ -1,0 +1,18 @@
+classDiagram
+  class Proyecto {
+    id entero
+    nombre texto
+    cliente texto
+    estado texto
+  }
+  class Plano {
+    id entero
+    nombre_archivo texto
+    formato texto
+    ancho_px entero
+    alto_px entero
+    escala_m_por_px decimal
+  }
+
+  Proyecto "1" -- "0..*" Plano : contiene
+  note for Plano "Un plano puede existir sin calibración. La escala se define luego de importar y validar una distancia real."

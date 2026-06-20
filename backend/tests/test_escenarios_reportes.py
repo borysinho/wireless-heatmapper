@@ -38,11 +38,9 @@ def test_optimizador_edificio_en_u_propone_aps_en_extremos():
         alto_px=300,
         metros_por_pixel=0.1,
         max_aps=2,
-        presupuesto=300,
         banda="5",
-        modelo_ap="AP empresarial de potencia ajustable",
-        costo_unitario=120,
         resolucion=32,
+        umbral_objetivo_dbm=-70,
     )
 
     assert escenarios

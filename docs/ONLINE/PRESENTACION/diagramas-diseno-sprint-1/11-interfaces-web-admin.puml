@@ -1,0 +1,75 @@
+' ============================================================
+' SECCIÓN DEL DOCUMENTO: § 8. R-3 — Ejecución del Sprint 1 › § 8.2 Diseño de Interfaces — Pantallas Panel Admin Web
+' Archivo: docs/ONLINE/PRESENTACION/presentacion-scrum-s0-s1.md
+' Perspectiva de diseño: (d) Diseño de Interfaces — Panel Admin Web React + TypeScript (Sprint 1)
+' ============================================================
+
+@startuml
+title Diseño de Interfaces — Pantallas Panel Admin Web (Sprint 1)\nWireless HeatMapper — React + TypeScript + Vite (modalidad 100 % en línea)
+skinparam componentBackgroundColor #EBF5FB
+skinparam componentBorderColor #2980B9
+skinparam packageBackgroundColor #FDFEFE
+skinparam packageBorderColor #BDC3C7
+skinparam arrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+
+' ─── Punto de entrada ────────────────────────────────────────
+package "Punto de Entrada (ruta /admin/login)" as P_LOGIN {
+  component "LoginAdmin.tsx\n─────────────────\n· Layout centrado, tarjeta de login\n· Campo email + contraseña\n· Botón «Iniciar sesión»\n· react-hook-form con validación inline\n· Error 401/403 como alerta roja\n· POST /api/auth/login (rol ADMIN)" as C_LOGIN
+}
+
+' ─── Layout compartido ───────────────────────────────────────
+package "AdminLayout.tsx (PB-13, PB-18, PB-19)" as P_LAYOUT {
+  component "AdminLayout.tsx\n─────────────────\n· Sidebar izquierdo con navegación:\n  · «Usuarios» → /admin/usuarios\n  · «Clientes» → /admin/clientes\n  · «Proyectos» → /admin/proyectos\n· Header con nombre del admin + «Cerrar sesión»\n· Área de contenido principal (children)" as C_LAYOUT
+}
+
+' ─── Pantallas del panel ─────────────────────────────────────
+package "GestionUsuarios.tsx (PB-13 — ruta /admin/usuarios)" as P_USR {
+  component "Tabla de usuarios\n─────────────────\n· Columnas: Nombre · Email · Rol · Estado · Acciones\n· Badge ACTIVO (verde) / INACTIVO (rojo)\n· Toggle activo/inactivo con confirmación\n· Búsqueda por nombre o email\n· Paginación (20 ítems/página)" as C_USR_TABLE
+
+  component "Modal «Nuevo técnico»\n─────────────────\n· Campo Nombre completo (requerido)\n· Campo Email (requerido, validado)\n· Campo Contraseña inicial (≥ 8 chars)\n· Selector Rol (TECNICO por defecto)\n· Botón «Crear» / «Cancelar»\n· Error 409 «Email ya registrado»" as C_USR_MODAL
+}
+
+package "GestionClientes.tsx (PB-19 — ruta /admin/clientes)" as P_CLI {
+  component "Tabla de clientes\n─────────────────\n· Columnas: Nombre · Estado · Acciones\n· Badge ACTIVO (verde) / INACTIVO (gris)\n· Toggle activo/inactivo\n· GET /api/clientes (todo usuario autenticado)" as C_CLI_TABLE
+
+  component "Modal «Nuevo cliente»\n─────────────────\n· Campo Nombre (requerido, único)\n· Botón «Crear» / «Cancelar»\n· Error 409 «Nombre ya existe»" as C_CLI_MODAL
+}
+
+package "ListadoProyectosOrg.tsx (PB-18 — ruta /admin/proyectos)" as P_PROY {
+  component "Tabla de proyectos de la organización\n─────────────────\n· Columnas: Nombre · Técnico · Cliente · Estado\n          · Última actividad · Puntos\n· Filtro por técnico (select)\n· Filtro por estado (select)\n· Filtro por rango de fechas\n· Paginación (20 ítems/página)\n· Orden: última actividad DESC\n· GET /api/admin/proyectos (solo rol ADMIN)" as C_PROY_TABLE
+}
+
+' ─── Flujo de navegación ─────────────────────────────────────
+C_LOGIN -down-> C_LAYOUT : autenticación exitosa\n→ redirige a /admin/usuarios
+C_LAYOUT -right-> C_USR_TABLE : sidebar → «Usuarios»
+C_LAYOUT -down-> C_CLI_TABLE : sidebar → «Clientes»
+C_LAYOUT -left-> C_PROY_TABLE : sidebar → «Proyectos»
+C_USR_TABLE -down-> C_USR_MODAL : botón «+ Nuevo técnico»
+C_CLI_TABLE -down-> C_CLI_MODAL : botón «+ Nuevo cliente»
+
+note right of P_LAYOUT
+  Rutas protegidas: redirigen
+  a /admin/login si no hay
+  token de ADMIN en sessionStorage.
+  React Router v6 + PrivateRoute.
+end note
+
+note bottom of P_USR
+  TanStack Query:
+  · useQuery(['usuarios']) para la tabla
+  · useMutation para crear/actualizar
+  · invalidateQueries tras mutación exitosa
+  Tokens de diseño CSS Modules:
+  --color-primary: #2980B9
+  --color-bg: #EBF5FB
+  Tipografía: Poppins (encabezados) + Inter (cuerpo)
+end note
+
+note bottom of P_PROY
+  Solo el rol ADMIN accede a esta ruta.
+  Si un TECNICO intenta acceder → 403.
+  Estado vacío: «No hay proyectos registrados aún».
+  Rendimiento objetivo: p95 ≤ 1.5 s con 100 proyectos.
+end note
+@enduml

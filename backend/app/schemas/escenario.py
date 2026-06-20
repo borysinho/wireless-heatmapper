@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.schemas.heatmap import MapaCalorOut
 
@@ -15,28 +15,36 @@ AccionRecomendacion = Literal[
 ]
 
 
-class RestriccionesEscenarioIn(BaseModel):
-    max_aps: int = Field(default=3, ge=1, le=5)
-    presupuesto: float | None = Field(default=None, gt=0)
-    banda_preferida: BandaWifi = "5"
-    bandas: list[BandaWifi] = Field(default_factory=lambda: ["2.4", "5"], min_length=1)
-    tipo_negocio: Literal["INSTALACION_NUEVA", "RED_EXISTENTE"] = "INSTALACION_NUEVA"
-    perfil: Literal[
-        "COBERTURA_EQUILIBRADA", "PRIORIZAR_5_GHZ", "MENOR_COSTO_CAMBIOS"
-    ] = "COBERTURA_EQUILIBRADA"
-    politica_combinacion: Literal[
-        "MEJOR_BANDA_COMPATIBLE", "PREFERIR_5_GHZ_SI_CUMPLE_UMBRAL", "SOLO_DUAL_BAND"
-    ] = "PREFERIR_5_GHZ_SI_CUMPLE_UMBRAL"
-    modelo_ap: str = Field(
-        default="AP WiFi 6 Bulldog BT-AX1800", min_length=3, max_length=120
-    )
-    costo_unitario: float = Field(default=120.0, gt=0)
-    resolucion: int = Field(default=64, ge=32, le=128)
+class FuenteEntradaEscenarioIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
 
-    @field_validator("modelo_ap")
+    tipo: Literal[
+        "SELECCION_APS_MAPA",
+        "INVENTARIO_RF",
+        "BASELINE_OBSERVADO",
+        "CONJUNTO_EXISTENTE",
+    ] = "SELECCION_APS_MAPA"
+    nombre: str | None = Field(default=None, max_length=100)
+    proposito: str | None = Field(default=None, max_length=255)
+    ap_ids: list[int] = Field(default_factory=list)
+    bssids: list[str] = Field(default_factory=list)
+    conjunto_id: int | None = Field(default=None, gt=0)
+
+    @field_validator("bssids")
     @classmethod
-    def limpiar_modelo(cls, value: str) -> str:
-        return value.strip()
+    def normalizar_bssids(cls, value: list[str]) -> list[str]:
+        return [item.strip().lower() for item in value if item.strip()]
+
+
+class RestriccionesEscenarioIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    plano_id: int | None = Field(default=None, gt=0)
+    fuente_entrada: FuenteEntradaEscenarioIn | None = None
+    max_aps: int = Field(default=3, ge=1, le=5)
+    bandas: list[BandaWifi] = Field(default_factory=lambda: ["2.4", "5"], min_length=1)
+    umbral_objetivo_dbm: int = Field(default=-70, ge=-90, le=-50)
+    resolucion: int = Field(default=64, ge=32, le=128)
 
 
 class RecomendacionAPOut(BaseModel):
@@ -63,6 +71,14 @@ class EscenarioOptimizadoOut(BaseModel):
     plano_id: int
     mapa_actual_id: int | None
     mapa_proyectado_id: int | None
+    conjunto_base_id: int | None
+    origen: str
+    estado_gobernanza: str
+    generado_por_id: int | None
+    aprobado_por_id: int | None
+    publicado_por_id: int | None
+    aprobado_at: datetime | None
+    publicado_at: datetime | None
     nombre: str
     tipo_negocio: str
     perfil: str
@@ -90,6 +106,15 @@ class EscenarioOptimizadoOut(BaseModel):
 
 class EscenariosGeneradosOut(BaseModel):
     escenarios: list[EscenarioOptimizadoOut]
+
+
+class CambiarEstadoEscenarioIn(BaseModel):
+    estado_gobernanza: Literal[
+        "pendiente_revision",
+        "aprobado_interno",
+        "publicado_cliente",
+        "descartado",
+    ]
 
 
 class ResumenComparacionOut(BaseModel):

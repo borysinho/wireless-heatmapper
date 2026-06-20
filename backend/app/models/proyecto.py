@@ -67,3 +67,8 @@ class Proyecto(Base):
         back_populates="proyecto",
         cascade="save-update, merge",
     )
+    enlaces_cliente = relationship(
+        "TokenEnlaceCliente",
+        back_populates="proyecto",
+        cascade="all, delete-orphan",
+    )

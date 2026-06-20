@@ -44,6 +44,7 @@ Este directorio contiene la documentación operativa del proceso Scrum aplicado 
 | 15  | [15-gestion-riesgos.md](15-gestion-riesgos.md)                                       | Riesgos del plan de implementación y plan de mitigación por sprint                      |
 | 16  | [16-plan-validacion-sprint-1.md](16-plan-validacion-sprint-1.md)                     | Plan de validación exhaustivo del Sprint 1: tests, DoD, brechas y pruebas de aceptación |
 | 17  | [17-especificacion-optimizacion-rf/](17-especificacion-optimizacion-rf/00-indice.md) | Especificación aprobada: optimización por AP físico/radio, 2,4/5 GHz y escenarios RF   |
+| 18  | [18-reglas-gobernanza-conjuntos-ap-heatmaps.md](18-reglas-gobernanza-conjuntos-ap-heatmaps.md) | Reglas de gobernanza móvil/web para conjuntos de APs, heatmaps, IA y publicación al cliente |
 
 ---
 
@@ -82,6 +83,8 @@ Este directorio contiene la documentación operativa del proceso Scrum aplicado 
 - **RP9 — Portal de cliente:** Sprint 6 (PB-15, PB-16, PB-17)
 
 Detalle completo en [14-trazabilidad-rp-hu.md](14-trazabilidad-rp-hu.md).
+
+> **Nota de gobernanza móvil/web:** las reglas para conjuntos manuales en móvil, heatmaps operativos, IA restringida a backend/web y publicación por enlace están registradas en [18-reglas-gobernanza-conjuntos-ap-heatmaps.md](18-reglas-gobernanza-conjuntos-ap-heatmaps.md).
 
 ---
 

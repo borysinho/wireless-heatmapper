@@ -1,0 +1,35 @@
+---
+title: Diseño de datos — tabla plano (Sprint 2)
+---
+erDiagram
+    proyecto {
+        bigint  id              PK
+        bigint  tecnico_id      FK
+        bigint  cliente_id      FK
+        varchar nombre
+        varchar estado
+    }
+
+    plano {
+        bigint  id              PK
+        bigint  proyecto_id     FK
+        varchar nombre
+        varchar ruta_archivo
+        varchar formato
+        double  escala_m_por_px
+        integer ancho_px
+        integer alto_px
+        boolean calibrado
+    }
+
+    punto_medicion {
+        bigint      id          PK
+        bigint      plano_id    FK
+        double      coord_x
+        double      coord_y
+        timestamptz ts
+        varchar     nota
+    }
+
+    proyecto    ||--o{ plano          : "tiene (1..N)"
+    plano       ||--o{ punto_medicion : "requerido en Sprint 3"

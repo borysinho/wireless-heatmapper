@@ -1,0 +1,60 @@
+flowchart TB
+  subgraph SG_MOBILE["App Movil Flutter/Dart"]
+    subgraph SG_MOBILE_PRESENTATION["presentation"]
+      M_SCREENS["screens"]
+      M_WIDGETS["widgets"]
+      M_BLOCS["blocs"]
+    end
+    subgraph SG_MOBILE_DOMAIN["domain"]
+      M_ENTITIES["entities"]
+      M_USE_CASES["use_cases"]
+      M_REPOSITORIES["repositories"]
+    end
+    subgraph SG_MOBILE_DATA["data"]
+      M_DATASOURCES["datasources"]
+      M_MODELS["models"]
+      M_REPOSITORIES_IMPL["repositories_impl"]
+    end
+  end
+
+  subgraph SG_BACKEND["Backend FastAPI/Python"]
+    subgraph SG_BACKEND_API["api"]
+      B_ROUTERS["routers"]
+      B_SCHEMAS["schemas"]
+      B_DEPENDENCIES["dependencies"]
+    end
+    subgraph SG_BACKEND_DOMAIN["domain"]
+      B_MODELS["models"]
+      B_SERVICES["services"]
+    end
+    subgraph SG_BACKEND_INFRA["infrastructure"]
+      B_DATABASE["database"]
+      B_REPOSITORIES["repositories"]
+      B_IA_MODULE["ia_module"]
+    end
+  end
+
+  subgraph SG_WEB["Web Admin React/TypeScript"]
+    subgraph SG_WEB_PAGES["pages"]
+      W_ADMIN["admin"]
+      W_AUTH["auth"]
+      W_CLIENT["client"]
+    end
+    subgraph SG_WEB_COMPONENTS["components"]
+      W_SHARED["shared"]
+      W_HEATMAP["heatmap"]
+    end
+    subgraph SG_WEB_SERVICES["services"]
+      W_API_CLIENT["api_client"]
+      W_STATE["state"]
+    end
+  end
+
+  subgraph SG_DB["Base de Datos PostgreSQL 15"]
+    DB_TABLAS["tablas"]
+    DB_MIGRACIONES["migraciones"]
+  end
+
+  SG_MOBILE -- "REST/HTTPS via Dio" --> SG_BACKEND
+  SG_WEB -- "REST/HTTPS via Axios" --> SG_BACKEND
+  SG_BACKEND -- "SQLAlchemy/ORM" --> SG_DB

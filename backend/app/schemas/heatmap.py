@@ -13,6 +13,14 @@ from pydantic import BaseModel, Field
 AlgoritmoHeatmap = Literal["IDW", "KRIGING"]
 ResolucionHeatmap = Literal[64, 128, 256]
 ModoGeneracionHeatmap = Literal["INDIVIDUAL", "SUBCONJUNTO", "CONJUNTO_COMPLETO"]
+EstadoGobernanzaConjunto = Literal[
+    "borrador_tecnico",
+    "preliminar",
+    "pendiente_revision",
+    "aprobado_interno",
+    "publicado_cliente",
+    "descartado",
+]
 
 
 class EscalaHeatmapItem(BaseModel):
@@ -45,6 +53,7 @@ class MapaCalorOut(BaseModel):
     id: int
     plano_id: int
     conjunto_ap_id: int | None = None
+    analisis_id: int | None = None
     modo_generacion: str = "SUBCONJUNTO"
     algoritmo: str
     resolucion: int
@@ -112,6 +121,7 @@ class ConjuntoAPActualizarIn(BaseModel):
     descripcion: str | None = Field(default=None, max_length=1000)
     es_principal: bool | None = None
     bssids: list[str] | None = Field(default=None, min_length=1)
+    estado_gobernanza: EstadoGobernanzaConjunto | None = None
 
 
 class ConjuntoAPOut(BaseModel):
@@ -121,6 +131,9 @@ class ConjuntoAPOut(BaseModel):
     proposito: str
     descripcion: str | None
     es_principal: bool
+    origen: str
+    estado_gobernanza: str
+    creado_por_id: int | None
     cantidad_aps: int
     items: list[ConjuntoAPItemOut]
     created_at: datetime

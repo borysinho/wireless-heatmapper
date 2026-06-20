@@ -1,0 +1,37 @@
+@startuml
+title Diseño de navegación — App Móvil Flutter (Sprint 1)
+skinparam activityBackgroundColor #EBF5FB
+skinparam activityBorderColor #2980B9
+skinparam arrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+
+start
+:Splash — verificar token en SecureStorage;
+if (¿token válido?) then (sí)
+  :ProyectosPage;
+  note right: Tab activos / archivados\nBúsqueda en tiempo real
+else (no)
+  :LoginPage;
+  note right: Banner rojo si sin conexión\nBotón deshabilitado sin red
+endif
+
+:LoginPage;
+if (credenciales OK — 200) then (sí)
+  :Guardar tokens en SecureStorage;
+  :ProyectosPage;
+else (no)
+  :mostrar error inline;
+endif
+
+:ProyectosPage;
+if (acción del usuario) then (crear / editar)
+  :ProyectoFormPage;
+  :POST /api/proyectos o PUT /api/proyectos/{id};
+  :volver a ProyectosPage;
+else (logout)
+  :POST /api/auth/logout;
+  :limpiar SecureStorage;
+  :LoginPage;
+endif
+stop
+@enduml

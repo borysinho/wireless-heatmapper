@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:get_it/get_it.dart';
 import 'app.dart';
 import 'core/network/connectivity_monitor.dart';
 import 'core/network/dio_client.dart';
 import 'core/navigation/app_router.dart';
+import 'core/notifications/servicio_notificaciones_push.dart';
+import 'firebase_options.dart';
 
 // PB-09: Autenticación
 import 'features/auth/data/datasources/auth_remote_datasource.dart';
@@ -47,7 +52,6 @@ import 'features/heatmap/data/repositories/heatmap_repository_impl.dart';
 import 'features/heatmap/domain/repositories/heatmap_repository.dart';
 import 'features/heatmap/domain/usecases/heatmap_usecases.dart';
 import 'features/heatmap/presentation/cubit/heatmap_cubit.dart';
-import 'features/heatmap/presentation/cubit/escenarios_cubit.dart';
 import 'features/planos/data/repositories/plano_repository_impl.dart';
 import 'features/planos/domain/repositories/plano_repository.dart';
 import 'features/planos/domain/usecases/plano_usecases.dart';
@@ -57,11 +61,24 @@ final GetIt sl = GetIt.instance;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   _initDependencias();
+
+  final notificaciones = sl<ServicioNotificacionesPush>();
+  notificaciones.alAbrirProyecto = (proyectoId, proyectoNombre) {
+    AppRouter.router.go(
+      '/proyectos/$proyectoId',
+      extra: {'proyectoNombre': proyectoNombre},
+    );
+  };
+  await notificaciones.inicializar();
 
   // Sp1-19: cuando el AuthInterceptor detecta que la sesión expiró,
   // redirige al usuario a la pantalla de login.
   DioClient.onSessionExpired = () {
+    unawaited(sl<ServicioNotificacionesPush>().invalidarTokenLocal());
     AppRouter.router.go('/login');
   };
 
@@ -82,6 +99,9 @@ void _initDependencias() {
   sl.registerLazySingleton<Connectivity>(() => Connectivity());
   sl.registerLazySingleton<ConnectivityMonitor>(
     () => ConnectivityMonitor(sl<Connectivity>()),
+  );
+  sl.registerLazySingleton<ServicioNotificacionesPush>(
+    () => ServicioNotificacionesPush(sl<Dio>()),
   );
 
   // PB-09: Autenticación ─────────────────────────────────────────────────────
@@ -112,6 +132,7 @@ void _initDependencias() {
       logoutUseCase: sl<LogoutUseCase>(),
       getUsuarioActivoUseCase: sl<GetUsuarioActivoUseCase>(),
       connectivityMonitor: sl<ConnectivityMonitor>(),
+      notificacionesPush: sl<ServicioNotificacionesPush>(),
     ),
   );
 
@@ -238,18 +259,6 @@ void _initDependencias() {
   sl.registerFactory<ConfirmarAPUseCase>(
     () => ConfirmarAPUseCase(sl<HeatmapRepository>()),
   );
-  sl.registerFactory<GenerarEscenariosUseCase>(
-    () => GenerarEscenariosUseCase(sl<HeatmapRepository>()),
-  );
-  sl.registerFactory<CompararEscenarioUseCase>(
-    () => CompararEscenarioUseCase(sl<HeatmapRepository>()),
-  );
-  sl.registerFactory<CrearReporteUseCase>(
-    () => CrearReporteUseCase(sl<HeatmapRepository>()),
-  );
-  sl.registerFactory<DescargarReporteUseCase>(
-    () => DescargarReporteUseCase(sl<HeatmapRepository>()),
-  );
   sl.registerFactory<HeatmapCubit>(
     () => HeatmapCubit(
       listarAPs: sl<ListarAPsDisponiblesUseCase>(),
@@ -262,15 +271,6 @@ void _initDependencias() {
       actualizarUbicacionAPConjunto: sl<ActualizarUbicacionAPConjuntoUseCase>(),
       analizarMapa: sl<AnalizarMapaUseCase>(),
       confirmarAP: sl<ConfirmarAPUseCase>(),
-    ),
-  );
-  sl.registerFactory<EscenariosCubit>(
-    () => EscenariosCubit(
-      generar: sl<GenerarEscenariosUseCase>(),
-      comparar: sl<CompararEscenarioUseCase>(),
-      crearReporte: sl<CrearReporteUseCase>(),
-      descargarReporte: sl<DescargarReporteUseCase>(),
-      repositorio: sl<HeatmapRepository>(),
     ),
   );
 }

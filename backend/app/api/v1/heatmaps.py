@@ -26,15 +26,15 @@ from app.repositories.medicion_repository import MedicionRepository
 from app.repositories.plano_repository import PlanoRepository
 from app.repositories.proyecto_repository import ProyectoRepository
 from app.schemas.heatmap import (
+    ActualizarUbicacionAPConjuntoIn,
     AnalisisCoberturaOut,
     APDetectadoOut,
     APDisponibleOut,
-    ActualizarUbicacionAPConjuntoIn,
+    ConfirmarAPIn,
     ConjuntoAPActualizarIn,
     ConjuntoAPCrearIn,
     ConjuntoAPItemOut,
     ConjuntoAPOut,
-    ConfirmarAPIn,
     GenerarHeatmapConjuntoIn,
     MapaCalorOut,
     PuntoLecturaHeatmapOut,
@@ -80,9 +80,14 @@ def _verificar_ownership_plano(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Plano no encontrado.",
         )
-    proyecto = ProyectoRepository(db).obtener_por_id(
-        proyecto_id=plano.proyecto_id,
-        tecnico_id=current_user.id,
+    proyecto_repo = ProyectoRepository(db)
+    proyecto = (
+        proyecto_repo.obtener_por_id_admin(proyecto_id=plano.proyecto_id)
+        if current_user.rol == "admin"
+        else proyecto_repo.obtener_por_id(
+            proyecto_id=plano.proyecto_id,
+            tecnico_id=current_user.id,
+        )
     )
     if proyecto is None:
         raise HTTPException(
@@ -140,6 +145,7 @@ def _mapa_out(
         id=mapa.id,
         plano_id=mapa.plano_id,
         conjunto_ap_id=mapa.conjunto_ap_id,
+        analisis_id=mapa.analisis.id if mapa.analisis is not None else None,
         modo_generacion=mapa.modo_generacion,
         algoritmo=mapa.algoritmo,
         resolucion=mapa.resolucion,
@@ -148,8 +154,7 @@ def _mapa_out(
         ap_pos_x=mapa.ap_pos_x,
         ap_pos_y=mapa.ap_pos_y,
         aps_interes=aps_interes,
-        bssids_generacion=mapa.bssids_generacion
-        or [ap["bssid"] for ap in aps_interes],
+        bssids_generacion=mapa.bssids_generacion or [ap["bssid"] for ap in aps_interes],
         url_imagen=_firmar(mapa.ruta_imagen, request),
         matriz=mapa.matriz,
         escala=mapa.escala,
@@ -319,6 +324,9 @@ def _conjunto_out(conjunto) -> ConjuntoAPOut:
         proposito=conjunto.proposito,
         descripcion=conjunto.descripcion,
         es_principal=conjunto.es_principal,
+        origen=conjunto.origen,
+        estado_gobernanza=conjunto.estado_gobernanza,
+        creado_por_id=conjunto.creado_por_id,
         cantidad_aps=len(items),
         items=items,
         created_at=conjunto.created_at,
@@ -396,9 +404,7 @@ def listar_aps_disponibles(
     )
     if mapas_recientes:
         ultimo_mapa = mapas_recientes[0]
-        aps_ultimo_mapa = ultimo_mapa.aps_interes or [
-            {"bssid": ultimo_mapa.bssid}
-        ]
+        aps_ultimo_mapa = ultimo_mapa.aps_interes or [{"bssid": ultimo_mapa.bssid}]
     else:
         aps_ultimo_mapa = []
     bssids_ultimo_mapa = {ap["bssid"] for ap in aps_ultimo_mapa}
@@ -568,6 +574,22 @@ def generar_heatmap(
 
 
 @router_planos_heatmap.get(
+    "/{plano_id}/mapas",
+    response_model=list[MapaCalorOut],
+    summary="Listar mapas de calor del plano",
+)
+def listar_mapas_plano(
+    plano_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> list[MapaCalorOut]:
+    _verificar_ownership_plano(plano_id=plano_id, current_user=current_user, db=db)
+    mapas = MapaCalorRepository(db).listar_recientes_por_plano(plano_id=plano_id)
+    return [_mapa_out(mapa, request) for mapa in mapas]
+
+
+@router_planos_heatmap.get(
     "/{plano_id}/conjuntos-ap",
     response_model=list[ConjuntoAPOut],
     summary="Listar conjuntos de APs del plano",
@@ -620,6 +642,11 @@ def crear_conjunto_ap(
         descripcion=body.descripcion,
         es_principal=body.es_principal,
         items=items,
+        origen="manual_web" if current_user.rol == "admin" else "manual_movil",
+        estado_gobernanza=(
+            "pendiente_revision" if current_user.rol == "admin" else "borrador_tecnico"
+        ),
+        creado_por_id=current_user.id,
     )
     return _conjunto_out(conjunto)
 
@@ -673,6 +700,11 @@ def actualizar_conjunto_ap(
     if body.bssids is not None:
         aps = MedicionRepository(db).listar_aps_por_plano(plano_id=conjunto.plano_id)
         items = _resolver_items_conjunto(aps=aps, bssids=body.bssids)
+    if body.estado_gobernanza is not None and current_user.rol != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo el panel web admin puede cambiar el estado del conjunto.",
+        )
     descripcion = (
         body.descripcion
         if "descripcion" in body.model_fields_set
@@ -685,6 +717,7 @@ def actualizar_conjunto_ap(
         descripcion=descripcion,
         es_principal=body.es_principal,
         items=items,
+        estado_gobernanza=body.estado_gobernanza,
     )
     return _conjunto_out(actualizado)
 

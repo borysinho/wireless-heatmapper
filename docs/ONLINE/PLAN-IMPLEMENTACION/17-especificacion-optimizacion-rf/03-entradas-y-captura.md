@@ -12,7 +12,18 @@ Cada entrada debe indicar su procedencia:
 
 Los valores estimados se muestran como supuestos y reducen la confianza del escenario.
 
-## 2. Datos obtenidos durante la medición
+## 2. Uso de entradas desde móvil
+
+La app móvil puede registrar datos detectados por Android, posiciones de APs, formularios de inventario y restricciones de campo. Estos datos son insumos persistidos en backend y no autorizan por sí mismos la generación IA.
+
+Reglas:
+
+1. El móvil puede guardar inventario preliminar o verificado según la evidencia disponible.
+2. El móvil puede crear conjuntos manuales de APs y heatmaps operativos conforme el documento 18.
+3. La validación de completitud puede mostrarse al técnico como guía de captura.
+4. La acción de optimizar, generar alternativas IA o comparar escenarios proyectados queda fuera del móvil.
+
+## 3. Datos obtenidos durante la medición
 
 Se conservan RSSI, SSID, BSSID, canal, frecuencia, coordenada y fecha. Cuando Android y el dispositivo lo permitan, se añaden:
 
@@ -23,7 +34,7 @@ Se conservan RSSI, SSID, BSSID, canal, frecuencia, coordenada y fecha. Cuando An
 
 El escaneo Android no sustituye un analizador de espectro y no puede descubrir de forma confiable la potencia configurada, la antena ni el AP físico que agrupa varios BSSID.
 
-## 3. Ficha obligatoria por AP físico
+## 4. Ficha obligatoria por AP físico
 
 | Dato                         | Nueva instalación | Red existente | Obligación para alta confianza |
 | ---------------------------- | ----------------- | ------------- | ------------------------------ |
@@ -34,7 +45,7 @@ El escaneo Android no sustituye un analizador de espectro y no puede descubrir d
 | Costo referencial            | Sí                | Opcional      | Requerido para optimizar costo |
 | Restricción de cableado/PoE  | Sí                | Sí            | Requerido si limita posiciones |
 
-## 4. Ficha obligatoria por radio
+## 5. Ficha obligatoria por radio
 
 | Dato                         | Unidad/valores                                  |
 | ---------------------------- | ------------------------------------------------ |
@@ -51,7 +62,7 @@ El escaneo Android no sustituye un analizador de espectro y no puede descubrir d
 
 La interfaz convierte mW a dBm, calcula EIRP cuando existen ganancia y pérdidas, y conserva el valor original para auditoría.
 
-## 5. Ficha de antena y montaje
+## 6. Ficha de antena y montaje
 
 - interna o externa;
 - fabricante/modelo, tipo y ganancia dBi;
@@ -62,7 +73,7 @@ La interfaz convierte mW a dBm, calcula EIRP cuando existen ganancia y pérdidas
 
 Si se desconoce la antena, puede usarse una omni de 2,14 dBi como supuesto inicial, claramente rotulado y con mayor incertidumbre.
 
-## 6. Datos del ambiente
+## 7. Datos del ambiente
 
 Estos datos pertenecen al plano o proyecto, no a un AP:
 
@@ -75,7 +86,7 @@ Estos datos pertenecen al plano o proyecto, no a un AP:
 - ruido por zona y banda cuando exista medición confiable;
 - posiciones permitidas/prohibidas para montaje.
 
-## 7. Perfil de servicio y restricciones
+## 8. Perfil de servicio y restricciones
 
 - áreas objetivo y criticidad;
 - aplicaciones y RSSI/SNR objetivo;
@@ -85,7 +96,7 @@ Estos datos pertenecen al plano o proyecto, no a un AP:
 - presupuesto, máximo de APs y modelos permitidos;
 - preferencia entre cobertura, 5 GHz, menor costo o menores cambios.
 
-## 8. Validación previa a optimizar
+## 9. Validación previa a optimizar
 
 El backend calcula un reporte de completitud:
 
@@ -96,4 +107,3 @@ El backend calcula un reporte de completitud:
 | Bajo    | Falta escala, potencia/configuración de AP temporal o relación BSSID-radio            |
 
 Con nivel bajo se permite guardar un borrador, pero no presentarlo como plan definitivo.
-

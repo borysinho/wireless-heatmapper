@@ -1,0 +1,23 @@
+@startuml
+title Diagrama PERT — Dependencias entre Sprints\nWireless HeatMapper (modalidad 100 % en línea)
+skinparam activityBackgroundColor #EBF5FB
+skinparam activityBorderColor #2980B9
+skinparam arrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+
+start
+:S0 · Infra (1 sem);
+:S1 · Auth + Admin (2 sem);
+:S2 · Proyectos + Planos (2 sem);
+:S3 · Captura WiFi (2 sem);
+:S4 · Heatmap + Análisis (2 sem);
+:S5 · IA + Comparación + Reportes (3 sem);
+note right
+  Ruta crítica: S0 → S1 → S2 → S3 → S4 → S5 → S6
+  El Sprint 5 dura 3 sem por la complejidad
+  del modelo IA (RP5, 21 PHU + comparación + reporte).
+end note
+:S6 · Portal de Cliente (2 sem);
+:Cierre (1 sem);
+stop
+@enduml

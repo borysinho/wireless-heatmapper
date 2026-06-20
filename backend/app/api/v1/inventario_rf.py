@@ -16,17 +16,18 @@ router = APIRouter(tags=["inventario-rf"])
 
 def _plano_tecnico(plano_id: int, usuario: Usuario, db: Session) -> Plano:
     plano = db.query(Plano).filter(Plano.id == plano_id).first()
-    if plano is None or plano.proyecto.tecnico_id != usuario.id:
+    if plano is None or (
+        usuario.rol != "admin" and plano.proyecto.tecnico_id != usuario.id
+    ):
         raise HTTPException(status_code=404, detail="Plano no encontrado.")
     return plano
 
 
 def _plano_proyecto(proyecto_id: int, usuario: Usuario, db: Session) -> Plano:
-    proyecto = (
-        db.query(Proyecto)
-        .filter(Proyecto.id == proyecto_id, Proyecto.tecnico_id == usuario.id)
-        .first()
-    )
+    query = db.query(Proyecto).filter(Proyecto.id == proyecto_id)
+    if usuario.rol != "admin":
+        query = query.filter(Proyecto.tecnico_id == usuario.id)
+    proyecto = query.first()
     if proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado.")
     plano = next(
