@@ -88,7 +88,7 @@ class ReporteService:
             lineas.append(
                 "Mejor escenario: "
                 f"{mejor.nombre} con {mejor.pct_cobertura:.1f}% de cobertura "
-                f">= -70 dBm y costo estimado {mejor.costo_estimado:.2f}."
+                ">= -70 dBm."
             )
         lineas.append(
             "El objetivo tecnico preservado es cobertura de diseno >= -70 dBm "
@@ -108,7 +108,7 @@ class ReporteService:
                 (
                     f"{escenario.nombre}: actual {escenario.pct_cobertura_actual:.1f}% "
                     f"-> proyectado {escenario.pct_cobertura:.1f}% | "
-                    f"APs {escenario.cantidad_aps} | costo {escenario.costo_estimado:.2f}"
+                    f"APs sugeridos {escenario.cantidad_aps}"
                 ),
                 11,
             )
@@ -125,7 +125,7 @@ class ReporteService:
         y += 28
         for rec in escenario.recomendaciones:
             texto = (
-                f"{rec.orden}. {rec.accion} {rec.modelo_ap} en "
+                f"{rec.orden}. {rec.accion} AP con potencia ajustable en "
                 f"({rec.coord_x:.1f}, {rec.coord_y:.1f}) banda {rec.banda} GHz. "
                 f"{rec.justificacion}"
             )

@@ -208,3 +208,18 @@ class CrearReporteUseCase {
     );
   }
 }
+
+class DescargarReporteUseCase {
+  final HeatmapRepository _repo;
+  const DescargarReporteUseCase(this._repo);
+
+  Future<String> call({
+    required String urlDescarga,
+    required String rutaDestino,
+  }) {
+    return _repo.descargarReporte(
+      urlDescarga: urlDescarga,
+      rutaDestino: rutaDestino,
+    );
+  }
+}

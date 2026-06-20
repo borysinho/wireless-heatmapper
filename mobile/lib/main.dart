@@ -247,6 +247,9 @@ void _initDependencias() {
   sl.registerFactory<CrearReporteUseCase>(
     () => CrearReporteUseCase(sl<HeatmapRepository>()),
   );
+  sl.registerFactory<DescargarReporteUseCase>(
+    () => DescargarReporteUseCase(sl<HeatmapRepository>()),
+  );
   sl.registerFactory<HeatmapCubit>(
     () => HeatmapCubit(
       listarAPs: sl<ListarAPsDisponiblesUseCase>(),
@@ -266,6 +269,7 @@ void _initDependencias() {
       generar: sl<GenerarEscenariosUseCase>(),
       comparar: sl<CompararEscenarioUseCase>(),
       crearReporte: sl<CrearReporteUseCase>(),
+      descargarReporte: sl<DescargarReporteUseCase>(),
     ),
   );
 }

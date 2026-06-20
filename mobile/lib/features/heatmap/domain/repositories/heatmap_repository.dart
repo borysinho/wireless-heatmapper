@@ -78,4 +78,9 @@ abstract class HeatmapRepository {
     required int proyectoId,
     int? escenarioId,
   });
+
+  Future<String> descargarReporte({
+    required String urlDescarga,
+    required String rutaDestino,
+  });
 }

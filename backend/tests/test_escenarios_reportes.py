@@ -39,7 +39,7 @@ def test_optimizador_edificio_en_u_propone_aps_en_extremos():
         max_aps=2,
         presupuesto=300,
         banda="5",
-        modelo_ap="AP Bulldog AX1800",
+        modelo_ap="AP empresarial de potencia ajustable",
         costo_unitario=120,
         resolucion=32,
     )
@@ -47,11 +47,11 @@ def test_optimizador_edificio_en_u_propone_aps_en_extremos():
     assert escenarios
     mejor = escenarios[0]
     assert mejor.cantidad_aps <= 2
-    assert mejor.costo_estimado <= 300
     assert mejor.pct_cobertura >= mejor.pct_cobertura_actual
     xs = [rec["coord_x"] for rec in mejor.recomendaciones]
     assert min(xs) < 120 or max(xs) > 280
     assert "RSSI proyectado" in mejor.recomendaciones[0]["justificacion"]
+    assert "potencia TX ajustable" in mejor.recomendaciones[0]["justificacion"]
 
 
 def test_reporte_pdf_contiene_hash_y_bytes_pdf():
@@ -62,7 +62,7 @@ def test_reporte_pdf_contiene_hash_y_bytes_pdf():
         plano_id=1,
         nombre="Alternativa 1",
         banda="5",
-        modelo_ap="AP Bulldog AX1800",
+        modelo_ap="AP empresarial de potencia ajustable",
         pct_cobertura_actual=42.0,
         pct_cobertura=88.0,
         costo_estimado=240.0,
@@ -78,7 +78,7 @@ def test_reporte_pdf_contiene_hash_y_bytes_pdf():
             coord_x=40,
             coord_y=30,
             banda="5",
-            modelo_ap="AP Bulldog AX1800",
+            modelo_ap="AP empresarial de potencia ajustable",
             costo_estimado=120,
             rssi_proyectado=-62,
             justificacion="RSSI proyectado -62 dBm en zona critica.",

@@ -48,10 +48,7 @@ class OptimizadorAPService:
         if not puntos_actuales:
             raise ValueError("Se requieren puntos de medición para optimizar.")
 
-        max_por_presupuesto = max_aps
-        if presupuesto is not None:
-            max_por_presupuesto = max(1, min(max_aps, int(presupuesto // costo_unitario)))
-        cantidad_max = max(1, min(max_aps, max_por_presupuesto))
+        cantidad_max = max(1, max_aps)
 
         pct_actual = self._pct_cobertura(matriz_actual)
         candidatos = self._candidatos(
@@ -87,7 +84,7 @@ class OptimizadorAPService:
                 resolucion=resolucion,
             )
             pct = self._pct_cobertura(matriz_proyectada)
-            costo = round(cantidad * costo_unitario, 2)
+            costo = 0.0
             recomendaciones = [
                 self._recomendacion(
                     orden=idx,
@@ -95,7 +92,7 @@ class OptimizadorAPService:
                     y=y,
                     banda=banda,
                     modelo_ap=modelo_ap,
-                    costo_unitario=costo_unitario,
+                    costo_unitario=0,
                     puntos=puntos_actuales,
                     metros_por_pixel=metros_por_pixel,
                 )
@@ -105,14 +102,14 @@ class OptimizadorAPService:
                 AlternativaOptimizada(
                     nombre=f"Alternativa {cantidad}",
                     banda=banda,
-                    modelo_ap=modelo_ap,
+                    modelo_ap="AP empresarial de potencia ajustable",
                     pct_cobertura_actual=pct_actual,
                     pct_cobertura=pct,
                     costo_estimado=costo,
                     cantidad_aps=cantidad,
                     resumen=(
-                        f"Con {cantidad} AP(s) {modelo_ap} en banda {banda} GHz "
-                        f"se proyecta {pct:.1f}% de cobertura >= -70 dBm."
+                        f"Con {cantidad} AP(s) de potencia ajustable en banda "
+                        f"{banda} GHz se proyecta {pct:.1f}% de cobertura >= -70 dBm."
                     ),
                     metricas={
                         "pct_cobertura_actual": pct_actual,
@@ -126,7 +123,7 @@ class OptimizadorAPService:
             )
         return sorted(
             alternativas,
-            key=lambda item: (-item.pct_cobertura, item.costo_estimado),
+            key=lambda item: (-item.pct_cobertura, item.cantidad_aps),
         )[:3]
 
     def _candidatos(
@@ -270,12 +267,16 @@ class OptimizadorAPService:
             "coord_x": round(x, 2),
             "coord_y": round(y, 2),
             "banda": banda,
-            "modelo_ap": modelo_ap,
-            "costo_estimado": round(costo_unitario, 2),
+            "modelo_ap": "AP empresarial de potencia ajustable",
+            "costo_estimado": 0,
             "rssi_proyectado": rssi,
             "justificacion": (
-                f"AP {orden}: cubre una zona crítica a {distancia_m:.1f} m; "
-                f"RSSI proyectado {rssi:.1f} dBm y objetivo de diseño >= -70 dBm."
+                f"AP {orden}: ubicar un equipo con potencia TX ajustable y "
+                f"capacidad para mantener RSSI proyectado {rssi:.1f} dBm "
+                f"en una zona crítica a {distancia_m:.1f} m. Debe permitir "
+                f"regular potencia para evitar solapamiento excesivo, operar "
+                f"en banda {banda} GHz, usar antenas adecuadas al área y "
+                f"soportar gestión centralizada. Objetivo de diseño: >= -70 dBm."
             ),
         }
 

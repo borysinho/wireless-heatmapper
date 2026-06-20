@@ -157,6 +157,7 @@ class ReporteTecnico extends Equatable {
   final int? escenarioId;
   final String estado;
   final String? urlDescarga;
+  final String? rutaLocal;
   final String? sha256;
   final int tamanioBytes;
   final String? error;
@@ -167,6 +168,7 @@ class ReporteTecnico extends Equatable {
     required this.escenarioId,
     required this.estado,
     required this.urlDescarga,
+    this.rutaLocal,
     required this.sha256,
     required this.tamanioBytes,
     required this.error,
@@ -179,6 +181,7 @@ class ReporteTecnico extends Equatable {
         escenarioId,
         estado,
         urlDescarga,
+        rutaLocal,
         sha256,
         tamanioBytes,
         error,

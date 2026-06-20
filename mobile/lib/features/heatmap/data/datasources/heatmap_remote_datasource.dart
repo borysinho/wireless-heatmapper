@@ -285,6 +285,21 @@ class HeatmapRemoteDatasource {
     }
   }
 
+  Future<String> descargarReporte({
+    required String urlDescarga,
+    required String rutaDestino,
+  }) async {
+    try {
+      await _dio.download(urlDescarga, rutaDestino);
+      return rutaDestino;
+    } on DioException catch (e) {
+      throw HeatmapApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
   static String _mensajeDesdeError(DioException e) {
     final status = e.response?.statusCode;
     final data = e.response?.data;

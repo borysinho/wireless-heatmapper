@@ -29,6 +29,7 @@ dependencies:
 
   # Renderizado PDF
   pdfx: ^2.9.0
+  path_provider: ^2.1.5
 
   # Formularios con validación (Sp1-17)
   flutter_form_builder: ^10.3.0+2

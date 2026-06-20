@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../domain/entities/escenario_optimizado.dart';
 import '../cubit/escenarios_cubit.dart';
 import '../cubit/escenarios_state.dart';
 
@@ -63,11 +64,7 @@ class EscenariosPage extends StatelessWidget {
                               ),
                             ),
                             Chip(label: Text('${escenario.cantidadAps} APs')),
-                            Chip(
-                              label: Text(
-                                'Bs ${escenario.costoEstimado.toStringAsFixed(0)}',
-                              ),
-                            ),
+                            Chip(label: Text('Banda ${escenario.banda} GHz')),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -76,7 +73,9 @@ class EscenariosPage extends StatelessWidget {
                             dense: true,
                             contentPadding: EdgeInsets.zero,
                             leading: const Icon(Icons.router),
-                            title: Text('${rec.accion} · ${rec.modeloAp}'),
+                            title: Text(
+                              '${rec.accion} AP con potencia ajustable',
+                            ),
                             subtitle: Text(rec.justificacion),
                           ),
                         Row(
@@ -95,67 +94,100 @@ class EscenariosPage extends StatelessWidget {
                                   ? null
                                   : () => context
                                       .read<EscenariosCubit>()
-                                      .crearReporte(
+                                      .crearYDescargarReporte(
                                         proyectoId: proyectoId,
                                         escenarioId: escenario.id,
                                       ),
-                              icon: const Icon(Icons.picture_as_pdf),
-                              label: const Text('Reporte'),
+                              icon: const Icon(Icons.download),
+                              label: const Text('Descargar PDF'),
                             ),
                           ],
                         ),
+                        if (state.comparacion?.escenario.id == escenario.id)
+                          _ComparacionCard(comparacion: state.comparacion!),
+                        if (state.reporte?.escenarioId == escenario.id)
+                          _ReporteDescargadoCard(
+                              ruta: state.reporte!.rutaLocal),
                       ],
                     ),
                   ),
                 ),
                 const SizedBox(height: 8),
               ],
-              if (state.comparacion != null)
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Comparación',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 8),
-                        _DeltaRow(
-                          etiqueta: 'Cobertura',
-                          valor:
-                              '${state.comparacion!.resumen.deltaPctCobertura.toStringAsFixed(1)}%',
-                        ),
-                        _DeltaRow(
-                          etiqueta: 'Zonas muertas',
-                          valor:
-                              '${state.comparacion!.resumen.deltaZonasMuertas}',
-                        ),
-                        _DeltaRow(
-                          etiqueta: 'Cambios',
-                          valor:
-                              '${state.comparacion!.resumen.cantidadCambios}',
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              if (state.reporte != null)
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.fact_check),
-                    title: Text('Reporte ${state.reporte!.estado}'),
-                    subtitle: Text(
-                      state.reporte!.urlDescarga ??
-                          state.reporte!.error ??
-                          'Sin URL disponible',
-                    ),
-                  ),
-                ),
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _ComparacionCard extends StatelessWidget {
+  final ComparacionEscenario comparacion;
+
+  const _ComparacionCard({required this.comparacion});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Comparación',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 8),
+              _DeltaRow(
+                etiqueta: 'Cobertura',
+                valor:
+                    '${comparacion.resumen.deltaPctCobertura.toStringAsFixed(1)}%',
+              ),
+              _DeltaRow(
+                etiqueta: 'Zonas muertas',
+                valor: '${comparacion.resumen.deltaZonasMuertas}',
+              ),
+              _DeltaRow(
+                etiqueta: 'Cambios',
+                valor: '${comparacion.resumen.cantidadCambios}',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReporteDescargadoCard extends StatelessWidget {
+  final String? ruta;
+
+  const _ReporteDescargadoCard({required this.ruta});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          leading: const Icon(Icons.picture_as_pdf),
+          title: const Text('PDF descargado en este dispositivo'),
+          subtitle:
+              SelectableText(ruta ?? 'No se pudo resolver la ruta local.'),
+        ),
       ),
     );
   }

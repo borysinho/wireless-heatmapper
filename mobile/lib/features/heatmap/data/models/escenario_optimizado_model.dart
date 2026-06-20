@@ -138,6 +138,7 @@ class ReporteTecnicoModel extends ReporteTecnico {
     required super.escenarioId,
     required super.estado,
     required super.urlDescarga,
+    super.rutaLocal,
     required super.sha256,
     required super.tamanioBytes,
     required super.error,

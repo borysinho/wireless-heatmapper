@@ -169,4 +169,15 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
       escenarioId: escenarioId,
     );
   }
+
+  @override
+  Future<String> descargarReporte({
+    required String urlDescarga,
+    required String rutaDestino,
+  }) {
+    return _datasource.descargarReporte(
+      urlDescarga: urlDescarga,
+      rutaDestino: rutaDestino,
+    );
+  }
 }
