@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../domain/entities/escenario_optimizado.dart';
 import '../cubit/escenarios_cubit.dart';
@@ -15,11 +16,26 @@ class EscenariosPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Escenarios IA')),
       body: BlocConsumer<EscenariosCubit, EscenariosState>(
+        listenWhen: (previous, current) {
+          final rutaAnterior = previous.reporte?.rutaLocal;
+          final rutaActual = current.reporte?.rutaLocal;
+          final nuevoReporte = rutaActual != null &&
+              (rutaAnterior != rutaActual ||
+                  previous.reporte?.id != current.reporte?.id);
+          final nuevoError =
+              current.error != null && previous.error != current.error;
+          return nuevoReporte || nuevoError;
+        },
         listener: (context, state) {
           if (state.error != null) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.error!)),
             );
+            return;
+          }
+          final rutaLocal = state.reporte?.rutaLocal;
+          if (rutaLocal != null) {
+            _compartirReporte(context, rutaLocal);
           }
         },
         builder: (context, state) {
@@ -94,20 +110,27 @@ class EscenariosPage extends StatelessWidget {
                                   ? null
                                   : () => context
                                       .read<EscenariosCubit>()
-                                      .crearYDescargarReporte(
+                                      .crearYCompartirReporte(
                                         proyectoId: proyectoId,
                                         escenarioId: escenario.id,
                                       ),
-                              icon: const Icon(Icons.download),
-                              label: const Text('Descargar PDF'),
+                              icon: const Icon(Icons.ios_share),
+                              label: const Text('Compartir PDF'),
                             ),
                           ],
                         ),
                         if (state.comparacion?.escenario.id == escenario.id)
                           _ComparacionCard(comparacion: state.comparacion!),
                         if (state.reporte?.escenarioId == escenario.id)
-                          _ReporteDescargadoCard(
-                              ruta: state.reporte!.rutaLocal),
+                          _ReporteCompartidoCard(
+                            ruta: state.reporte!.rutaLocal,
+                            onCompartir: state.reporte!.rutaLocal == null
+                                ? null
+                                : () => _compartirReporte(
+                                      context,
+                                      state.reporte!.rutaLocal!,
+                                    ),
+                          ),
                       ],
                     ),
                   ),
@@ -119,6 +142,30 @@ class EscenariosPage extends StatelessWidget {
         },
       ),
     );
+  }
+
+  Future<void> _compartirReporte(BuildContext context, String rutaLocal) async {
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          title: 'Reporte Wireless HeatMapper',
+          subject: 'Reporte Wireless HeatMapper',
+          text: 'Reporte técnico generado por Wireless HeatMapper.',
+          files: [
+            XFile(
+              rutaLocal,
+              mimeType: 'application/pdf',
+              name: 'reporte-wireless-heatmapper.pdf',
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo compartir el PDF: $e')),
+      );
+    }
   }
 }
 
@@ -167,10 +214,14 @@ class _ComparacionCard extends StatelessWidget {
   }
 }
 
-class _ReporteDescargadoCard extends StatelessWidget {
+class _ReporteCompartidoCard extends StatelessWidget {
   final String? ruta;
+  final VoidCallback? onCompartir;
 
-  const _ReporteDescargadoCard({required this.ruta});
+  const _ReporteCompartidoCard({
+    required this.ruta,
+    required this.onCompartir,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -184,9 +235,13 @@ class _ReporteDescargadoCard extends StatelessWidget {
         child: ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           leading: const Icon(Icons.picture_as_pdf),
-          title: const Text('PDF descargado en este dispositivo'),
-          subtitle:
-              SelectableText(ruta ?? 'No se pudo resolver la ruta local.'),
+          title: const Text('PDF listo para compartir'),
+          subtitle: const Text('Elige una aplicación para enviarlo o abrirlo.'),
+          trailing: IconButton(
+            tooltip: 'Compartir nuevamente',
+            onPressed: ruta == null ? null : onCompartir,
+            icon: const Icon(Icons.ios_share),
+          ),
         ),
       ),
     );

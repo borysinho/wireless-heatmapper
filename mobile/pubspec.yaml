@@ -51,6 +51,7 @@ dependencies:
 
   # Permisos en tiempo de ejecución (Sprint 3 — ACCESS_FINE_LOCATION)
   permission_handler: ^12.0.0
+  share_plus: ^12.0.2
 
 dev_dependencies:
   flutter_test:

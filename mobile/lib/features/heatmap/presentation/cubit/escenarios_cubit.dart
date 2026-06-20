@@ -60,7 +60,7 @@ class EscenariosCubit extends Cubit<EscenariosState> {
     }
   }
 
-  Future<void> crearYDescargarReporte({
+  Future<void> crearYCompartirReporte({
     required int proyectoId,
     int? escenarioId,
   }) async {
@@ -75,12 +75,13 @@ class EscenariosCubit extends Cubit<EscenariosState> {
         return;
       }
       final descargarReporte = _resolverDescargaReporte();
-      final dir = await getApplicationDocumentsDirectory();
-      final carpeta = Directory('${dir.path}/reportes');
+      final dir = await getTemporaryDirectory();
+      final carpeta = Directory('${dir.path}/reportes-heatmapper');
       if (!await carpeta.exists()) {
         await carpeta.create(recursive: true);
       }
-      final rutaDestino = '${carpeta.path}/reporte-${reporte.id}.pdf';
+      final rutaDestino =
+          '${carpeta.path}/reporte-heatmapper-${reporte.id}.pdf';
       final rutaLocal = await descargarReporte(
         urlDescarga: reporte.urlDescarga!,
         rutaDestino: rutaDestino,
