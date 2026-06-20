@@ -5,6 +5,7 @@ import 'package:get_it/get_it.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../domain/entities/escenario_optimizado.dart';
+import '../../domain/repositories/heatmap_repository.dart';
 import '../../domain/usecases/heatmap_usecases.dart';
 import 'escenarios_state.dart';
 
@@ -12,7 +13,7 @@ class EscenariosCubit extends Cubit<EscenariosState> {
   final GenerarEscenariosUseCase _generar;
   final CompararEscenarioUseCase _comparar;
   final CrearReporteUseCase _crearReporte;
-  final DescargarReporteUseCase _descargarReporte;
+  final DescargarReporteUseCase? _descargarReporte;
 
   EscenariosCubit({
     GenerarEscenariosUseCase? generar,
@@ -22,8 +23,7 @@ class EscenariosCubit extends Cubit<EscenariosState> {
   })  : _generar = generar ?? GetIt.I<GenerarEscenariosUseCase>(),
         _comparar = comparar ?? GetIt.I<CompararEscenarioUseCase>(),
         _crearReporte = crearReporte ?? GetIt.I<CrearReporteUseCase>(),
-        _descargarReporte =
-            descargarReporte ?? GetIt.I<DescargarReporteUseCase>(),
+        _descargarReporte = descargarReporte,
         super(const EscenariosState());
 
   Future<void> generar({
@@ -74,13 +74,14 @@ class EscenariosCubit extends Cubit<EscenariosState> {
         emit(state.copyWith(cargando: false, reporte: reporte));
         return;
       }
+      final descargarReporte = _resolverDescargaReporte();
       final dir = await getApplicationDocumentsDirectory();
       final carpeta = Directory('${dir.path}/reportes');
       if (!await carpeta.exists()) {
         await carpeta.create(recursive: true);
       }
       final rutaDestino = '${carpeta.path}/reporte-${reporte.id}.pdf';
-      final rutaLocal = await _descargarReporte(
+      final rutaLocal = await descargarReporte(
         urlDescarga: reporte.urlDescarga!,
         rutaDestino: rutaDestino,
       );
@@ -103,5 +104,19 @@ class EscenariosCubit extends Cubit<EscenariosState> {
     } catch (e) {
       emit(state.copyWith(cargando: false, error: e.toString()));
     }
+  }
+
+  DescargarReporteUseCase _resolverDescargaReporte() {
+    if (_descargarReporte != null) return _descargarReporte;
+    if (GetIt.I.isRegistered<DescargarReporteUseCase>()) {
+      return GetIt.I<DescargarReporteUseCase>();
+    }
+    if (GetIt.I.isRegistered<HeatmapRepository>()) {
+      return DescargarReporteUseCase(GetIt.I<HeatmapRepository>());
+    }
+    throw StateError(
+      'No se pudo inicializar la descarga del reporte. '
+      'Reinicia la app para cargar las dependencias.',
+    );
   }
 }
