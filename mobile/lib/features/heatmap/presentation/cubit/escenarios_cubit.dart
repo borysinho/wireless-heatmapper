@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:get_it/get_it.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../domain/entities/escenario_optimizado.dart';
@@ -14,14 +15,15 @@ class EscenariosCubit extends Cubit<EscenariosState> {
   final DescargarReporteUseCase _descargarReporte;
 
   EscenariosCubit({
-    required GenerarEscenariosUseCase generar,
-    required CompararEscenarioUseCase comparar,
-    required CrearReporteUseCase crearReporte,
-    required DescargarReporteUseCase descargarReporte,
-  })  : _generar = generar,
-        _comparar = comparar,
-        _crearReporte = crearReporte,
-        _descargarReporte = descargarReporte,
+    GenerarEscenariosUseCase? generar,
+    CompararEscenarioUseCase? comparar,
+    CrearReporteUseCase? crearReporte,
+    DescargarReporteUseCase? descargarReporte,
+  })  : _generar = generar ?? GetIt.I<GenerarEscenariosUseCase>(),
+        _comparar = comparar ?? GetIt.I<CompararEscenarioUseCase>(),
+        _crearReporte = crearReporte ?? GetIt.I<CrearReporteUseCase>(),
+        _descargarReporte =
+            descargarReporte ?? GetIt.I<DescargarReporteUseCase>(),
         super(const EscenariosState());
 
   Future<void> generar({
