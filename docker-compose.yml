@@ -35,9 +35,10 @@ services:
       STORAGE_URL_TTL_SECONDS: ${STORAGE_URL_TTL_SECONDS:-3600}
       PUBLIC_API_URL: ${PUBLIC_API_URL:-}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
-      FIREBASE_CREDENTIALS_JSON: ${FIREBASE_CREDENTIALS_JSON:-}
+      FIREBASE_CREDENTIALS_PATH: /run/secrets/firebase-admin.json
     volumes:
       - planos_data:/var/lib/heatmapper/planos
+      - ./.secrets/firebase-admin.json:/run/secrets/firebase-admin.json:ro
     depends_on:
       db:
         condition: service_healthy

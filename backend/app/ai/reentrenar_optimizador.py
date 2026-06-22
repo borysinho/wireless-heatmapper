@@ -1,8 +1,9 @@
-"""Genera artefacto reproducible del modelo IA Sprint 5.
+"""Genera artefacto reproducible del baseline RF de Sprint 5.
 
-El proyecto académico permite degradación controlada a FSPL cuando no hay
-dataset real suficiente. Este script persiste el dataset sintético usado para
-regresión en lugar de depender de paquetes externos no fijados en el stack base.
+La recomendación vigente calibra `ModeloPropagacion` por plano cuando existen
+mediciones reales vinculadas a APs ubicados. Este script conserva un payload
+sintético reproducible solo como respaldo documental del baseline FSPL, sin
+entrenar un modelo global ni introducir dependencias externas al stack base.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ def main() -> None:
     destino.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "tipo": "baseline_fspl",
-        "descripcion": "FSPL CWNA-107 con dataset sintético reproducible.",
+        "descripcion": "FSPL/log-distance con dataset sintético reproducible.",
         "dataset": generar_dataset_sintetico(),
     }
     destino.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

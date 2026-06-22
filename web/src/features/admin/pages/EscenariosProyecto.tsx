@@ -23,6 +23,7 @@ import {
   EmptyState,
   useToast,
 } from "@/shared/components";
+import { resolverUrlApi } from "@/shared/api/urlApi";
 import {
   useAPsPlano,
   useCambiarEstadoEscenario,
@@ -760,14 +761,14 @@ export default function EscenariosProyecto() {
                 <figure>
                   <figcaption>Heatmap actual observado</figcaption>
                   <img
-                    src={comparacion.heatmap_actual.url_imagen}
+                    src={resolverUrlApi(comparacion.heatmap_actual.url_imagen)}
                     alt="Heatmap actual observado"
                   />
                 </figure>
                 <figure>
                   <figcaption>Heatmap proyectado por IA</figcaption>
                   <img
-                    src={comparacion.heatmap_proyectado.url_imagen}
+                    src={resolverUrlApi(comparacion.heatmap_proyectado.url_imagen)}
                     alt="Heatmap proyectado por IA"
                   />
                 </figure>

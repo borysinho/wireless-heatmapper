@@ -145,16 +145,17 @@ class _AuthInterceptor extends Interceptor {
       final newToken = response.data!['access_token'] as String;
       await _storage.write(key: _keyToken, value: newToken);
 
+      // Cada petición que recibió 401 conserva su método, ruta y cuerpo. No se
+      // puede resolver toda la cola con la respuesta de la primera petición:
+      // al arrancar la app eso hacía que GET /proyectos reemplazara al POST que
+      // registra el token FCM, por lo que el dispositivo nunca quedaba asociado
+      // al técnico.
+      await _reintentarPendientes(newToken);
+
       // Reintentar la petición original con el nuevo token
       final retryOptions = err.requestOptions;
       retryOptions.headers['Authorization'] = 'Bearer $newToken';
       final retryResponse = await _dio.fetch<dynamic>(retryOptions);
-
-      // Resolver peticiones encoladas
-      for (final pending in _pendingQueue) {
-        pending.complete(retryResponse);
-      }
-      _pendingQueue.clear();
 
       handler.resolve(retryResponse);
     } on DioException {
@@ -167,6 +168,26 @@ class _AuthInterceptor extends Interceptor {
       handler.next(err);
     } finally {
       _isRefreshing = false;
+    }
+  }
+
+  Future<void> _reintentarPendientes(String newToken) async {
+    // Drenar por lotes también cubre peticiones que entren a la cola mientras
+    // se están reintentando las anteriores.
+    while (_pendingQueue.isNotEmpty) {
+      final pendientes = List<_PendingRequest>.of(_pendingQueue);
+      _pendingQueue.clear();
+      await Future.wait(
+        pendientes.map((pending) async {
+          final options = pending.requestOptions;
+          options.headers['Authorization'] = 'Bearer $newToken';
+          try {
+            pending.complete(await _dio.fetch<dynamic>(options));
+          } on DioException {
+            pending.complete(null);
+          }
+        }),
+      );
     }
   }
 

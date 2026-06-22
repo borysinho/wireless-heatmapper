@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import math
 import secrets
 from pathlib import Path
 from urllib.parse import unquote
@@ -11,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
+from app.ai.modelo_propagacion import ModeloPropagacion, MuestraCalibracionRF
 from app.ai.optimizador_ap_service import OptimizadorAPService
 from app.api.v1.heatmaps import _mapa_out
 from app.core.config import settings
@@ -396,6 +398,45 @@ def _mapa_actual(
     return mapa, puntos
 
 
+def _modelo_calibrado_para_plano(
+    *,
+    plano: Plano,
+    db: Session,
+    bssids_seleccionados: list[str] | None = None,
+) -> ModeloPropagacion:
+    """Construye un predictor RF local usando mediciones y APs conocidos."""
+    query = (
+        db.query(MedicionWifi, PuntoMedicion, RadioAP, APFisico)
+        .join(PuntoMedicion, MedicionWifi.punto_id == PuntoMedicion.id)
+        .join(BSSIDRadio, MedicionWifi.bssid == BSSIDRadio.bssid)
+        .join(RadioAP, BSSIDRadio.radio_id == RadioAP.id)
+        .join(APFisico, RadioAP.ap_fisico_id == APFisico.id)
+        .filter(PuntoMedicion.plano_id == plano.id)
+        .filter(APFisico.plano_id == plano.id)
+        .filter(RadioAP.habilitada.is_(True))
+    )
+    if bssids_seleccionados is not None:
+        query = query.filter(
+            MedicionWifi.bssid.in_([bssid.lower() for bssid in bssids_seleccionados])
+        )
+
+    muestras: list[MuestraCalibracionRF] = []
+    metros_por_pixel = plano.escala_m_por_px or 1.0
+    for medicion, punto, radio, ap in query.all():
+        distancia_px = math.hypot(punto.pos_x - ap.coord_x, punto.pos_y - ap.coord_y)
+        muestras.append(
+            MuestraCalibracionRF(
+                distancia_m=max(1.0, distancia_px * metros_por_pixel),
+                banda=radio.banda,
+                rssi_dbm=float(medicion.rssi),
+                potencia_dbm=radio.potencia_dbm,
+                ganancia_dbi=radio.ganancia_dbi,
+                perdida_cable_db=radio.perdida_cable_db,
+            )
+        )
+    return ModeloPropagacion.calibrar_desde_muestras(muestras)
+
+
 @router_proyectos_escenarios.post(
     "/{proyecto_id}/escenarios",
     response_model=EscenariosGeneradosOut,
@@ -430,7 +471,12 @@ def generar_escenarios(
         db=db,
         bssids_seleccionados=bssids_seleccionados,
     )
-    optimizador = OptimizadorAPService()
+    modelo_propagacion = _modelo_calibrado_para_plano(
+        plano=plano,
+        db=db,
+        bssids_seleccionados=bssids_seleccionados,
+    )
+    optimizador = OptimizadorAPService(modelo=modelo_propagacion)
     aps_existentes = _aps_existentes_para_ia(plano_id=plano.id, body=body, db=db)
     banda_objetivo = "5" if "5" in body.bandas else body.bandas[0]
     alternativas = optimizador.optimizar(
@@ -517,7 +563,10 @@ def generar_escenarios(
             cantidad_aps=alternativa.cantidad_aps,
             resumen=alternativa.resumen,
             restricciones=body.model_dump(),
-            metricas=alternativa.metricas,
+            metricas={
+                **alternativa.metricas,
+                "calibracion_modelo": modelo_propagacion.resumen_calibracion(),
+            },
             recomendaciones=alternativa.recomendaciones,
             tipo_negocio="OPTIMIZACION_COBERTURA",
             perfil="MAXIMIZAR_COBERTURA",

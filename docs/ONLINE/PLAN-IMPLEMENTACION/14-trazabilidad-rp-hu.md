@@ -127,6 +127,7 @@
 | Umbral operativo < −75 dBm = zona problemática | PB-05, PB-06        | S4                   |
 | Throttling Android ≥ 8.0 = 4 escaneos / 2 min | PB-03               | S3                   |
 | FSPL / log-distance (6 dB por duplicar distancia) | PB-07 (modelo IA) | S5                   |
+| Calibración local del predictor por plano finalizado | PB-07, PB-12 | S5                   |
 | Tabla 3.1 — atenuación de materiales a 2,4 GHz | PB-07 (modelo IA) | S5                   |
 | Heatmap por APs de interés (BSSID; ubicación AP referencial; puntos de lectura como fuente de interpolación) | PB-20, PB-05, PB-06 | S4                   |
 | CCI / ACI (canales 2.4 GHz Δ ≤ 4)             | PB-06               | S4                   |

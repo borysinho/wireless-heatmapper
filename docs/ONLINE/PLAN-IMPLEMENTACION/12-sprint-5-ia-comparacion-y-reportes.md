@@ -7,9 +7,11 @@
 > Desplegar el motor híbrido RF + optimización que recomienda APs físicos y configuración de radios 2,4/5 GHz para instalaciones nuevas o redes existentes, genera valores y heatmaps proyectados por banda, permite compararlos sin alterar mediciones reales y exporta reportes profesionales en PDF.
 
 **HU incluidas:** PB-07, PB-12, PB-08
-**Restricciones:** modelo físico FSPL/log-distance como baseline · atenuación de materiales según CWNA-107 Tabla 3.1 · comparación lado a lado · PDF reproducible.
+**Restricciones:** modelo físico FSPL/log-distance como baseline · calibración local por plano cuando existan APs/BSSID vinculados a mediciones reales · comparación lado a lado · PDF reproducible.
 
 > **Refinamiento aprobado (20-jun-2026):** la [Especificación de Optimización RF por Escenarios](17-especificacion-optimizacion-rf/00-indice.md) es normativa para PB-07/PB-12. La Tabla 3.1 aporta atenuación de materiales; FSPL y la regla de 6 dB se tratan como fundamentos separados.
+
+> **Ajuste de implementación (22-jun-2026):** para el alcance académico vigente, el backend no entrena un modelo global con datos sintéticos ni promete precisión generalizada. Por cada plano con captura finalizada, APs ubicados y BSSID asociados, `ModeloPropagacion` calibra parámetros locales por banda usando las lecturas reales; si no hay datos suficientes, degrada al baseline FSPL/log-distance.
 
 ---
 
@@ -26,7 +28,7 @@ participant "App Móvil\n(EscenariosPage)" as app
 participant "ApiClient" as api
 participant "Backend\n/api/proyectos/{id}/escenarios" as be
 participant "OptimizadorAPService\n(IA)" as ia
-participant "ModeloPropagacion\n(FSPL + ML)" as ml
+participant "ModeloPropagacion\n(FSPL + calibración local)" as ml
 participant "InterpolacionService" as inter
 database "PostgreSQL" as db
 
@@ -70,11 +72,12 @@ Para     : Diseñar la red sin depender de mi experiencia subjetiva
 Reglas de negocio:
   · Entrada: análisis actual + inventario AP físico/radio/BSSID + restricciones
     (tipo de negocio, max_aps, presupuesto, bandas 2,4/5 GHz y modelo permitido).
-  · Modelo de propagación baseline: FSPL (Free Space Path Loss) usando
-    Tabla 3.1 del CWNA-107: 6 dB de pérdida por duplicar la distancia.
-  · Mejora con scikit-learn: RandomForestRegressor entrenado con datasets
-    sintéticos (paredes, materiales, frecuencia). Si el dataset real es
-    insuficiente, se usa solo FSPL (degradación controlada).
+  · Modelo de propagación baseline: FSPL/log-distance, preservando la regla
+    CWNA-107 de 6 dB de pérdida por duplicar la distancia.
+  · Mejora local: cuando el plano tiene APs ubicados, radios/BSSID asociados y
+    mediciones reales, se calibran por banda la referencia efectiva a 1 m y la
+    pérdida por duplicar distancia. Si el dataset del plano es insuficiente,
+    se usa solo FSPL (degradación controlada).
   · Algoritmo: greedy con búsqueda local (intentar mover cada AP propuesto
     en una grilla de pasos) para maximizar `pct_cobertura ≥ −70 dBm`.
   · Devuelve hasta 3 alternativas ordenadas por (pct_cobertura DESC, costo ASC).
@@ -94,6 +97,8 @@ Criterios de aceptación:
     miniatura del heatmap.
   - CA6: Test de regresión: dataset sintético "edificio en U" → IA propone
     al menos 1 AP en cada extremo de la U.
+  - CA7: Si existen APs físicos vinculados a BSSID medidos, el escenario guarda
+    métricas de `calibracion_modelo` sin modificar `MedicionWifi`.
 
 Desarrollador: Borys (IA + backend) + Jhasmany (móvil)
 ```
@@ -187,8 +192,8 @@ Desarrollador: Borys
 | Sp5-01 | Migración Alembic `0005_escenarios_e_ia` (`escenario_optimizado`, `recomendacion_ap`) | Borys    |  2 hrs |
 | Sp5-02 | Modelos + schemas de Escenario y RecomendacionAP                                      | Borys    |  2 hrs |
 | Sp5-03 | `ModeloPropagacion.fspl()` con Tabla 3.1 CWNA-107                                     | Borys    |  3 hrs |
-| Sp5-04 | Generación de dataset sintético (edificios paramétricos)                              | Borys    |  5 hrs |
-| Sp5-05 | Entrenamiento RandomForestRegressor + persistencia con joblib                         | Borys    |  5 hrs |
+| Sp5-04 | Calibración local por plano desde AP físico, BSSID y mediciones reales                | Borys    |  5 hrs |
+| Sp5-05 | Fallback FSPL/log-distance y métricas de calibración persistidas en escenario          | Borys    |  5 hrs |
 | Sp5-06 | `OptimizadorAPService.greedy_busqueda_local()`                                        | Borys    |  6 hrs |
 | Sp5-07 | Restricciones (max_aps, presupuesto, banda) + validación                              | Borys    |  3 hrs |
 | Sp5-08 | Generación de justificaciones textuales por recomendación                             | Borys    |  3 hrs |

@@ -254,33 +254,11 @@
   font-weight: 700;
 }
 
-.vistaMapa {
+.mapaNoDisponible {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  margin: 0;
-  overflow: hidden;
-}
-
-.vistaMapa figcaption,
-.vistaMapa small {
-  color: var(--text);
-  display: block;
-  font-size: 0.78rem;
-  padding: 0.55rem 0.7rem;
-}
-
-.vistaMapa figcaption {
-  color: var(--text-h);
-  font-weight: 700;
-}
-
-.vistaMapa img {
-  background: #111827;
-  display: block;
-  height: auto;
-  max-height: 30rem;
-  object-fit: contain;
-  width: 100%;
+  color: var(--text-muted);
+  padding: 1rem;
 }
 
 .comparacionTemporal {

@@ -1,0 +1,45 @@
+.contenedor { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-md); margin: 0; overflow: hidden; }
+.encabezado { align-items: center; display: flex; gap: 1rem; justify-content: space-between; padding: .65rem .75rem; }
+.encabezado strong, .encabezado span { display: block; }
+.encabezado strong { color: var(--text-h); font-size: .82rem; }
+.encabezado span { color: var(--text-muted); font-size: .73rem; margin-top: .15rem; }
+.controlesVista { align-items: center; display: flex; gap: .25rem; }
+.controlesVista button { align-items: center; background: var(--bg-surface); border: 1px solid var(--border); border-radius: .35rem; color: var(--text); cursor: pointer; display: flex; height: 2rem; justify-content: center; width: 2rem; }
+.controlesVista > span { margin: 0 .25rem; min-width: 2.6rem; text-align: center; }
+.barraCapas { align-items: center; background: var(--bg-surface); border-block: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: .5rem 1rem; padding: .5rem .75rem; }
+.barraCapas label { align-items: center; color: var(--text); display: flex; font-size: .75rem; gap: .35rem; }
+.opacidad { margin-left: auto; }
+.opacidad input { accent-color: var(--color-primary); width: 7rem; }
+.opacidad span { min-width: 2.2rem; }
+.visor { align-items: center; background: #0f172a; cursor: grab; display: flex; height: min(58vh, 40rem); justify-content: center; overflow: hidden; touch-action: none; user-select: none; }
+.arrastrando { cursor: grabbing; }
+.lienzo { flex: 0 0 auto; position: relative; transform-origin: center; }
+.plano, .heatmap, .marcadores { height: 100%; inset: 0; position: absolute; width: 100%; }
+.plano { object-fit: fill; }
+.heatmap { image-rendering: auto; pointer-events: none; }
+.marcadores { overflow: visible; }
+.punto { cursor: pointer; stroke: rgba(255,255,255,.95); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.ap { cursor: pointer; }
+.ap circle { fill: #172033; stroke: #fbbf24; stroke-width: 3; vector-effect: non-scaling-stroke; }
+.ap text { fill: white; font-size: 12px; font-weight: 800; pointer-events: none; }
+.tooltip { background: rgba(15,23,42,.94); border: 1px solid rgba(255,255,255,.22); border-radius: .35rem; color: white; font-size: .72rem; padding: .3rem .45rem; pointer-events: none; position: absolute; z-index: 3; }
+.leyenda { align-items: center; display: flex; flex-wrap: wrap; gap: .4rem .8rem; justify-content: center; padding: .6rem .75rem; }
+.leyenda span { align-items: center; color: var(--text-muted); display: flex; font-size: .7rem; gap: .3rem; }
+.leyenda i { height: .55rem; width: .8rem; }
+.detalle { align-items: center; background: color-mix(in srgb, var(--color-primary) 12%, var(--bg)); border: 0; border-top: 1px solid var(--border); color: var(--text-h); cursor: pointer; display: flex; font: inherit; font-size: .76rem; justify-content: space-between; padding: .65rem .75rem; text-align: left; width: 100%; }
+.detalle span { font-size: 1.1rem; }
+.informacion { border-top: 1px solid var(--border); display: grid; gap: .75rem; padding: .75rem; }
+.metricas { display: grid; gap: .5rem; grid-template-columns: repeat(6, minmax(0,1fr)); }
+.metricas div { background: var(--bg-surface); border-radius: .4rem; padding: .55rem; }
+.metricas span, .metricas strong { display: block; }
+.metricas span { color: var(--text-muted); font-size: .68rem; }
+.metricas strong { color: var(--text-h); font-size: .8rem; margin-top: .2rem; }
+.listaAps { display: grid; gap: .45rem; grid-template-columns: repeat(auto-fit,minmax(13rem,1fr)); }
+.listaAps button { align-items: center; background: var(--bg-surface); border: 1px solid var(--border); border-radius: .4rem; color: var(--text-h); cursor: pointer; display: flex; gap: .5rem; padding: .55rem; text-align: left; }
+.listaAps span, .listaAps strong, .listaAps small { display: block; min-width: 0; }
+.listaAps strong { font-size: .76rem; }
+.listaAps small { color: var(--text-muted); font-size: .66rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.advertencias { color: var(--text); font-size: .75rem; margin: 0; padding-left: 1.2rem; }
+.advertencias li + li { margin-top: .35rem; }
+@media (max-width: 800px) { .metricas { grid-template-columns: repeat(3,minmax(0,1fr)); } .opacidad { margin-left: 0; } .visor { height: 28rem; } }
+@media (max-width: 520px) { .encabezado { align-items: flex-start; flex-direction: column; } .metricas { grid-template-columns: repeat(2,minmax(0,1fr)); } .visor { height: 22rem; } }

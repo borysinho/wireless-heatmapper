@@ -10,6 +10,14 @@ La solución se divide en tres responsabilidades:
 
 El modelo de ML no sustituye las restricciones físicas ni regulatorias.
 
+> **Implementación vigente (22-jun-2026):** el backend opera con un predictor
+> FSPL/log-distance calibrable por plano. Cuando un mapa finalizado tiene APs
+> ubicados, BSSID asociados y mediciones reales, el sistema ajusta parámetros
+> locales por banda y usa ese predictor dentro del optimizador greedy +
+> búsqueda local. El corrector ML residual queda como evolución posterior; no
+> se entrena un modelo global con datos sintéticos para afirmar precisión en un
+> edificio real.
+
 ```plantuml
 @startuml
 title Flujo del motor de optimización RF
@@ -139,4 +147,3 @@ No usa simplemente el mayor RSSI entre bandas. Debe declarar una política, por 
 ## 9. Incertidumbre
 
 Cada mapa y punto proyectado incluye error estimado. El escenario presenta advertencias cuando extrapola lejos de puntos medidos, usa antenas supuestas o carece de caracterización de obstáculos.
-

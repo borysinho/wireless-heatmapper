@@ -1,11 +1,12 @@
 """Pruebas del refinamiento RF de PB-07/PB-12."""
 
+import math
 import tempfile
 
 import pytest
 from fastapi import HTTPException
 
-from app.ai.modelo_propagacion import ModeloPropagacion
+from app.ai.modelo_propagacion import ModeloPropagacion, MuestraCalibracionRF
 from app.ai.optimizador_ap_service import OptimizadorAPService
 from app.api.v1.escenarios import generar_escenarios
 from app.api.v1.inventario_rf import crear_ap, obtener_inventario
@@ -93,6 +94,33 @@ def test_propagacion_distingue_bandas_y_potencia():
     )
     assert rssi_24 > rssi_5
     assert rssi_5_mayor_potencia > rssi_5
+
+
+def test_modelo_propagacion_calibra_parametros_locales_por_banda():
+    muestras = [
+        MuestraCalibracionRF(
+            distancia_m=distancia,
+            banda="5",
+            rssi_dbm=-35 - 8 * math.log2(distancia) - 6.4,
+        )
+        for distancia in (1, 2, 4, 8, 16, 32)
+    ]
+
+    modelo = ModeloPropagacion.calibrar_desde_muestras(muestras)
+    resumen = modelo.resumen_calibracion()
+    prediccion = modelo.predecir_rssi(
+        distancia_px=80,
+        metros_por_pixel=0.1,
+        banda="5",
+    )
+
+    assert resumen["tipo"] == "calibracion_local_por_plano"
+    assert resumen["muestras"] == 6
+    assert resumen["bandas"]["5"]["perdida_por_doble_distancia_db"] == pytest.approx(
+        8.0,
+        abs=0.1,
+    )
+    assert prediccion == pytest.approx(-65.4, abs=0.5)
 
 
 def test_optimizador_dual_band_respeta_umbral_y_ap_fijo():
@@ -185,6 +213,48 @@ def test_generacion_persiste_proyecciones_sin_alterar_mediciones(
     originales = {
         medicion.id: medicion.rssi for medicion in db_session.query(MedicionWifi).all()
     }
+    crear_ap(
+        plano_id=plano.id,
+        body=APFisicoCrearIn(
+            nombre="AP existente calibracion",
+            fabricante="Bulldog Tech.",
+            modelo="BT-AX1800",
+            coord_x=120,
+            coord_y=100,
+            altura_m=2.8,
+            verificado=True,
+            radios=[
+                RadioAPIn(
+                    banda="2.4",
+                    canal=6,
+                    potencia_original=8,
+                    potencia_dbm=8,
+                    potencia_max_dbm=20,
+                    bssids=[
+                        BSSIDRadioIn(
+                            bssid="aa:bb:cc:dd:ee:24",
+                            ssid="Bulldog-24",
+                        )
+                    ],
+                ),
+                RadioAPIn(
+                    banda="5",
+                    canal=44,
+                    potencia_original=14,
+                    potencia_dbm=14,
+                    potencia_max_dbm=23,
+                    bssids=[
+                        BSSIDRadioIn(
+                            bssid="aa:bb:cc:dd:ee:50",
+                            ssid="Bulldog-5",
+                        )
+                    ],
+                ),
+            ],
+        ),
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
     with tempfile.TemporaryDirectory() as tmp:
         monkeypatch.setattr(settings, "storage_root", tmp)
         respuesta = generar_escenarios(
@@ -218,6 +288,10 @@ def test_generacion_persiste_proyecciones_sin_alterar_mediciones(
         "aa:bb:cc:dd:ee:24",
         "aa:bb:cc:dd:ee:50",
     }
+    assert escenario.metricas["calibracion_modelo"]["tipo"] == (
+        "calibracion_local_por_plano"
+    )
+    assert escenario.metricas["calibracion_modelo"]["muestras"] == 10
     assert len(escenario.recomendaciones[0].radios) == 2
     db_session.expire_all()
     assert {

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
 import { Badge, Button, EmptyState, useToast } from "@/shared/components";
+import { MapaCalorInteractivo } from "../components/MapaCalorInteractivo";
 import {
   useAPsPlano,
   useActualizarConjuntoAP,
@@ -26,6 +27,7 @@ import type {
   ConjuntoAPOut,
   EstadoGobernanzaConjunto,
   MapaCalorOut,
+  PlanoOut,
 } from "../types";
 import styles from "./ConjuntosAPProyecto.module.css";
 
@@ -268,7 +270,7 @@ export default function ConjuntosAPProyecto() {
           </div>
           {modo !== "CONJUNTO_COMPLETO" && <div className={styles.apSelector}>{conjuntoRevision.items.map((ap) => <label key={ap.bssid}><input type="checkbox" checked={bssidsHeatmap.has(ap.bssid)} onChange={() => setBssidsHeatmap((prev) => _toggleTexto(prev, ap.bssid))} /><span><strong>{ap.ssid || "SSID oculto"}</strong><small>{ap.bssid}</small></span></label>)}</div>}
           <div className={styles.accionesEditor}><Button type="button" isLoading={generando} onClick={generarMapa}>Generar heatmap</Button>{mapaGenerado && <Button type="button" variante="secondary" isLoading={analizando} onClick={analizarMapa}><Activity size={15} aria-hidden="true" /> Analizar</Button>}</div>
-          {mapaGenerado && <VistaMapa mapa={mapaGenerado} titulo="Heatmap generado" />}
+          {mapaGenerado && <VistaMapa mapa={mapaGenerado} plano={planosPorId.get(mapaGenerado.plano_id)} titulo="Heatmap generado" />}
 
           <div className={styles.comparacionTemporal}>
             <h3>Comparación temporal</h3>
@@ -276,7 +278,7 @@ export default function ConjuntosAPProyecto() {
               <select value={mapaTemporalA ?? ""} onChange={(e) => setMapaTemporalA(Number(e.target.value) || null)}><option value="">Mapa anterior</option>{mapasRevision.map((mapa) => <option key={mapa.id} value={mapa.id}>{_fechaMapa(mapa)}</option>)}</select>
               <select value={mapaTemporalB ?? ""} onChange={(e) => setMapaTemporalB(Number(e.target.value) || null)}><option value="">Mapa posterior</option>{mapasRevision.map((mapa) => <option key={mapa.id} value={mapa.id}>{_fechaMapa(mapa)}</option>)}</select>
             </div>
-            {mapaTemporalA && mapaTemporalB && <div className={styles.mapasComparados}><VistaMapa mapa={mapasPorId.get(mapaTemporalA)!} titulo="Anterior" /><VistaMapa mapa={mapasPorId.get(mapaTemporalB)!} titulo="Posterior" /></div>}
+            {mapaTemporalA && mapaTemporalB && <div className={styles.mapasComparados}><VistaMapa mapa={mapasPorId.get(mapaTemporalA)!} plano={planosPorId.get(mapasPorId.get(mapaTemporalA)!.plano_id)} titulo="Anterior" compacto /><VistaMapa mapa={mapasPorId.get(mapaTemporalB)!} plano={planosPorId.get(mapasPorId.get(mapaTemporalB)!.plano_id)} titulo="Posterior" compacto /></div>}
           </div>
         </section>
       )}
@@ -284,8 +286,9 @@ export default function ConjuntosAPProyecto() {
   );
 }
 
-function VistaMapa({ mapa, titulo }: { mapa: MapaCalorOut; titulo: string }) {
-  return <figure className={styles.vistaMapa}><figcaption>{titulo} · {mapa.modo_generacion}</figcaption><img src={mapa.url_imagen} alt={`${titulo} de ${mapa.ssid || mapa.bssid}`} /><small>{mapa.rssi_min.toFixed(1)} a {mapa.rssi_max.toFixed(1)} dBm · {mapa.cantidad_puntos} puntos</small></figure>;
+function VistaMapa({ mapa, plano, titulo, compacto = false }: { mapa: MapaCalorOut; plano?: PlanoOut; titulo: string; compacto?: boolean }) {
+  if (!plano) return <div className={styles.mapaNoDisponible}>No se encontró el plano asociado al heatmap.</div>;
+  return <MapaCalorInteractivo mapa={mapa} plano={plano} titulo={titulo} compacto={compacto} />;
 }
 
 function ResumenItem({ etiqueta, valor }: { etiqueta: string; valor: number }) {
