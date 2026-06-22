@@ -1,16 +1,22 @@
 name: Despliegue Azure VM
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "web/**"
+      - "nginx/**"
+      - "scripts/deploy/**"
+      - "docker-compose.prod.yml"
+      - ".env.prod.example"
+      - ".github/workflows/deploy-azure-vm.yml"
   workflow_dispatch:
     inputs:
       image_tag:
         description: "Etiqueta de imagen a desplegar"
         required: false
         default: "latest"
-  workflow_run:
-    workflows: ["CI"]
-    branches: [main]
-    types: [completed]
 
 permissions:
   contents: read
@@ -24,25 +30,67 @@ env:
 
 jobs:
   construir-y-desplegar:
-    name: Construir imagenes y actualizar VM
+    name: Validar backend/web, construir imagenes y actualizar VM
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Normalizar propietario GHCR
         run: |
           echo "OWNER_LC=${OWNER,,}" >> "$GITHUB_ENV"
-          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
-            echo "COMMIT_SHA=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_ENV"
-            echo "IMAGE_TAG_DESPLIEGUE=latest" >> "$GITHUB_ENV"
-          else
-            echo "COMMIT_SHA=${GITHUB_SHA}" >> "$GITHUB_ENV"
-            echo "IMAGE_TAG_DESPLIEGUE=${{ github.event.inputs.image_tag || 'latest' }}" >> "$GITHUB_ENV"
-          fi
+          echo "COMMIT_SHA=${GITHUB_SHA}" >> "$GITHUB_ENV"
+          echo "IMAGE_TAG_DESPLIEGUE=${{ github.event.inputs.image_tag || 'latest' }}" >> "$GITHUB_ENV"
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+
+      - name: Instalar dependencias backend
+        run: pip install -e ".[dev]"
+        working-directory: backend
+
+      - name: Lint backend con Ruff
+        run: >
+          ruff check
+          app/ai/modelo_propagacion.py
+          app/ai/reentrenar_optimizador.py
+          app/api/v1/escenarios.py
+        working-directory: backend
+
+      - name: Pruebas backend
+        run: pytest tests/ -v
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite:///./test.db
+          SECRET_KEY: ci_secret_key_only
+          DEBUG: "false"
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Instalar dependencias web
+        run: npm ci
+        working-directory: web
+
+      - name: Lint web
+        run: npm run lint
+        working-directory: web
+
+      - name: Build web
+        run: npm run build
+        working-directory: web
+
+      - name: Pruebas web
+        run: npm test
+        working-directory: web
 
       - name: Autenticar en GHCR
         uses: docker/login-action@v3
