@@ -144,5 +144,4 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
   }) {
     return _datasource.confirmarAP(apId: apId, posX: posX, posY: posY);
   }
-
 }

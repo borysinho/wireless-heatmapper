@@ -68,5 +68,4 @@ abstract class HeatmapRepository {
     required double posX,
     required double posY,
   });
-
 }
