@@ -7,15 +7,10 @@ on:
         description: "Etiqueta de imagen a desplegar"
         required: false
         default: "latest"
-  push:
+  workflow_run:
+    workflows: ["CI"]
     branches: [main]
-    paths:
-      - "backend/**"
-      - "web/**"
-      - "docker-compose.prod.yml"
-      - "nginx/nginx.conf"
-      - "scripts/deploy/**"
-      - ".github/workflows/deploy-azure-vm.yml"
+    types: [completed]
 
 permissions:
   contents: read
@@ -31,12 +26,23 @@ jobs:
   construir-y-desplegar:
     name: Construir imagenes y actualizar VM
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Normalizar propietario GHCR
-        run: echo "OWNER_LC=${OWNER,,}" >> "$GITHUB_ENV"
+        run: |
+          echo "OWNER_LC=${OWNER,,}" >> "$GITHUB_ENV"
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            echo "COMMIT_SHA=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_ENV"
+            echo "IMAGE_TAG_DESPLIEGUE=latest" >> "$GITHUB_ENV"
+          else
+            echo "COMMIT_SHA=${GITHUB_SHA}" >> "$GITHUB_ENV"
+            echo "IMAGE_TAG_DESPLIEGUE=${{ github.event.inputs.image_tag || 'latest' }}" >> "$GITHUB_ENV"
+          fi
 
       - name: Autenticar en GHCR
         uses: docker/login-action@v3
@@ -52,7 +58,7 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ env.OWNER_LC }}/wireless-heatmapper-backend:latest
-            ghcr.io/${{ env.OWNER_LC }}/wireless-heatmapper-backend:${{ github.sha }}
+            ghcr.io/${{ env.OWNER_LC }}/wireless-heatmapper-backend:${{ env.COMMIT_SHA }}
 
       - name: Construir y publicar web
         uses: docker/build-push-action@v6
@@ -61,7 +67,7 @@ jobs:
           push: true
           tags: |
             ghcr.io/${{ env.OWNER_LC }}/wireless-heatmapper-web:latest
-            ghcr.io/${{ env.OWNER_LC }}/wireless-heatmapper-web:${{ github.sha }}
+            ghcr.io/${{ env.OWNER_LC }}/wireless-heatmapper-web:${{ env.COMMIT_SHA }}
 
       - name: Copiar archivos de despliegue a la VM
         uses: appleboy/scp-action@v0.1.7
@@ -77,7 +83,7 @@ jobs:
         uses: appleboy/ssh-action@v1.2.0
         env:
           GHCR_OWNER: ${{ env.OWNER_LC }}
-          IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG_DESPLIEGUE }}
           GHCR_USUARIO: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
