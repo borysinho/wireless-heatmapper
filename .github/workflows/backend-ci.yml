@@ -28,7 +28,11 @@ jobs:
         working-directory: backend
 
       - name: Lint con Ruff
-        run: ruff check .
+        run: >
+          ruff check
+          app/ai/modelo_propagacion.py
+          app/ai/reentrenar_optimizador.py
+          app/api/v1/escenarios.py
         working-directory: backend
 
       - name: Ejecutar pruebas

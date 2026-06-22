@@ -22,7 +22,10 @@ def main() -> None:
         "descripcion": "FSPL/log-distance con dataset sintético reproducible.",
         "dataset": generar_dataset_sintetico(),
     }
-    destino.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    destino.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
     print(destino)
 
 

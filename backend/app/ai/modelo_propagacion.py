@@ -57,7 +57,7 @@ class ModeloPropagacion:
     def calibrar_desde_muestras(
         cls,
         muestras: list[MuestraCalibracionRF],
-    ) -> "ModeloPropagacion":
+    ) -> ModeloPropagacion:
         """Ajusta un modelo local por banda a partir de lecturas observadas."""
         por_banda: dict[str, list[MuestraCalibracionRF]] = defaultdict(list)
         for muestra in muestras:
@@ -103,7 +103,10 @@ class ModeloPropagacion:
                 -120.0,
                 min(
                     0.0,
-                    referencia - perdida - penalizacion_banda - penalizacion_material_db,
+                    referencia
+                    - perdida
+                    - penalizacion_banda
+                    - penalizacion_material_db,
                 ),
             ),
             2,
@@ -163,7 +166,11 @@ class ModeloPropagacion:
                     - (muestra.rssi_dbm + penalizacion)
                     - perdida * distancia
                 )
-            perdida_sistema = cls._promedio_recortado(perdidas, minimo=35.0, maximo=80.0)
+            perdida_sistema = cls._promedio_recortado(
+                perdidas,
+                minimo=35.0,
+                maximo=80.0,
+            )
 
         errores = []
         for muestra in muestras:
