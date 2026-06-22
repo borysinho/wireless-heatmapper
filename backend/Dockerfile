@@ -12,6 +12,8 @@ RUN useradd --no-create-home --shell /bin/false appuser
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/uvicorn
 COPY --from=builder /app/app ./app
+COPY alembic ./alembic
+COPY alembic.ini .
 USER appuser
 
 EXPOSE 8000

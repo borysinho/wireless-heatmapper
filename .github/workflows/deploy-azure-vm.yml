@@ -1,0 +1,103 @@
+name: Despliegue Azure VM
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Etiqueta de imagen a desplegar"
+        required: false
+        default: "latest"
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "web/**"
+      - "docker-compose.prod.yml"
+      - "nginx/nginx.conf"
+      - "scripts/deploy/**"
+      - ".github/workflows/deploy-azure-vm.yml"
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: ${{ github.repository_owner }}
+  BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/wireless-heatmapper-backend
+  WEB_IMAGE: ghcr.io/${{ github.repository_owner }}/wireless-heatmapper-web
+
+jobs:
+  construir-y-desplegar:
+    name: Construir imagenes y actualizar VM
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Normalizar propietario GHCR
+        run: echo "OWNER_LC=${OWNER,,}" >> "$GITHUB_ENV"
+
+      - name: Autenticar en GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Construir y publicar backend
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER_LC }}/wireless-heatmapper-backend:latest
+            ghcr.io/${{ env.OWNER_LC }}/wireless-heatmapper-backend:${{ github.sha }}
+
+      - name: Construir y publicar web
+        uses: docker/build-push-action@v6
+        with:
+          context: web
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER_LC }}/wireless-heatmapper-web:latest
+            ghcr.io/${{ env.OWNER_LC }}/wireless-heatmapper-web:${{ github.sha }}
+
+      - name: Copiar archivos de despliegue a la VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          source: "docker-compose.prod.yml,nginx/nginx.conf,scripts/deploy/actualizar-produccion.sh,.env.prod.example"
+          target: "/tmp/wireless-heatmapper-release"
+          rm: true
+
+      - name: Actualizar servicios en Azure VM
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          GHCR_OWNER: ${{ env.OWNER_LC }}
+          IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}
+          GHCR_USUARIO: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          host: ${{ secrets.AZURE_VM_HOST }}
+          username: ${{ secrets.AZURE_VM_USER }}
+          key: ${{ secrets.AZURE_VM_SSH_KEY }}
+          envs: GHCR_OWNER,IMAGE_TAG,GHCR_USUARIO,GHCR_TOKEN
+          script: |
+            set -euo pipefail
+            sudo mkdir -p /opt/wireless-heatmapper/nginx /opt/wireless-heatmapper/scripts/deploy /opt/wireless-heatmapper/.secrets
+            sudo cp /tmp/wireless-heatmapper-release/docker-compose.prod.yml /opt/wireless-heatmapper/docker-compose.prod.yml
+            sudo cp /tmp/wireless-heatmapper-release/nginx/nginx.conf /opt/wireless-heatmapper/nginx/nginx.conf
+            sudo cp /tmp/wireless-heatmapper-release/scripts/deploy/actualizar-produccion.sh /opt/wireless-heatmapper/scripts/deploy/actualizar-produccion.sh
+            if [ ! -f /opt/wireless-heatmapper/.env ]; then
+              sudo cp /tmp/wireless-heatmapper-release/.env.prod.example /opt/wireless-heatmapper/.env
+              echo "Se creo /opt/wireless-heatmapper/.env. Completa secretos antes del siguiente deploy." >&2
+              exit 1
+            fi
+            sudo sed -i "s/^GHCR_OWNER=.*/GHCR_OWNER=${GHCR_OWNER}/" /opt/wireless-heatmapper/.env
+            sudo sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${IMAGE_TAG}/" /opt/wireless-heatmapper/.env
+            echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u "$GHCR_USUARIO" --password-stdin
+            sudo chmod +x /opt/wireless-heatmapper/scripts/deploy/actualizar-produccion.sh
+            sudo APP_DIR=/opt/wireless-heatmapper /opt/wireless-heatmapper/scripts/deploy/actualizar-produccion.sh

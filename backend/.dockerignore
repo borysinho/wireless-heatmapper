@@ -1,0 +1,15 @@
+.coverage
+.env
+.pytest_cache/
+.ruff_cache/
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+coverage.json
+coverage_output.txt
+test.db
+test_output.txt
+test_results.txt
+tests/
+heatmapper_backend.egg-info/

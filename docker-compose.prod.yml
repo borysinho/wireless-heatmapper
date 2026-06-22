@@ -1,0 +1,85 @@
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - heatmapper-net
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  backend:
+    image: ghcr.io/${GHCR_OWNER}/wireless-heatmapper-backend:${IMAGE_TAG:-latest}
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      DEBUG: ${DEBUG:-false}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      STORAGE_ROOT: ${STORAGE_ROOT:-/var/lib/heatmapper/planos}
+      STORAGE_URL_SECRET: ${STORAGE_URL_SECRET}
+      STORAGE_URL_TTL_SECONDS: ${STORAGE_URL_TTL_SECONDS:-3600}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CREDENTIALS_PATH: /run/secrets/firebase-admin.json
+    volumes:
+      - planos_data:/var/lib/heatmapper/planos
+      - ./.secrets:/run/secrets:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - heatmapper-net
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:8000/health'')"',
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  web:
+    image: ghcr.io/${GHCR_OWNER}/wireless-heatmapper-web:${IMAGE_TAG:-latest}
+    networks:
+      - heatmapper-net
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+      - web
+    networks:
+      - heatmapper-net
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  planos_data:
+
+networks:
+  heatmapper-net:
+    driver: bridge
