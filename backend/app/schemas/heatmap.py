@@ -105,7 +105,7 @@ class ConjuntoAPItemOut(BaseModel):
 
 class ConjuntoAPBase(BaseModel):
     nombre: str = Field(..., min_length=1, max_length=100)
-    proposito: str = Field(..., min_length=1, max_length=255)
+    proposito: str = Field(default="", max_length=255)
     descripcion: str | None = Field(default=None, max_length=1000)
     es_principal: bool = False
     bssids: list[str] = Field(..., min_length=1)
@@ -117,7 +117,7 @@ class ConjuntoAPCrearIn(ConjuntoAPBase):
 
 class ConjuntoAPActualizarIn(BaseModel):
     nombre: str | None = Field(default=None, min_length=1, max_length=100)
-    proposito: str | None = Field(default=None, min_length=1, max_length=255)
+    proposito: str | None = Field(default=None, max_length=255)
     descripcion: str | None = Field(default=None, max_length=1000)
     es_principal: bool | None = None
     bssids: list[str] | None = Field(default=None, min_length=1)

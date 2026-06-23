@@ -160,6 +160,26 @@ def test_listar_aps_disponibles_para_seleccion(db_session, tecnico_usuario):
     assert all(not ap.seleccionado for ap in aps)
 
 
+def test_crear_conjunto_ap_acepta_proposito_vacio(db_session, tecnico_usuario):
+    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
+    _insertar_puntos_sinteticos(db_session, plano_id, cantidad=5)
+
+    conjunto = crear_conjunto_ap(
+        plano_id=plano_id,
+        body=ConjuntoAPCrearIn(
+            nombre="Red corporativa",
+            proposito="",
+            bssids=["aa:bb:cc:dd:ee:01"],
+        ),
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    assert conjunto.nombre == "Red corporativa"
+    assert conjunto.proposito == ""
+    assert conjunto.cantidad_aps == 1
+
+
 def test_crear_conjunto_ap_y_generar_heatmaps_por_modo(
     db_session,
     tecnico_usuario,

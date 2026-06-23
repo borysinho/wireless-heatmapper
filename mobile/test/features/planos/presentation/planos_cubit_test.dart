@@ -91,6 +91,7 @@ void main() {
               rutaArchivo: any(named: 'rutaArchivo'),
               bytesArchivo: any(named: 'bytesArchivo'),
               nombreArchivo: any(named: 'nombreArchivo'),
+              extensionArchivo: any(named: 'extensionArchivo'),
               nombre: any(named: 'nombre'),
               descripcion: any(named: 'descripcion'),
             )).thenThrow(
@@ -105,6 +106,7 @@ void main() {
         await c.importarPlano(
           rutaArchivo: '/tmp/plano.png',
           nombreArchivo: 'plano.png',
+          extensionArchivo: 'png',
           nombre: 'Planta baja',
         );
       },

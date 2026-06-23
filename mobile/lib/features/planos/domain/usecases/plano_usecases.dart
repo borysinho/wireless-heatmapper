@@ -19,6 +19,7 @@ class ImportarPlanoUseCase {
     String? rutaArchivo,
     List<int>? bytesArchivo,
     String? nombreArchivo,
+    String? extensionArchivo,
     String? nombre,
     String? descripcion,
   }) {
@@ -27,6 +28,7 @@ class ImportarPlanoUseCase {
       rutaArchivo: rutaArchivo,
       bytesArchivo: bytesArchivo,
       nombreArchivo: nombreArchivo,
+      extensionArchivo: extensionArchivo,
       nombre: nombre,
       descripcion: descripcion,
     );

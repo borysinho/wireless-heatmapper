@@ -154,6 +154,33 @@ void main() {
     );
 
     blocTest<CapturaCubit, CapturaState>(
+      'preserva modo continuo e intervalo al entrar y salir de throttling',
+      build: () => cubit,
+      setUp: () {
+        when(() => connectivity.estaConectado()).thenAnswer((_) async => true);
+        when(() => throttling.puedeEscanear).thenReturn(false);
+        when(() => throttling.segundosHastaProximo).thenReturn(45);
+      },
+      act: (c) async {
+        c.cambiarModo(continuo: true, intervaloSegundos: 15);
+        await c.marcarPunto(posX: 50, posY: 50);
+        c.reanudar();
+      },
+      expect: () => [
+        isA<CapturaActiva>()
+            .having((s) => s.modosContinuo, 'modo continuo activo', isTrue)
+            .having((s) => s.intervaloSegundos, 'intervalo', 15),
+        isA<CapturaThrottling>()
+            .having((s) => s.segundosRestantes, 'segundos', 45)
+            .having((s) => s.modosContinuo, 'modo continuo activo', isTrue)
+            .having((s) => s.intervaloSegundos, 'intervalo', 15),
+        isA<CapturaActiva>()
+            .having((s) => s.modosContinuo, 'modo continuo restaurado', isTrue)
+            .having((s) => s.intervaloSegundos, 'intervalo restaurado', 15),
+      ],
+    );
+
+    blocTest<CapturaCubit, CapturaState>(
       'emite CapturaError si el escaneo WiFi está vacío',
       build: () => cubit,
       setUp: () {

@@ -153,8 +153,65 @@ void main() {
         isFalse,
       );
     });
+
+    test('acepta JPG cuando Android entrega el nombre sin extensión', () async {
+      final adapter = _CapturandoAdapter();
+      final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api'))
+        ..httpClientAdapter = adapter;
+      final datasource = PlanoRemoteDatasource(dio);
+
+      await datasource.importar(
+        proyectoId: 10,
+        bytesArchivo: _jpgMinimo,
+        nombreArchivo: 'imagen_sin_extension',
+        extensionArchivo: 'jpg',
+        nombre: 'Planta alta',
+      );
+
+      final formData = adapter.ultimaRequest!.data as FormData;
+      expect(formData.files.single.value.filename, 'imagen_sin_extension.jpg');
+      expect(
+        formData.fields.any(
+          (field) => field.key == 'nombre' && field.value == 'Planta alta',
+        ),
+        isTrue,
+      );
+    });
+
+    test('infiere JPG por contenido si no hay extensión informada', () async {
+      final adapter = _CapturandoAdapter();
+      final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api'))
+        ..httpClientAdapter = adapter;
+      final datasource = PlanoRemoteDatasource(dio);
+
+      await datasource.importar(
+        proyectoId: 10,
+        bytesArchivo: _jpgMinimo,
+        nombreArchivo: 'imagen_sin_extension',
+        nombre: 'Planta alta',
+      );
+
+      final formData = adapter.ultimaRequest!.data as FormData;
+      expect(formData.files.single.value.filename, 'imagen_sin_extension.jpg');
+    });
   });
 }
+
+const _jpgMinimo = <int>[
+  0xff,
+  0xd8,
+  0xff,
+  0xe0,
+  0x00,
+  0x10,
+  0x4a,
+  0x46,
+  0x49,
+  0x46,
+  0x00,
+  0xff,
+  0xd9,
+];
 
 const _pngMinimo = <int>[
   0x89,

@@ -12,11 +12,13 @@ class PlanoPuntosPainter extends CustomPainter {
   final List<PuntoMedicion> puntos;
   final int? puntoSeleccionadoId;
   final Size tamanoPlano;
+  final double zoomEscala;
 
   const PlanoPuntosPainter({
     required this.puntos,
     required this.tamanoPlano,
     this.puntoSeleccionadoId,
+    this.zoomEscala = 1.0,
   });
 
   @override
@@ -31,12 +33,15 @@ class PlanoPuntosPainter extends CustomPainter {
       final cy = punto.posY * scaleY;
 
       final seleccionado = punto.id == puntoSeleccionadoId;
-      final radio = seleccionado ? 14.0 : 10.0;
+      final escalaSegura = zoomEscala <= 0 ? 1.0 : zoomEscala;
+      final radio = (seleccionado ? 14.0 : 10.0) / escalaSegura;
+      final sombraOffset = 1.0 / escalaSegura;
+      final borde = (seleccionado ? 3.0 : 2.0) / escalaSegura;
 
       // Sombra
       canvas.drawCircle(
-        Offset(cx + 1, cy + 1),
-        radio + 1,
+        Offset(cx + sombraOffset, cy + sombraOffset),
+        radio + sombraOffset,
         Paint()..color = Colors.black26,
       );
 
@@ -54,7 +59,7 @@ class PlanoPuntosPainter extends CustomPainter {
         Paint()
           ..color = Colors.white
           ..style = PaintingStyle.stroke
-          ..strokeWidth = seleccionado ? 3 : 2,
+          ..strokeWidth = borde,
       );
     }
   }
@@ -63,7 +68,8 @@ class PlanoPuntosPainter extends CustomPainter {
   bool shouldRepaint(PlanoPuntosPainter oldDelegate) =>
       oldDelegate.puntos != puntos ||
       oldDelegate.puntoSeleccionadoId != puntoSeleccionadoId ||
-      oldDelegate.tamanoPlano != tamanoPlano;
+      oldDelegate.tamanoPlano != tamanoPlano ||
+      oldDelegate.zoomEscala != zoomEscala;
 
   /// Convierte coordenadas de pantalla en coordenadas del plano.
   /// [tapOffset] es la posición del toque en el widget canvas.

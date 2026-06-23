@@ -73,6 +73,7 @@ class _PlanosListPageState extends State<PlanosListPage> {
           rutaArchivo: file.path,
           bytesArchivo: file.bytes,
           nombreArchivo: file.name,
+          extensionArchivo: file.extension,
           nombre: metadata.nombre,
           descripcion: metadata.descripcion,
         );

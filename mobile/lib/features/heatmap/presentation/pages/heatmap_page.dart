@@ -470,7 +470,7 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
           const SizedBox(height: 8),
           TextField(
             controller: _propositoCtrl,
-            decoration: const InputDecoration(labelText: 'Propósito'),
+            decoration: const InputDecoration(labelText: 'Propósito opcional'),
             maxLines: 2,
           ),
           const SizedBox(height: 16),
@@ -563,8 +563,8 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
   void _guardar() {
     final nombre = _nombreCtrl.text.trim();
     final proposito = _propositoCtrl.text.trim();
-    if (nombre.isEmpty || proposito.isEmpty) {
-      _mostrarMensaje('Nombre y propósito son obligatorios.');
+    if (nombre.isEmpty) {
+      _mostrarMensaje('El nombre es obligatorio.');
       return;
     }
     if (_seleccionados.isEmpty) {
@@ -634,7 +634,7 @@ class _ConjuntosAPView extends StatelessWidget {
                       style: theme.textTheme.titleMedium),
                   const SizedBox(height: 6),
                   Text(
-                    'Crea un conjunto con propósito para generar heatmaps focalizados.',
+                    'Crea un conjunto para generar heatmaps focalizados.',
                     style: theme.textTheme.bodyMedium,
                   ),
                 ],
@@ -670,6 +670,7 @@ class _ConjuntoAPTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final proposito = conjunto.proposito.trim();
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Card(
@@ -678,8 +679,12 @@ class _ConjuntoAPTile extends StatelessWidget {
           onTap: onTap,
           leading: const Icon(Icons.wifi_tethering),
           title: Text(conjunto.nombre),
-          subtitle: Text('${conjunto.proposito}\n${conjunto.cantidadAps} APs'),
-          isThreeLine: true,
+          subtitle: Text(
+            proposito.isEmpty
+                ? '${conjunto.cantidadAps} APs'
+                : '$proposito\n${conjunto.cantidadAps} APs',
+          ),
+          isThreeLine: proposito.isNotEmpty,
           trailing: PopupMenuButton<_AccionConjuntoAP>(
             tooltip: 'Opciones',
             onSelected: (accion) {
@@ -768,13 +773,38 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
   static const double _apMarkerSize = 32.0;
   static const double _apMarkerHalf = _apMarkerSize / 2;
 
+  final TransformationController _transformController =
+      TransformationController();
+
   Offset? _ultimoTapDown;
   String? _bssidArrastrado;
   Offset? _ultimaPosArrastradaPlano;
+  double _zoomEscala = 1.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _transformController.addListener(_actualizarZoomEscala);
+  }
+
+  @override
+  void dispose() {
+    _transformController.removeListener(_actualizarZoomEscala);
+    _transformController.dispose();
+    super.dispose();
+  }
+
+  void _actualizarZoomEscala() {
+    final nuevaEscala = _transformController.value.getMaxScaleOnAxis();
+    if ((nuevaEscala - _zoomEscala).abs() > 0.001) {
+      setState(() => _zoomEscala = nuevaEscala);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return InteractiveViewer(
+      transformationController: _transformController,
       panEnabled: widget.onMoverAPInteres == null,
       scaleEnabled: widget.onMoverAPInteres == null,
       minScale: 0.5,
@@ -831,6 +861,7 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
                         painter: _PuntosLecturaPainter(
                           puntos: widget.puntosLectura,
                           tamanoPlano: widget.tamanoPlano,
+                          zoomEscala: _zoomEscala,
                         ),
                       ),
                     CustomPaint(
@@ -974,7 +1005,7 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
         (punto.posX / widget.tamanoPlano.width) * w,
         (punto.posY / widget.tamanoPlano.height) * h,
       );
-      if ((local - pantalla).distance <= 18) return punto;
+      if ((local - pantalla).distance <= 18 / _zoomEscala) return punto;
     }
     return null;
   }
@@ -1846,18 +1877,22 @@ class _ColorStop {
 class _PuntosLecturaPainter extends CustomPainter {
   final List<PuntoLecturaHeatmap> puntos;
   final Size tamanoPlano;
+  final double zoomEscala;
 
   const _PuntosLecturaPainter({
     required this.puntos,
     required this.tamanoPlano,
+    this.zoomEscala = 1.0,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
+    final escalaSegura = zoomEscala <= 0 ? 1.0 : zoomEscala;
+    final radio = 4.5 / escalaSegura;
     final relleno = Paint()..style = PaintingStyle.fill;
     final borde = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
+      ..strokeWidth = 1.5 / escalaSegura
       ..color = Colors.white.withValues(alpha: 0.85);
 
     for (final punto in puntos) {
@@ -1866,8 +1901,8 @@ class _PuntosLecturaPainter extends CustomPainter {
         (punto.posY / tamanoPlano.height) * size.height,
       );
       relleno.color = _colorParaRssi(punto.rssi).withValues(alpha: 0.95);
-      canvas.drawCircle(centro, 4.5, relleno);
-      canvas.drawCircle(centro, 4.5, borde);
+      canvas.drawCircle(centro, radio, relleno);
+      canvas.drawCircle(centro, radio, borde);
     }
   }
 
@@ -1884,7 +1919,8 @@ class _PuntosLecturaPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _PuntosLecturaPainter oldDelegate) {
     return oldDelegate.puntos != puntos ||
-        oldDelegate.tamanoPlano != tamanoPlano;
+        oldDelegate.tamanoPlano != tamanoPlano ||
+        oldDelegate.zoomEscala != zoomEscala;
   }
 }
 

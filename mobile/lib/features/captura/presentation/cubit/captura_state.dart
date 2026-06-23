@@ -57,17 +57,27 @@ class CapturaActiva extends CapturaState {
 class CapturaEnviando extends CapturaState {
   final int planoId;
   final List<PuntoMedicion> puntos;
+  final bool modosContinuo;
+  final int intervaloSegundos;
 
-  const CapturaEnviando({required this.planoId, required this.puntos});
+  const CapturaEnviando({
+    required this.planoId,
+    required this.puntos,
+    this.modosContinuo = false,
+    this.intervaloSegundos = 30,
+  });
 
   @override
-  List<Object?> get props => [planoId, puntos];
+  List<Object?> get props =>
+      [planoId, puntos, modosContinuo, intervaloSegundos];
 }
 
 /// Throttling activo: se alcanzó el límite de 4 escaneos / 2 min.
 class CapturaThrottling extends CapturaState {
   final int planoId;
   final List<PuntoMedicion> puntos;
+  final bool modosContinuo;
+  final int intervaloSegundos;
 
   /// Segundos restantes hasta que se libere el siguiente slot.
   final int segundosRestantes;
@@ -76,21 +86,32 @@ class CapturaThrottling extends CapturaState {
     required this.planoId,
     required this.puntos,
     required this.segundosRestantes,
+    this.modosContinuo = false,
+    this.intervaloSegundos = 30,
   });
 
   @override
-  List<Object?> get props => [planoId, puntos, segundosRestantes];
+  List<Object?> get props =>
+      [planoId, puntos, segundosRestantes, modosContinuo, intervaloSegundos];
 }
 
 /// Red caída: la app no puede enviar el lote.
 class CapturaPausada extends CapturaState {
   final int planoId;
   final List<PuntoMedicion> puntos;
+  final bool modosContinuo;
+  final int intervaloSegundos;
 
-  const CapturaPausada({required this.planoId, required this.puntos});
+  const CapturaPausada({
+    required this.planoId,
+    required this.puntos,
+    this.modosContinuo = false,
+    this.intervaloSegundos = 30,
+  });
 
   @override
-  List<Object?> get props => [planoId, puntos];
+  List<Object?> get props =>
+      [planoId, puntos, modosContinuo, intervaloSegundos];
 }
 
 /// Detalle de un punto abierto en el bottom sheet.
@@ -119,13 +140,18 @@ class CapturaError extends CapturaState {
   final int planoId;
   final List<PuntoMedicion> puntos;
   final String mensaje;
+  final bool modosContinuo;
+  final int intervaloSegundos;
 
   const CapturaError({
     required this.planoId,
     required this.puntos,
     required this.mensaje,
+    this.modosContinuo = false,
+    this.intervaloSegundos = 30,
   });
 
   @override
-  List<Object?> get props => [planoId, puntos, mensaje];
+  List<Object?> get props =>
+      [planoId, puntos, mensaje, modosContinuo, intervaloSegundos];
 }

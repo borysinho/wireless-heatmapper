@@ -44,6 +44,10 @@ class _CapturaPageState extends State<CapturaPage> {
   final TransformationController _transformController =
       TransformationController();
 
+  /// Escala actual del plano interactivo; permite mantener los puntos pequeños
+  /// al hacer zoom para marcar posiciones con precisión.
+  double _zoomEscala = 1.0;
+
   // Modo continuo
   Timer? _timerContinuo;
 
@@ -69,6 +73,7 @@ class _CapturaPageState extends State<CapturaPage> {
   @override
   void initState() {
     super.initState();
+    _transformController.addListener(_actualizarZoomEscala);
     context.read<CapturaCubit>().iniciarSesion(widget.planoId);
   }
 
@@ -76,6 +81,7 @@ class _CapturaPageState extends State<CapturaPage> {
   void dispose() {
     _timerContinuo?.cancel();
     _timerContador?.cancel();
+    _transformController.removeListener(_actualizarZoomEscala);
     _transformController.dispose();
     super.dispose();
   }
@@ -83,6 +89,13 @@ class _CapturaPageState extends State<CapturaPage> {
   // ── Dimensiones del plano ──────────────────────────────────────────────────
 
   Size get _tamanoPlano => Size(widget.anchoPlanoPx, widget.altoPlanoPx);
+
+  void _actualizarZoomEscala() {
+    final nuevaEscala = _transformController.value.getMaxScaleOnAxis();
+    if ((nuevaEscala - _zoomEscala).abs() > 0.001) {
+      setState(() => _zoomEscala = nuevaEscala);
+    }
+  }
 
   // ── Handlers de gestos ─────────────────────────────────────────────────────
 
@@ -95,6 +108,7 @@ class _CapturaPageState extends State<CapturaPage> {
       canvasSize: box.size,
       tamanoPlano: _tamanoPlano,
       puntos: puntos,
+      radioToleranciaPantalla: 28 / _zoomEscala,
     );
 
     if (puntoTocado != null) {
@@ -124,7 +138,11 @@ class _CapturaPageState extends State<CapturaPage> {
       final cubitState = context.read<CapturaCubit>().state;
       final enModoContinuo = switch (cubitState) {
         CapturaActiva(:final modosContinuo) => modosContinuo,
+        CapturaEnviando(:final modosContinuo) => modosContinuo,
+        CapturaThrottling(:final modosContinuo) => modosContinuo,
+        CapturaPausada(:final modosContinuo) => modosContinuo,
         CapturaPuntoDetalle(:final modosContinuo) => modosContinuo,
+        CapturaError(:final modosContinuo) => modosContinuo,
         _ => false,
       };
 
@@ -307,12 +325,20 @@ class _CapturaPageState extends State<CapturaPage> {
         final enviando = state is CapturaEnviando;
         final modoContinuo = switch (state) {
           CapturaActiva(:final modosContinuo) => modosContinuo,
+          CapturaEnviando(:final modosContinuo) => modosContinuo,
+          CapturaThrottling(:final modosContinuo) => modosContinuo,
+          CapturaPausada(:final modosContinuo) => modosContinuo,
           CapturaPuntoDetalle(:final modosContinuo) => modosContinuo,
+          CapturaError(:final modosContinuo) => modosContinuo,
           _ => false,
         };
         final intervalo = switch (state) {
           CapturaActiva(:final intervaloSegundos) => intervaloSegundos,
+          CapturaEnviando(:final intervaloSegundos) => intervaloSegundos,
+          CapturaThrottling(:final intervaloSegundos) => intervaloSegundos,
+          CapturaPausada(:final intervaloSegundos) => intervaloSegundos,
           CapturaPuntoDetalle(:final intervaloSegundos) => intervaloSegundos,
+          CapturaError(:final intervaloSegundos) => intervaloSegundos,
           _ => 30,
         };
         final puntoSeleccionadoId = switch (state) {
@@ -411,6 +437,7 @@ class _CapturaPageState extends State<CapturaPage> {
                               puntos: puntos,
                               tamanoPlano: _tamanoPlano,
                               puntoSeleccionadoId: puntoSeleccionadoId,
+                              zoomEscala: _zoomEscala,
                             ),
                             child: Image.network(
                               widget.imagenUrl,

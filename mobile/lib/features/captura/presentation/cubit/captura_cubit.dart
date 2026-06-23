@@ -53,6 +53,26 @@ class CapturaCubit extends Cubit<CapturaState> {
         _ => null,
       };
 
+  bool get _modoContinuoActual => switch (state) {
+        CapturaActiva(:final modosContinuo) => modosContinuo,
+        CapturaEnviando(:final modosContinuo) => modosContinuo,
+        CapturaThrottling(:final modosContinuo) => modosContinuo,
+        CapturaPausada(:final modosContinuo) => modosContinuo,
+        CapturaPuntoDetalle(:final modosContinuo) => modosContinuo,
+        CapturaError(:final modosContinuo) => modosContinuo,
+        _ => false,
+      };
+
+  int get _intervaloSegundosActual => switch (state) {
+        CapturaActiva(:final intervaloSegundos) => intervaloSegundos,
+        CapturaEnviando(:final intervaloSegundos) => intervaloSegundos,
+        CapturaThrottling(:final intervaloSegundos) => intervaloSegundos,
+        CapturaPausada(:final intervaloSegundos) => intervaloSegundos,
+        CapturaPuntoDetalle(:final intervaloSegundos) => intervaloSegundos,
+        CapturaError(:final intervaloSegundos) => intervaloSegundos,
+        _ => 30,
+      };
+
   // -------------------------------------------------------------------------
   // Ciclo de sesión
   // -------------------------------------------------------------------------
@@ -113,11 +133,18 @@ class CapturaCubit extends Cubit<CapturaState> {
     // e intervaloSegundos al restaurar al finalizar.
     final estadoAntes = state;
     final puntosActuales = _puntosActuales;
+    final modoContinuo = _modoContinuoActual;
+    final intervaloSegundos = _intervaloSegundosActual;
 
     // 1. Verificar conectividad
     final conectado = await _connectivity.estaConectado();
     if (!conectado) {
-      emit(CapturaPausada(planoId: planoId, puntos: puntosActuales));
+      emit(CapturaPausada(
+        planoId: planoId,
+        puntos: puntosActuales,
+        modosContinuo: modoContinuo,
+        intervaloSegundos: intervaloSegundos,
+      ));
       return;
     }
 
@@ -127,11 +154,18 @@ class CapturaCubit extends Cubit<CapturaState> {
         planoId: planoId,
         puntos: puntosActuales,
         segundosRestantes: _throttling.segundosHastaProximo,
+        modosContinuo: modoContinuo,
+        intervaloSegundos: intervaloSegundos,
       ));
       return;
     }
 
-    emit(CapturaEnviando(planoId: planoId, puntos: puntosActuales));
+    emit(CapturaEnviando(
+      planoId: planoId,
+      puntos: puntosActuales,
+      modosContinuo: modoContinuo,
+      intervaloSegundos: intervaloSegundos,
+    ));
 
     try {
       // 3. Escanear
@@ -141,6 +175,8 @@ class CapturaCubit extends Cubit<CapturaState> {
           planoId: planoId,
           puntos: puntosActuales,
           mensaje: 'No se detectaron redes WiFi en el escaneo.',
+          modosContinuo: modoContinuo,
+          intervaloSegundos: intervaloSegundos,
         ));
         return;
       }
@@ -164,18 +200,24 @@ class CapturaCubit extends Cubit<CapturaState> {
         planoId: planoId,
         puntos: puntosActuales,
         mensaje: e.mensaje,
+        modosContinuo: modoContinuo,
+        intervaloSegundos: intervaloSegundos,
       ));
     } on CapturaApiException catch (e) {
       emit(CapturaError(
         planoId: planoId,
         puntos: puntosActuales,
         mensaje: e.mensaje,
+        modosContinuo: modoContinuo,
+        intervaloSegundos: intervaloSegundos,
       ));
     } catch (_) {
       emit(CapturaError(
         planoId: planoId,
         puntos: puntosActuales,
         mensaje: 'No se pudo enviar el lote. Reintenta.',
+        modosContinuo: modoContinuo,
+        intervaloSegundos: intervaloSegundos,
       ));
     }
   }
@@ -195,18 +237,30 @@ class CapturaCubit extends Cubit<CapturaState> {
 
     final puntosActuales = _puntosActuales;
     final estadoActual = state;
+    final modoContinuo = _modoContinuoActual;
+    final intervaloSegundos = _intervaloSegundosActual;
 
     // 1. Verificar conectividad
     final conectado = await _connectivity.estaConectado();
     if (!conectado) {
-      emit(CapturaPausada(planoId: planoId, puntos: puntosActuales));
+      emit(CapturaPausada(
+        planoId: planoId,
+        puntos: puntosActuales,
+        modosContinuo: modoContinuo,
+        intervaloSegundos: intervaloSegundos,
+      ));
       return;
     }
 
     // 2. Throttling: saltar ciclo silenciosamente (no bloquear modo continuo)
     if (!_throttling.puedeEscanear) return;
 
-    emit(CapturaEnviando(planoId: planoId, puntos: puntosActuales));
+    emit(CapturaEnviando(
+      planoId: planoId,
+      puntos: puntosActuales,
+      modosContinuo: modoContinuo,
+      intervaloSegundos: intervaloSegundos,
+    ));
 
     try {
       // 3. Escanear
@@ -234,7 +288,12 @@ class CapturaCubit extends Cubit<CapturaState> {
       _restaurarActivo(estadoActual, planoId, puntosActuales);
     } on CapturaApiException catch (e) {
       emit(CapturaError(
-          planoId: planoId, puntos: puntosActuales, mensaje: e.mensaje));
+        planoId: planoId,
+        puntos: puntosActuales,
+        mensaje: e.mensaje,
+        modosContinuo: modoContinuo,
+        intervaloSegundos: intervaloSegundos,
+      ));
     } catch (_) {
       _restaurarActivo(estadoActual, planoId, puntosActuales);
     }
@@ -264,7 +323,12 @@ class CapturaCubit extends Cubit<CapturaState> {
         intervaloSegundos: estadoAntes.intervaloSegundos,
       ));
     } else {
-      emit(CapturaActiva(planoId: planoId, puntos: puntos));
+      emit(CapturaActiva(
+        planoId: planoId,
+        puntos: puntos,
+        modosContinuo: _modoContinuoActual,
+        intervaloSegundos: _intervaloSegundosActual,
+      ));
     }
   }
 
@@ -341,12 +405,16 @@ class CapturaCubit extends Cubit<CapturaState> {
         planoId: planoId,
         puntos: anteriores,
         mensaje: e.mensaje,
+        modosContinuo: _modoContinuoActual,
+        intervaloSegundos: _intervaloSegundosActual,
       ));
     } catch (_) {
       emit(CapturaError(
         planoId: planoId,
         puntos: anteriores,
         mensaje: 'No se pudo mover el punto.',
+        modosContinuo: _modoContinuoActual,
+        intervaloSegundos: _intervaloSegundosActual,
       ));
     }
   }
@@ -359,7 +427,12 @@ class CapturaCubit extends Cubit<CapturaState> {
   void reanudar() {
     final id = _planoIdActual;
     if (id == null) return;
-    emit(CapturaActiva(planoId: id, puntos: _puntosActuales));
+    emit(CapturaActiva(
+      planoId: id,
+      puntos: _puntosActuales,
+      modosContinuo: _modoContinuoActual,
+      intervaloSegundos: _intervaloSegundosActual,
+    ));
   }
 
   // -------------------------------------------------------------------------
@@ -385,8 +458,8 @@ class CapturaCubit extends Cubit<CapturaState> {
       modoCont = modosContinuo;
       intervalo = intervaloSegundos;
     } else {
-      modoCont = false;
-      intervalo = 30;
+      modoCont = _modoContinuoActual;
+      intervalo = _intervaloSegundosActual;
     }
     try {
       final punto = await _repo.obtenerPunto(puntoId);
@@ -402,6 +475,8 @@ class CapturaCubit extends Cubit<CapturaState> {
         planoId: id,
         puntos: _puntosActuales,
         mensaje: 'No se pudo cargar el detalle del punto.',
+        modosContinuo: modoCont,
+        intervaloSegundos: intervalo,
       ));
     }
   }
@@ -420,8 +495,8 @@ class CapturaCubit extends Cubit<CapturaState> {
       modoCont = modosContinuo;
       intervalo = intervaloSegundos;
     } else {
-      modoCont = false;
-      intervalo = 30;
+      modoCont = _modoContinuoActual;
+      intervalo = _intervaloSegundosActual;
     }
     emit(CapturaActiva(
       planoId: id,
@@ -449,6 +524,8 @@ class CapturaCubit extends Cubit<CapturaState> {
         planoId: id,
         puntos: actuales,
         mensaje: e.mensaje,
+        modosContinuo: _modoContinuoActual,
+        intervaloSegundos: _intervaloSegundosActual,
       ));
     }
   }

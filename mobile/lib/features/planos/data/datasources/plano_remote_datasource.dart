@@ -37,6 +37,7 @@ class PlanoRemoteDatasource {
     String? rutaArchivo,
     List<int>? bytesArchivo,
     String? nombreArchivo,
+    String? extensionArchivo,
     String? nombre,
     String? descripcion,
   }) async {
@@ -47,10 +48,18 @@ class PlanoRemoteDatasource {
     );
     final nombrePlano = nombre?.trim();
     final descripcionPlano = descripcion?.trim();
-    final ext = _extension(nombreArchivoFinal);
+    final ext = _resolverExtension(
+      nombreArchivo: nombreArchivoFinal,
+      extensionArchivo: extensionArchivo,
+      bytesArchivo: bytesArchivo,
+    );
     if (!kFormatosPermitidos.contains(ext)) {
       throw PlanoFormatoNoSoportadoException(ext);
     }
+    final nombreArchivoMultipart = _nombreArchivoConExtension(
+      nombreArchivoFinal,
+      ext,
+    );
 
     final tamano = bytesArchivo?.length ?? await _tamanoDesdeRuta(rutaArchivo);
     if (tamano > kMaxBytes) {
@@ -62,8 +71,11 @@ class PlanoRemoteDatasource {
       if (descripcionPlano != null && descripcionPlano.isNotEmpty)
         'descripcion': descripcionPlano,
       'archivo': bytesArchivo != null
-          ? MultipartFile.fromBytes(bytesArchivo, filename: nombreArchivoFinal)
-          : await _multipartDesdeRuta(rutaArchivo, nombreArchivoFinal),
+          ? MultipartFile.fromBytes(
+              bytesArchivo,
+              filename: nombreArchivoMultipart,
+            )
+          : await _multipartDesdeRuta(rutaArchivo, nombreArchivoMultipart),
     });
 
     try {
@@ -190,6 +202,60 @@ class PlanoRemoteDatasource {
     final i = base.lastIndexOf('.');
     if (i < 0 || i == base.length - 1) return '';
     return base.substring(i + 1).toLowerCase();
+  }
+
+  static String _resolverExtension({
+    required String nombreArchivo,
+    String? extensionArchivo,
+    List<int>? bytesArchivo,
+  }) {
+    final extensionPorNombre = _extension(nombreArchivo);
+    if (extensionPorNombre.isNotEmpty) return extensionPorNombre;
+
+    final extensionPicker = _normalizarExtension(extensionArchivo);
+    if (extensionPicker.isNotEmpty) return extensionPicker;
+
+    return _inferirExtensionDesdeBytes(bytesArchivo);
+  }
+
+  static String _normalizarExtension(String? extension) {
+    final limpia = extension?.trim().toLowerCase().replaceFirst('.', '') ?? '';
+    return limpia == 'jpe' ? 'jpg' : limpia;
+  }
+
+  static String _inferirExtensionDesdeBytes(List<int>? bytes) {
+    if (bytes == null || bytes.isEmpty) return '';
+    if (bytes.length >= 4 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4e &&
+        bytes[3] == 0x47) {
+      return 'png';
+    }
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xff &&
+        bytes[1] == 0xd8 &&
+        bytes[2] == 0xff) {
+      return 'jpg';
+    }
+    if (bytes.length >= 4 &&
+        bytes[0] == 0x25 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x44 &&
+        bytes[3] == 0x46) {
+      return 'pdf';
+    }
+    return '';
+  }
+
+  static String _nombreArchivoConExtension(
+    String nombreArchivo,
+    String extension,
+  ) {
+    if (_extension(nombreArchivo).isNotEmpty || extension.isEmpty) {
+      return nombreArchivo;
+    }
+    return '$nombreArchivo.$extension';
   }
 
   /// Devuelve el nombre del archivo (sin path).

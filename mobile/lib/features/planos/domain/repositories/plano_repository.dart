@@ -11,12 +11,15 @@ abstract class PlanoRepository {
   /// Android la expone. [bytesArchivo] evita depender de rutas de caché
   /// inaccesibles en builds de producción.
   /// [nombreArchivo] conserva el nombre real del archivo para el multipart.
+  /// [extensionArchivo] permite reconocer el formato si Android omite la
+  /// extensión en el nombre del archivo.
   /// [nombre] es opcional; si es null se usa el nombre del archivo.
   Future<Plano> importar({
     required int proyectoId,
     String? rutaArchivo,
     List<int>? bytesArchivo,
     String? nombreArchivo,
+    String? extensionArchivo,
     String? nombre,
     String? descripcion,
   });

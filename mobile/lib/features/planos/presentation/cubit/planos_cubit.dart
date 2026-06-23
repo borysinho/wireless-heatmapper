@@ -56,6 +56,7 @@ class PlanosCubit extends Cubit<PlanosState> {
     String? rutaArchivo,
     List<int>? bytesArchivo,
     String? nombreArchivo,
+    String? extensionArchivo,
     String? nombre,
     String? descripcion,
   }) async {
@@ -73,6 +74,7 @@ class PlanosCubit extends Cubit<PlanosState> {
         rutaArchivo: rutaArchivo,
         bytesArchivo: bytesArchivo,
         nombreArchivo: nombreArchivo,
+        extensionArchivo: extensionArchivo,
         nombre: nombre,
         descripcion: descripcion,
       );

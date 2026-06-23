@@ -150,6 +150,7 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
       canvasSize: _renderSize,
       tamanoPlano: Size(_plano.anchoPx.toDouble(), _plano.altoPx.toDouble()),
       puntos: puntos,
+      radioToleranciaPantalla: 28 / _zoomEscala,
     );
   }
 
@@ -549,6 +550,7 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
                                           ),
                                           puntoSeleccionadoId:
                                               puntoSeleccionadoId,
+                                          zoomEscala: _zoomEscala,
                                         ),
                                       );
                                     },
