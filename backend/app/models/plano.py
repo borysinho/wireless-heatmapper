@@ -59,6 +59,7 @@ class Plano(Base):
     calibracion_y2 = Column(Float, nullable=True)
     distancia_real_m = Column(Float, nullable=True)
     escala_m_por_px = Column(Float, nullable=True)
+    poligono_interes = Column(sa.JSON, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(

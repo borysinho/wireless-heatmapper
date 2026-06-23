@@ -170,6 +170,67 @@
   box-shadow: 0 0 0 1px var(--color-primary);
 }
 
+.conjuntosGrid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.conjuntoCard {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text);
+  cursor: pointer;
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.conjuntoCard:hover {
+  border-color: var(--color-primary);
+}
+
+.conjuntoCard span {
+  display: block;
+  color: var(--text-h);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.conjuntoCard small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  margin-top: 0.25rem;
+}
+
+.conjuntoActivo {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.detalleConjunto {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.75rem;
+}
+
+.detalleConjunto strong {
+  color: var(--text-h);
+  overflow-wrap: anywhere;
+}
+
+.detalleConjunto span {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
 .conjuntoEditor {
   display: grid;
   gap: 0.875rem;
@@ -460,6 +521,68 @@
   margin-bottom: 0.15rem;
 }
 
+.heatmapsEscenario {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0.875rem;
+}
+
+.skeletonHeatmap {
+  animation: shimmer 1.4s infinite;
+  background: linear-gradient(90deg, var(--border) 25%, var(--bg-surface) 50%, var(--border) 75%);
+  background-size: 400% 100%;
+  border-radius: var(--radius-md);
+  height: 18rem;
+}
+
+.heatmapNoDisponible {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 0.86rem;
+  margin-top: 0.875rem;
+  padding: 1rem;
+}
+
+.recomendacionesCompactas {
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  margin-top: 0.875rem;
+}
+
+.recomendacionCompacta {
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  padding: 0.55rem 0.625rem;
+}
+
+.recomendacionCompacta strong,
+.recomendacionCompacta small {
+  display: block;
+  min-width: 0;
+}
+
+.recomendacionCompacta strong {
+  color: var(--text-h);
+  font-size: 0.82rem;
+  margin-bottom: 0.08rem;
+}
+
+.recomendacionCompacta small {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  line-height: 1.25;
+}
+
 .accionesEscenario {
   display: flex;
   flex-wrap: wrap;
@@ -537,8 +660,10 @@
 @media (max-width: 800px) {
   .generacionGrid,
   .planosGrid,
+  .conjuntosGrid,
   .formularioConjunto,
   .formulario,
+  .heatmapsEscenario,
   .heatmapsComparacion {
     grid-template-columns: 1fr;
   }

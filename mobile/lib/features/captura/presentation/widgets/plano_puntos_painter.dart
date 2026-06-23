@@ -13,12 +13,16 @@ class PlanoPuntosPainter extends CustomPainter {
   final int? puntoSeleccionadoId;
   final Size tamanoPlano;
   final double zoomEscala;
+  final List<Offset> poligonoInteres;
+  final bool poligonoCerrado;
 
   const PlanoPuntosPainter({
     required this.puntos,
     required this.tamanoPlano,
     this.puntoSeleccionadoId,
     this.zoomEscala = 1.0,
+    this.poligonoInteres = const [],
+    this.poligonoCerrado = false,
   });
 
   @override
@@ -27,6 +31,7 @@ class PlanoPuntosPainter extends CustomPainter {
 
     final scaleX = size.width / tamanoPlano.width;
     final scaleY = size.height / tamanoPlano.height;
+    _dibujarPoligono(canvas, scaleX: scaleX, scaleY: scaleY);
 
     for (final punto in puntos) {
       final cx = punto.posX * scaleX;
@@ -64,12 +69,68 @@ class PlanoPuntosPainter extends CustomPainter {
     }
   }
 
+  void _dibujarPoligono(
+    Canvas canvas, {
+    required double scaleX,
+    required double scaleY,
+  }) {
+    if (poligonoInteres.isEmpty) return;
+
+    final escalaSegura = zoomEscala <= 0 ? 1.0 : zoomEscala;
+    final path = Path();
+    for (var idx = 0; idx < poligonoInteres.length; idx++) {
+      final punto = poligonoInteres[idx];
+      final offset = Offset(punto.dx * scaleX, punto.dy * scaleY);
+      if (idx == 0) {
+        path.moveTo(offset.dx, offset.dy);
+      } else {
+        path.lineTo(offset.dx, offset.dy);
+      }
+    }
+    if (poligonoCerrado && poligonoInteres.length >= 3) {
+      path.close();
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = const Color(0x332980B9)
+          ..style = PaintingStyle.fill,
+      );
+    }
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = const Color(0xFF2980B9)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.4 / escalaSegura,
+    );
+
+    final radio = 5.5 / escalaSegura;
+    for (final punto in poligonoInteres) {
+      final centro = Offset(punto.dx * scaleX, punto.dy * scaleY);
+      canvas.drawCircle(
+        centro,
+        radio,
+        Paint()..color = Colors.white,
+      );
+      canvas.drawCircle(
+        centro,
+        radio,
+        Paint()
+          ..color = const Color(0xFF2980B9)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2 / escalaSegura,
+      );
+    }
+  }
+
   @override
   bool shouldRepaint(PlanoPuntosPainter oldDelegate) =>
       oldDelegate.puntos != puntos ||
       oldDelegate.puntoSeleccionadoId != puntoSeleccionadoId ||
       oldDelegate.tamanoPlano != tamanoPlano ||
-      oldDelegate.zoomEscala != zoomEscala;
+      oldDelegate.zoomEscala != zoomEscala ||
+      oldDelegate.poligonoInteres != poligonoInteres ||
+      oldDelegate.poligonoCerrado != poligonoCerrado;
 
   /// Convierte coordenadas de pantalla en coordenadas del plano.
   /// [tapOffset] es la posición del toque en el widget canvas.

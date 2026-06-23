@@ -74,6 +74,12 @@ def _crear_plano_calibrado(db_session, tecnico_usuario) -> int:
         calibracion_y2=0,
         distancia_real_m=10,
         escala_m_por_px=0.1,
+        poligono_interes=[
+            {"x": 0, "y": 0},
+            {"x": 400, "y": 0},
+            {"x": 400, "y": 300},
+            {"x": 0, "y": 300},
+        ],
     )
     db_session.add(plano)
     db_session.commit()

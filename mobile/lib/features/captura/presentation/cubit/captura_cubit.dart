@@ -5,6 +5,7 @@ import '../../../../core/wifi/throttling_manager.dart';
 import '../../../../core/wifi/wifi_scanner.dart';
 import '../../domain/entities/punto_medicion.dart';
 import '../../domain/repositories/captura_repository.dart';
+import '../../../planos/domain/entities/plano.dart';
 import 'captura_state.dart';
 
 /// Cubit de la sesión de captura WiFi.
@@ -86,6 +87,17 @@ class CapturaCubit extends Cubit<CapturaState> {
     } catch (_) {
       emit(CapturaActiva(planoId: planoId));
     }
+  }
+
+  Future<List<PuntoPlano>> obtenerPoligonoInteres(int planoId) {
+    return _repo.obtenerPoligonoInteres(planoId);
+  }
+
+  Future<List<PuntoPlano>> guardarPoligonoInteres({
+    required int planoId,
+    required List<PuntoPlano> puntos,
+  }) {
+    return _repo.guardarPoligonoInteres(planoId: planoId, puntos: puntos);
   }
 
   /// Detiene la sesión. El estado vuelve a [CapturaInactiva].

@@ -24,6 +24,7 @@ import {
   eliminarEscenario,
   eliminarEscenariosProyecto,
   eliminarProyectoAdmin,
+  enviarCorreoEnlaceCliente,
   generarEscenariosProyecto,
   generarHeatmapConjunto,
   listarConjuntosPlano,
@@ -296,6 +297,23 @@ export function useActualizarEnlaceCliente(proyectoId: number) {
       enlaceId: number;
       revocado: boolean;
     }) => actualizarEnlaceCliente(enlaceId, revocado),
+    onSuccess: () =>
+      qc.invalidateQueries({
+        queryKey: ["admin", "proyectos", proyectoId, "enlaces-cliente"],
+      }),
+  });
+}
+
+export function useEnviarCorreoEnlaceCliente(proyectoId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      enlaceId,
+      clienteId,
+    }: {
+      enlaceId: number;
+      clienteId: number;
+    }) => enviarCorreoEnlaceCliente(enlaceId, { cliente_id: clienteId }),
     onSuccess: () =>
       qc.invalidateQueries({
         queryKey: ["admin", "proyectos", proyectoId, "enlaces-cliente"],

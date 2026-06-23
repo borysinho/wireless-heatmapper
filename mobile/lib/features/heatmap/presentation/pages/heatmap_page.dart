@@ -7,6 +7,7 @@ import '../../domain/entities/ap_detectado.dart';
 import '../../domain/entities/conjunto_ap.dart';
 import '../../domain/entities/escala_heatmap.dart';
 import '../../domain/entities/mapa_calor.dart';
+import '../../../planos/domain/entities/plano.dart';
 import '../cubit/heatmap_cubit.dart';
 import '../cubit/heatmap_state.dart';
 
@@ -220,6 +221,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
                       planoUrl: widget.imagenUrl,
                       heatmapMatriz: listo!.mapa.matriz,
                       puntosLectura: listo.mapa.puntosLectura,
+                      poligonoInteres: listo.mapa.poligonoInteres,
                       tamanoPlano: _tamanoPlano,
                       aps: const [],
                       apsInteres: apsInteresListo,
@@ -733,6 +735,7 @@ class _HeatmapCanvas extends StatefulWidget {
   final String planoUrl;
   final List<List<double>>? heatmapMatriz;
   final List<PuntoLecturaHeatmap> puntosLectura;
+  final List<PuntoPlano> poligonoInteres;
   final Size tamanoPlano;
   final List<APDetectado> aps;
   final List<APDisponible> apsInteres;
@@ -750,6 +753,7 @@ class _HeatmapCanvas extends StatefulWidget {
     required this.planoUrl,
     this.heatmapMatriz,
     this.puntosLectura = const [],
+    this.poligonoInteres = const [],
     required this.tamanoPlano,
     required this.aps,
     this.apsInteres = const [],
@@ -859,6 +863,8 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
                         isComplex: true,
                         painter: _HeatmapMatrixPainter(
                           matriz: widget.heatmapMatriz!,
+                          poligonoInteres: widget.poligonoInteres,
+                          tamanoPlano: widget.tamanoPlano,
                         ),
                       ),
                     if (widget.puntosLectura.isNotEmpty)
@@ -1809,8 +1815,14 @@ class _Metrica extends StatelessWidget {
 
 class _HeatmapMatrixPainter extends CustomPainter {
   final List<List<double>> matriz;
+  final List<PuntoPlano> poligonoInteres;
+  final Size tamanoPlano;
 
-  const _HeatmapMatrixPainter({required this.matriz});
+  const _HeatmapMatrixPainter({
+    required this.matriz,
+    this.poligonoInteres = const [],
+    required this.tamanoPlano,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1824,6 +1836,11 @@ class _HeatmapMatrixPainter extends CustomPainter {
     final paint = Paint()
       ..style = PaintingStyle.fill
       ..isAntiAlias = false;
+
+    if (poligonoInteres.length >= 3 && !tamanoPlano.isEmpty) {
+      canvas.save();
+      canvas.clipPath(_pathPoligono(size));
+    }
 
     for (var fila = 0; fila < filas; fila++) {
       final valores = matriz[fila];
@@ -1840,6 +1857,34 @@ class _HeatmapMatrixPainter extends CustomPainter {
         );
       }
     }
+
+    if (poligonoInteres.length >= 3 && !tamanoPlano.isEmpty) {
+      canvas.restore();
+      canvas.drawPath(
+        _pathPoligono(size),
+        Paint()
+          ..color = const Color(0xFF2980B9).withValues(alpha: 0.78)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.4,
+      );
+    }
+  }
+
+  Path _pathPoligono(Size size) {
+    final path = Path();
+    final scaleX = size.width / tamanoPlano.width;
+    final scaleY = size.height / tamanoPlano.height;
+    for (var i = 0; i < poligonoInteres.length; i++) {
+      final punto = poligonoInteres[i];
+      final x = punto.x * scaleX;
+      final y = punto.y * scaleY;
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    return path..close();
   }
 
   Color _colorParaRssi(double rssi) {
@@ -1875,7 +1920,9 @@ class _HeatmapMatrixPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _HeatmapMatrixPainter oldDelegate) {
-    return oldDelegate.matriz != matriz;
+    return oldDelegate.matriz != matriz ||
+        oldDelegate.poligonoInteres != poligonoInteres ||
+        oldDelegate.tamanoPlano != tamanoPlano;
   }
 }
 

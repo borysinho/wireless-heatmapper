@@ -7,17 +7,12 @@ import {
   useConjuntosPorPlanos,
   useCrearEnlaceCliente,
   useEnlacesCliente,
+  useEnviarCorreoEnlaceCliente,
   useEscenariosProyecto,
-  useMapasPorPlanos,
   usePlanosProyecto,
-  useReportesProyecto,
 } from "../hooks/useProyectosOrg";
-import type {
-  ConjuntoAPOut,
-  EscenarioOptimizadoOut,
-  MapaCalorOut,
-  ReporteOut,
-} from "../types";
+import { useClientes } from "../hooks/useClientes";
+import type { ConjuntoAPOut, EscenarioOptimizadoOut } from "../types";
 import styles from "./PublicacionClienteProyecto.module.css";
 
 export default function PublicacionClienteProyecto() {
@@ -27,113 +22,120 @@ export default function PublicacionClienteProyecto() {
   }>();
   const toast = useToast();
   const [diasEnlace, setDiasEnlace] = useState(7);
-  const [emailDestino, setEmailDestino] = useState("");
+  const [clienteDestinoId, setClienteDestinoId] = useState<number | null>(null);
   const [ultimoEnlace, setUltimoEnlace] = useState<string | null>(null);
-  const [escenariosSeleccionados, setEscenariosSeleccionados] = useState<Set<number>>(
-    () => new Set(),
-  );
+  const [clientesEnvioPorEnlace, setClientesEnvioPorEnlace] = useState<
+    Record<number, number | "">
+  >({});
   const [conjuntosSeleccionados, setConjuntosSeleccionados] = useState<Set<number>>(
     () => new Set(),
   );
-  const [mapasSeleccionados, setMapasSeleccionados] = useState<Set<number>>(
+  const [escenariosSeleccionados, setEscenariosSeleccionados] = useState<Set<number>>(
     () => new Set(),
   );
-  const [analisisSeleccionados, setAnalisisSeleccionados] = useState<Set<number>>(
-    () => new Set(),
-  );
-  const [reporteSeleccionado, setReporteSeleccionado] = useState<number | null>(null);
 
-  const { data: escenarios, isLoading: cargandoEscenarios, isError: errorEscenarios } =
-    useEscenariosProyecto(proyectoId);
   const { data: planos, isLoading: cargandoPlanos, isError: errorPlanos } =
     usePlanosProyecto(proyectoId);
   const planoIds = useMemo(() => (planos ?? []).map((plano) => plano.id), [planos]);
   const consultasConjuntos = useConjuntosPorPlanos(planoIds);
-  const consultasMapas = useMapasPorPlanos(planoIds);
-  const { data: reportes, isLoading: cargandoReportes, isError: errorReportes } =
-    useReportesProyecto(proyectoId);
+  const { data: escenarios, isLoading: cargandoEscenarios, isError: errorEscenarios } =
+    useEscenariosProyecto(proyectoId);
+  const { data: clientes, isLoading: cargandoClientes, isError: errorClientes } =
+    useClientes();
   const { data: enlacesCliente, isLoading: cargandoEnlaces } =
     useEnlacesCliente(proyectoId);
   const { mutateAsync: crearEnlace, isPending: creandoEnlace } =
     useCrearEnlaceCliente(proyectoId);
   const { mutateAsync: actualizarEnlace, isPending: actualizandoEnlace } =
     useActualizarEnlaceCliente(proyectoId);
+  const { mutateAsync: enviarCorreoEnlace, isPending: enviandoCorreo } =
+    useEnviarCorreoEnlaceCliente(proyectoId);
 
-  const escenariosPublicados = useMemo(
-    () =>
-      [...(escenarios ?? [])]
-        .filter((escenario) => escenario.estado_gobernanza === "publicado_cliente")
-        .sort((a, b) => b.pct_cobertura - a.pct_cobertura),
-    [escenarios],
-  );
-  const conjuntosPublicados = useMemo(
+  const conjuntos = useMemo(
     () =>
       consultasConjuntos
         .flatMap((consulta) => consulta.data ?? [])
-        .filter((conjunto) => conjunto.estado_gobernanza === "publicado_cliente")
         .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1)),
     [consultasConjuntos],
   );
+  const conjuntosPublicados = useMemo(
+    () =>
+      conjuntos
+        .filter((conjunto) => conjunto.estado_gobernanza === "publicado_cliente")
+        .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1)),
+    [conjuntos],
+  );
+  const escenariosPublicados = useMemo(
+    () =>
+      (escenarios ?? [])
+        .filter((escenario) => escenario.estado_gobernanza === "publicado_cliente")
+        .sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
+    [escenarios],
+  );
   const cargandoConjuntos = consultasConjuntos.some((consulta) => consulta.isLoading);
   const errorConjuntos = consultasConjuntos.some((consulta) => consulta.isError);
-  const mapas = useMemo(
-    () =>
-      consultasMapas
-        .flatMap((consulta) => consulta.data ?? [])
-        .sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
-    [consultasMapas],
-  );
-  const reportesListos = useMemo(
-    () => (reportes ?? []).filter((reporte) => reporte.estado === "LISTO"),
-    [reportes],
-  );
-  const cargandoMapas = consultasMapas.some((consulta) => consulta.isLoading);
-  const errorMapas = consultasMapas.some((consulta) => consulta.isError);
   const cargando =
-    cargandoEscenarios || cargandoPlanos || cargandoConjuntos || cargandoMapas || cargandoReportes;
-  const error = errorEscenarios || errorPlanos || errorConjuntos || errorMapas || errorReportes;
+    cargandoPlanos ||
+    cargandoConjuntos ||
+    cargandoEscenarios ||
+    cargandoClientes;
+  const error =
+    errorPlanos ||
+    errorConjuntos ||
+    errorEscenarios ||
+    errorClientes;
+  const clientesActivos = useMemo(
+    () => (clientes ?? []).filter((cliente) => cliente.activo),
+    [clientes],
+  );
+  const clienteDestino =
+    clientesActivos.find((cliente) => cliente.id === clienteDestinoId) ?? null;
 
+  const conjuntosSeleccionadosPublicados = useMemo(
+    () =>
+      conjuntosPublicados.filter((conjunto) =>
+        conjuntosSeleccionados.has(conjunto.id),
+      ),
+    [conjuntosPublicados, conjuntosSeleccionados],
+  );
+  const escenariosSeleccionadosPublicados = useMemo(
+    () =>
+      escenariosPublicados.filter((escenario) =>
+        escenariosSeleccionados.has(escenario.id),
+      ),
+    [escenariosPublicados, escenariosSeleccionados],
+  );
   const totalSeleccionado =
-    escenariosSeleccionados.size +
-    conjuntosSeleccionados.size +
-    mapasSeleccionados.size +
-    analisisSeleccionados.size +
-    Number(reporteSeleccionado !== null);
+    conjuntosSeleccionadosPublicados.length + escenariosSeleccionadosPublicados.length;
 
   const handleCrearEnlace = async () => {
-    const escenarios = escenariosPublicados.filter((escenario) =>
-      escenariosSeleccionados.has(escenario.id),
-    );
-    const conjuntos = conjuntosPublicados.filter((conjunto) =>
-      conjuntosSeleccionados.has(conjunto.id),
-    );
     if (totalSeleccionado === 0) {
-      toast.error("Seleccione al menos un contenido publicado para el cliente.");
+      toast.error("Seleccione al menos un conjunto o escenario IA publicado para el cliente.");
+      return;
+    }
+    if (clienteDestinoId !== null && !clienteDestino?.email_referencia) {
+      toast.error("El cliente seleccionado no tiene correo de referencia registrado.");
       return;
     }
     try {
       const enlace = await crearEnlace({
         expira_en_dias: diasEnlace,
-        email_destino: emailDestino.trim() || null,
+        cliente_id: clienteDestinoId,
         contenido: {
-          conjunto_ids: conjuntos.map((item) => item.id),
-          escenario_ids: escenarios.map((item) => item.id),
-          mapa_ids: Array.from(mapasSeleccionados),
-          analisis_ids: Array.from(analisisSeleccionados),
-          reporte_id: reporteSeleccionado,
+          conjunto_ids: conjuntosSeleccionadosPublicados.map((item) => item.id),
+          escenario_ids: escenariosSeleccionadosPublicados.map((item) => item.id),
         },
       });
       const url = `${window.location.origin}${enlace.url_publica}`;
       setUltimoEnlace(url);
       const copiado = await _copiar(url);
       toast.exito(
-        emailDestino.trim()
+        clienteDestino
           ? "Enlace creado y enviado al cliente."
           : copiado
             ? "Enlace de cliente creado y copiado."
             : "Enlace de cliente creado.",
       );
-      if (emailDestino.trim()) setEmailDestino("");
     } catch {
       toast.error("No se pudo crear el enlace de cliente.");
     }
@@ -145,6 +147,25 @@ export default function PublicacionClienteProyecto() {
       toast.exito(revocado ? "Enlace revocado." : "Enlace reactivado.");
     } catch {
       toast.error("No se pudo actualizar el enlace.");
+    }
+  };
+
+  const handleEnviarCorreo = async (enlaceId: number) => {
+    const clienteId = clientesEnvioPorEnlace[enlaceId];
+    if (typeof clienteId !== "number") {
+      toast.error("Seleccione un cliente con correo de referencia.");
+      return;
+    }
+    const cliente = clientesActivos.find((item) => item.id === clienteId);
+    if (!cliente?.email_referencia) {
+      toast.error("El cliente seleccionado no tiene correo de referencia registrado.");
+      return;
+    }
+    try {
+      await enviarCorreoEnlace({ enlaceId, clienteId });
+      toast.exito("Correo enviado al cliente.");
+    } catch {
+      toast.error("No se pudo enviar el correo del enlace.");
     }
   };
 
@@ -163,7 +184,7 @@ export default function PublicacionClienteProyecto() {
       <div className={styles.encabezadoSeccion}>
         <div>
           <h2>Publicación al cliente</h2>
-          <p>El enlace incluye únicamente el contenido seleccionado en esta pantalla.</p>
+          <p>El enlace incluye únicamente conjuntos y escenarios IA publicados seleccionados.</p>
         </div>
         <div className={styles.generador}>
           <label>
@@ -178,14 +199,28 @@ export default function PublicacionClienteProyecto() {
               <option value={90}>90 días</option>
             </select>
           </label>
-          <label>
-            Email cliente
-            <input
-              type="email"
-              value={emailDestino}
-              onChange={(event) => setEmailDestino(event.target.value)}
-              placeholder="cliente@empresa.com"
-            />
+          <label className={styles.clienteDestino}>
+            Cliente
+            <select
+              value={clienteDestinoId ?? ""}
+              onChange={(event) =>
+                setClienteDestinoId(event.target.value ? Number(event.target.value) : null)
+              }
+            >
+              <option value="">Solo generar enlace</option>
+              {clientesActivos.map((cliente) => (
+                <option
+                  key={cliente.id}
+                  value={cliente.id}
+                  disabled={!cliente.email_referencia}
+                >
+                  {cliente.nombre}
+                  {cliente.email_referencia
+                    ? ` · ${cliente.email_referencia}`
+                    : " · sin correo de referencia"}
+                </option>
+              ))}
+            </select>
           </label>
           <Button
             type="button"
@@ -193,12 +228,12 @@ export default function PublicacionClienteProyecto() {
             isLoading={creandoEnlace}
             onClick={handleCrearEnlace}
           >
-            {emailDestino.trim() ? (
+            {clienteDestino ? (
               <Mail size={16} aria-hidden="true" />
             ) : (
               <Link2 size={16} aria-hidden="true" />
             )}
-            {emailDestino.trim() ? "Enviar enlace" : "Generar enlace"}
+            {clienteDestino ? "Enviar enlace" : "Generar enlace"}
           </Button>
         </div>
       </div>
@@ -222,39 +257,9 @@ export default function PublicacionClienteProyecto() {
           ))}
         </PanelSeleccion>
 
-        <PanelSeleccion titulo="Heatmaps" vacio="No hay heatmaps generados.">
-          {mapas.map((mapa) => (
-            <SeleccionMapa
-              key={mapa.id}
-              mapa={mapa}
-              seleccionado={mapasSeleccionados.has(mapa.id)}
-              onToggle={() =>
-                setMapasSeleccionados((prev) => _toggleSet(prev, mapa.id))
-              }
-            />
-          ))}
-        </PanelSeleccion>
-
-        <PanelSeleccion titulo="Análisis" vacio="No hay análisis generados.">
-          {mapas
-            .filter((mapa) => mapa.analisis_id !== null)
-            .map((mapa) => (
-              <SeleccionAnalisis
-                key={mapa.analisis_id}
-                mapa={mapa}
-                seleccionado={analisisSeleccionados.has(mapa.analisis_id ?? 0)}
-                onToggle={() =>
-                  setAnalisisSeleccionados((prev) =>
-                    _toggleSet(prev, mapa.analisis_id ?? 0),
-                  )
-                }
-              />
-            ))}
-        </PanelSeleccion>
-
         <PanelSeleccion
-          titulo="Alternativas IA publicadas"
-          vacio="No hay alternativas IA publicadas para cliente."
+          titulo="Escenarios IA publicados"
+          vacio="No hay propuestas IA publicadas para cliente."
         >
           {escenariosPublicados.map((escenario) => (
             <SeleccionEscenario
@@ -264,21 +269,6 @@ export default function PublicacionClienteProyecto() {
               onToggle={() =>
                 setEscenariosSeleccionados((prev) =>
                   _toggleSet(prev, escenario.id),
-                )
-              }
-            />
-          ))}
-        </PanelSeleccion>
-
-        <PanelSeleccion titulo="Reporte" vacio="No hay reportes listos.">
-          {reportesListos.map((reporte) => (
-            <SeleccionReporte
-              key={reporte.id}
-              reporte={reporte}
-              seleccionado={reporteSeleccionado === reporte.id}
-              onToggle={() =>
-                setReporteSeleccionado((prev) =>
-                  prev === reporte.id ? null : reporte.id,
                 )
               }
             />
@@ -296,57 +286,103 @@ export default function PublicacionClienteProyecto() {
           <EmptyState mensaje="Todavía no hay enlaces de cliente para este proyecto." />
         ) : (
           <div className={styles.enlacesLista}>
-            {enlacesCliente.map((enlace) => (
-              <div key={enlace.id} className={styles.enlaceRow}>
-                <div>
-                  <strong>
-                    {enlace.revocado ? "Revocado" : "Activo"} · vence{" "}
-                    {_fechaCorta(enlace.expira_en)}
-                  </strong>
-                  <small>
-                    {enlace.accesos} acceso(s) ·{" "}
-                    {enlace.contenido.conjunto_ids.length} conjunto(s) ·{" "}
-                    {enlace.contenido.escenario_ids.length} alternativa(s)
-                  </small>
+            {enlacesCliente.map((enlace) => {
+              const clienteEnvioId = clientesEnvioPorEnlace[enlace.id] ?? "";
+              return (
+                <div key={enlace.id} className={styles.enlaceRow}>
+                  <div>
+                    <strong>
+                      {enlace.revocado ? "Revocado" : "Activo"} · vence{" "}
+                      {_fechaCorta(enlace.expira_en)}
+                    </strong>
+                    <small>
+                      {enlace.accesos} acceso(s) ·{" "}
+                      {enlace.contenido.conjunto_ids.length} conjunto(s) ·{" "}
+                      {enlace.contenido.escenario_ids.length} escenario(s) IA
+                    </small>
+                  </div>
+                  <div className={styles.enlaceAcciones}>
+                    <select
+                      className={styles.selectorCorreo}
+                      value={clienteEnvioId}
+                      disabled={enlace.revocado || enviandoCorreo}
+                      aria-label="Cliente destino para correo"
+                      onChange={(event) =>
+                        setClientesEnvioPorEnlace((prev) => ({
+                          ...prev,
+                          [enlace.id]: event.target.value
+                            ? Number(event.target.value)
+                            : "",
+                        }))
+                      }
+                    >
+                      <option value="">Cliente</option>
+                      {clientesActivos.map((cliente) => (
+                        <option
+                          key={cliente.id}
+                          value={cliente.id}
+                          disabled={!cliente.email_referencia}
+                        >
+                          {cliente.nombre}
+                          {cliente.email_referencia
+                            ? ` · ${cliente.email_referencia}`
+                            : " · sin correo"}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      type="button"
+                      variante="secondary"
+                      tamano="sm"
+                      disabled={
+                        enlace.revocado ||
+                        typeof clienteEnvioId !== "number" ||
+                        enviandoCorreo
+                      }
+                      isLoading={enviandoCorreo}
+                      onClick={() => handleEnviarCorreo(enlace.id)}
+                    >
+                      <Mail size={14} aria-hidden="true" />
+                      Enviar
+                    </Button>
+                    <Button
+                      type="button"
+                      variante="ghost"
+                      tamano="sm"
+                      onClick={() => handleCopiar(enlace.url_publica)}
+                    >
+                      <Copy size={14} aria-hidden="true" />
+                      Copiar
+                    </Button>
+                    <a
+                      className={styles.abrirEnlace}
+                      href={enlace.url_publica}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="Abrir enlace"
+                    >
+                      <ExternalLink size={14} aria-hidden="true" />
+                    </a>
+                    <Button
+                      type="button"
+                      variante={enlace.revocado ? "secondary" : "danger"}
+                      tamano="sm"
+                      disabled={actualizandoEnlace}
+                      onClick={() =>
+                        handleActualizarEnlace(enlace.id, !enlace.revocado)
+                      }
+                    >
+                      {enlace.revocado ? (
+                        <RotateCcw size={14} aria-hidden="true" />
+                      ) : (
+                        <XCircle size={14} aria-hidden="true" />
+                      )}
+                      {enlace.revocado ? "Reactivar" : "Revocar"}
+                    </Button>
+                  </div>
                 </div>
-                <div className={styles.enlaceAcciones}>
-                  <Button
-                    type="button"
-                    variante="ghost"
-                    tamano="sm"
-                    onClick={() => handleCopiar(enlace.url_publica)}
-                  >
-                    <Copy size={14} aria-hidden="true" />
-                    Copiar
-                  </Button>
-                  <a
-                    className={styles.abrirEnlace}
-                    href={enlace.url_publica}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label="Abrir enlace"
-                  >
-                    <ExternalLink size={14} aria-hidden="true" />
-                  </a>
-                  <Button
-                    type="button"
-                    variante={enlace.revocado ? "secondary" : "danger"}
-                    tamano="sm"
-                    disabled={actualizandoEnlace}
-                    onClick={() =>
-                      handleActualizarEnlace(enlace.id, !enlace.revocado)
-                    }
-                  >
-                    {enlace.revocado ? (
-                      <RotateCcw size={14} aria-hidden="true" />
-                    ) : (
-                      <XCircle size={14} aria-hidden="true" />
-                    )}
-                    {enlace.revocado ? "Reactivar" : "Revocar"}
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -409,70 +445,13 @@ function SeleccionEscenario({
       <input type="checkbox" checked={seleccionado} onChange={onToggle} />
       <span>
         <strong>{escenario.nombre}</strong>
-        <small>
-          {escenario.pct_cobertura.toFixed(1)}% cobertura ·{" "}
-          {escenario.cantidad_aps} APs
-        </small>
-      </span>
-    </label>
-  );
-}
-
-function SeleccionMapa({
-  mapa,
-  seleccionado,
-  onToggle,
-}: {
-  mapa: MapaCalorOut;
-  seleccionado: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <label className={styles.itemSeleccion}>
-      <input type="checkbox" checked={seleccionado} onChange={onToggle} />
-      <span>
-        <strong>{mapa.ssid || mapa.bssid || `Heatmap #${mapa.id}`}</strong>
-        <small>{mapa.modo_generacion} · {mapa.cantidad_puntos} puntos</small>
-      </span>
-    </label>
-  );
-}
-
-function SeleccionAnalisis({
-  mapa,
-  seleccionado,
-  onToggle,
-}: {
-  mapa: MapaCalorOut;
-  seleccionado: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <label className={styles.itemSeleccion}>
-      <input type="checkbox" checked={seleccionado} onChange={onToggle} />
-      <span>
-        <strong>Análisis #{mapa.analisis_id}</strong>
-        <small>Heatmap {mapa.ssid || mapa.bssid || `#${mapa.id}`}</small>
-      </span>
-    </label>
-  );
-}
-
-function SeleccionReporte({
-  reporte,
-  seleccionado,
-  onToggle,
-}: {
-  reporte: ReporteOut;
-  seleccionado: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <label className={styles.itemSeleccion}>
-      <input type="checkbox" checked={seleccionado} onChange={onToggle} />
-      <span>
-        <strong>Reporte #{reporte.id}</strong>
-        <small>{_fechaCorta(reporte.created_at)} · {reporte.tamanio_bytes} bytes</small>
+        <small>{escenario.resumen}</small>
+        <span className={styles.itemMeta}>
+          <span>Actual {_porcentaje(escenario.pct_cobertura_actual)}</span>
+          <span>Proyectada {_porcentaje(escenario.pct_cobertura)}</span>
+          <span>{escenario.cantidad_aps} AP(s)</span>
+          <span>{escenario.confianza}</span>
+        </span>
       </span>
     </label>
   );
@@ -512,4 +491,8 @@ function _labelOrigen(origen: string): string {
     ia: "IA",
   };
   return mapa[origen] ?? origen;
+}
+
+function _porcentaje(valor: number): string {
+  return `${valor.toFixed(1)}%`;
 }

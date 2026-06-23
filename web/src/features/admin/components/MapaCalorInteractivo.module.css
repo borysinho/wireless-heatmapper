@@ -1,17 +1,22 @@
 .contenedor { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-md); margin: 0; overflow: hidden; }
+.compacto { background: var(--bg-surface); }
 .encabezado { align-items: center; display: flex; gap: 1rem; justify-content: space-between; padding: .65rem .75rem; }
 .encabezado strong, .encabezado span { display: block; }
 .encabezado strong { color: var(--text-h); font-size: .82rem; }
 .encabezado span { color: var(--text-muted); font-size: .73rem; margin-top: .15rem; }
+.compacto .encabezado { padding: .55rem .65rem; }
 .controlesVista { align-items: center; display: flex; gap: .25rem; }
 .controlesVista button { align-items: center; background: var(--bg-surface); border: 1px solid var(--border); border-radius: .35rem; color: var(--text); cursor: pointer; display: flex; height: 2rem; justify-content: center; width: 2rem; }
 .controlesVista > span { margin: 0 .25rem; min-width: 2.6rem; text-align: center; }
+.compacto .controlesVista button { height: 1.75rem; width: 1.75rem; }
 .barraCapas { align-items: center; background: var(--bg-surface); border-block: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: .5rem 1rem; padding: .5rem .75rem; }
 .barraCapas label { align-items: center; color: var(--text); display: flex; font-size: .75rem; gap: .35rem; }
+.compacto .barraCapas { gap: .45rem .7rem; padding: .45rem .65rem; }
 .opacidad { margin-left: auto; }
 .opacidad input { accent-color: var(--color-primary); width: 7rem; }
 .opacidad span { min-width: 2.2rem; }
 .visor { align-items: center; background: #0f172a; cursor: grab; display: flex; height: min(58vh, 40rem); justify-content: center; overflow: hidden; touch-action: none; user-select: none; }
+.compacto .visor { height: 18rem; }
 .arrastrando { cursor: grabbing; }
 .lienzo { flex: 0 0 auto; position: relative; transform-origin: center; }
 .plano, .heatmap, .marcadores { height: 100%; inset: 0; position: absolute; width: 100%; }
@@ -23,9 +28,19 @@
 .ap circle { fill: #172033; stroke: #fbbf24; stroke-width: 3; vector-effect: non-scaling-stroke; }
 .ap text { fill: white; font-size: 12px; font-weight: 800; pointer-events: none; }
 .tooltip { background: rgba(15,23,42,.94); border: 1px solid rgba(255,255,255,.22); border-radius: .35rem; color: white; font-size: .72rem; padding: .3rem .45rem; pointer-events: none; position: absolute; z-index: 3; }
+.apHint { background: rgba(15,23,42,.97); border: 1px solid rgba(251,191,36,.55); border-radius: .45rem; box-shadow: 0 14px 30px rgba(0,0,0,.28); color: white; display: grid; gap: .35rem; max-width: min(18rem, 86%); min-width: 13rem; padding: .7rem .8rem; pointer-events: none; position: absolute; transform: translate(1rem,-50%); z-index: 4; }
+.apHint strong, .apHint span { display: block; }
+.apHint strong { font-size: .82rem; }
+.apHint span { color: rgba(255,255,255,.72); font-size: .72rem; line-height: 1.35; }
+.apHint dl { display: grid; gap: .35rem; grid-template-columns: repeat(2,minmax(0,1fr)); margin: .1rem 0 0; }
+.apHint div { min-width: 0; }
+.apHint dt { color: rgba(255,255,255,.58); font-size: .62rem; margin: 0 0 .05rem; text-transform: uppercase; }
+.apHint dd { color: white; font-size: .72rem; font-weight: 700; margin: 0; overflow-wrap: anywhere; }
 .leyenda { align-items: center; display: flex; flex-wrap: wrap; gap: .4rem .8rem; justify-content: center; padding: .6rem .75rem; }
 .leyenda span { align-items: center; color: var(--text-muted); display: flex; font-size: .7rem; gap: .3rem; }
 .leyenda i { height: .55rem; width: .8rem; }
+.compacto .leyenda { gap: .35rem .55rem; padding: .45rem .6rem; }
+.compacto .leyenda span { font-size: .66rem; }
 .detalle { align-items: center; background: color-mix(in srgb, var(--color-primary) 12%, var(--bg)); border: 0; border-top: 1px solid var(--border); color: var(--text-h); cursor: pointer; display: flex; font: inherit; font-size: .76rem; justify-content: space-between; padding: .65rem .75rem; text-align: left; width: 100%; }
 .detalle span { font-size: 1.1rem; }
 .informacion { border-top: 1px solid var(--border); display: grid; gap: .75rem; padding: .75rem; }

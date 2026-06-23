@@ -6,6 +6,10 @@ import math
 from dataclasses import dataclass
 
 from app.ai.modelo_propagacion import ModeloPropagacion
+from app.services.geometria_service import (
+    mascara_poligono,
+    punto_en_poligono,
+)
 from app.services.interpolacion_service import PuntoRSSI
 
 
@@ -42,12 +46,14 @@ class OptimizadorAPService:
         ancho_px: int,
         alto_px: int,
         metros_por_pixel: float,
-        max_aps: int,
+        max_aps: int | None = None,
         banda: str,
         resolucion: int,
         umbral_objetivo_dbm: int = -70,
         bandas: list[str] | None = None,
         aps_existentes: list[dict] | None = None,
+        cantidad_recomendaciones: int = 3,
+        poligono_interes: list[dict] | None = None,
     ) -> list[AlternativaOptimizada]:
         if not puntos_actuales:
             raise ValueError("Se requieren puntos de medición para optimizar.")
@@ -55,28 +61,38 @@ class OptimizadorAPService:
         bandas_objetivo = list(dict.fromkeys(bandas or [banda]))
         if banda not in bandas_objetivo:
             banda = "5" if "5" in bandas_objetivo else bandas_objetivo[0]
-        cantidad_max = max(1, max_aps)
-
         pct_actual = self._pct_cobertura(
             matriz_actual,
             umbral_objetivo_dbm=umbral_objetivo_dbm,
+            mascara=mascara_poligono(
+                poligono=poligono_interes,
+                ancho_px=ancho_px,
+                alto_px=alto_px,
+                resolucion=len(matriz_actual),
+            ),
         )
         candidatos = self._candidatos(
             puntos=puntos_actuales,
             ancho_px=ancho_px,
             alto_px=alto_px,
+            poligono_interes=poligono_interes,
         )
+        cantidad_max = max(1, min(max_aps or len(candidatos), len(candidatos)))
         alternativas: list[AlternativaOptimizada] = []
-        for cantidad in range(1, cantidad_max + 1):
-            seleccionados = self._greedy(
+        variantes_iniciales = [()] + [(candidato,) for candidato in candidatos]
+        vistos: set[tuple[tuple[float, float], ...]] = set()
+        for iniciales in variantes_iniciales:
+            seleccionados = self._greedy_desde(
                 candidatos=candidatos,
-                cantidad=cantidad,
+                cantidad=cantidad_max,
+                iniciales=list(iniciales),
                 ancho_px=ancho_px,
                 alto_px=alto_px,
                 metros_por_pixel=metros_por_pixel,
                 banda=banda,
                 resolucion=resolucion,
                 umbral_objetivo_dbm=umbral_objetivo_dbm,
+                poligono_interes=poligono_interes,
             )
             seleccionados = self._busqueda_local(
                 seleccionados=seleccionados,
@@ -86,10 +102,26 @@ class OptimizadorAPService:
                 banda=banda,
                 resolucion=resolucion,
                 umbral_objetivo_dbm=umbral_objetivo_dbm,
+                poligono_interes=poligono_interes,
             )
+            clave = tuple(sorted((round(x, 1), round(y, 1)) for x, y in seleccionados))
+            if clave in vistos:
+                continue
+            vistos.add(clave)
             for indice, ap in enumerate((aps_existentes or [])[: len(seleccionados)]):
-                if ap.get("restriccion_movimiento") == "FIJO":
+                ap_dentro = self._coord_en_poligono(
+                    float(ap["coord_x"]),
+                    float(ap["coord_y"]),
+                    poligono_interes,
+                )
+                if ap.get("restriccion_movimiento") == "FIJO" and ap_dentro:
                     seleccionados[indice] = (float(ap["coord_x"]), float(ap["coord_y"]))
+            mascara = mascara_poligono(
+                poligono=poligono_interes,
+                ancho_px=ancho_px,
+                alto_px=alto_px,
+                resolucion=resolucion,
+            )
             mapas_por_banda = {
                 banda_actual: self._matriz_desde_aps(
                     aps=seleccionados,
@@ -105,6 +137,7 @@ class OptimizadorAPService:
             pct = self._pct_cobertura(
                 matriz_proyectada,
                 umbral_objetivo_dbm=umbral_objetivo_dbm,
+                mascara=mascara,
             )
             recomendaciones = [
                 self._recomendacion(
@@ -116,37 +149,43 @@ class OptimizadorAPService:
                     metros_por_pixel=metros_por_pixel,
                     bandas=bandas_objetivo,
                     umbral_objetivo_dbm=umbral_objetivo_dbm,
-                    ap_existente=(aps_existentes or [None] * cantidad)[idx - 1]
-                    if idx <= len(aps_existentes or [])
-                    else None,
+                    ap_existente=self._ap_existente_para_recomendacion(
+                        aps_existentes=aps_existentes,
+                        indice=idx - 1,
+                        poligono_interes=poligono_interes,
+                    ),
                 )
                 for idx, (x, y) in enumerate(seleccionados, start=1)
             ]
             alternativas.append(
                 AlternativaOptimizada(
-                    nombre=f"Alternativa {cantidad}",
+                    nombre=f"Propuesta {len(alternativas) + 1}",
                     banda=banda,
                     modelo_ap="AP propuesto para cobertura",
                     pct_cobertura_actual=pct_actual,
                     pct_cobertura=pct,
                     costo_estimado=0,
-                    cantidad_aps=cantidad,
+                    cantidad_aps=len(seleccionados),
                     resumen=(
-                        f"Con {cantidad} AP(s) de potencia ajustable en banda "
-                        f"{banda} GHz se proyecta {pct:.1f}% de cobertura "
-                        f">= {umbral_objetivo_dbm} dBm."
+                        f"Se recomiendan {len(seleccionados)} ubicación(es) de AP con "
+                        f"potencia ajustable en banda {banda} GHz para proyectar "
+                        f"{pct:.1f}% de cobertura >= {umbral_objetivo_dbm} dBm."
                     ),
                     metricas={
                         "pct_cobertura_actual": pct_actual,
                         "pct_cobertura_proyectada": pct,
                         "mejora_pct": round(pct - pct_actual, 2),
+                        "cantidad_aps_evaluada": len(seleccionados),
+                        "limite_aps_derivado": cantidad_max,
                         "zonas_muertas_proyectadas": self._zonas_muertas(
-                            matriz_proyectada
+                            matriz_proyectada,
+                            mascara=mascara,
                         ),
                         "pct_cobertura_por_banda": {
                             key: self._pct_cobertura(
                                 value,
                                 umbral_objetivo_dbm=umbral_objetivo_dbm,
+                                mascara=mascara,
                             )
                             for key, value in mapas_por_banda.items()
                         },
@@ -176,7 +215,7 @@ class OptimizadorAPService:
         return sorted(
             alternativas,
             key=lambda item: (-item.pct_cobertura, item.cantidad_aps),
-        )[:3]
+        )[: max(1, cantidad_recomendaciones)]
 
     def _candidatos(
         self,
@@ -184,6 +223,7 @@ class OptimizadorAPService:
         puntos: list[PuntoRSSI],
         ancho_px: int,
         alto_px: int,
+        poligono_interes: list[dict] | None = None,
     ) -> list[tuple[float, float]]:
         criticos = sorted(puntos, key=lambda p: p.rssi)[: max(6, len(puntos) // 3)]
         candidatos = [(p.x, p.y) for p in criticos]
@@ -198,7 +238,13 @@ class OptimizadorAPService:
             )
             if coord not in unicos:
                 unicos.append(coord)
-        return unicos
+        filtrados = [
+            coord for coord in unicos if self._coord_en_poligono(*coord, poligono_interes)
+        ]
+        if filtrados:
+            return filtrados
+        centroide = self._centroide_poligono(poligono_interes)
+        return [centroide] if centroide is not None else unicos
 
     def _greedy(
         self,
@@ -211,9 +257,37 @@ class OptimizadorAPService:
         banda: str,
         resolucion: int,
         umbral_objetivo_dbm: int,
+        poligono_interes: list[dict] | None = None,
     ) -> list[tuple[float, float]]:
-        seleccionados: list[tuple[float, float]] = []
-        restantes = candidatos[:]
+        return self._greedy_desde(
+            candidatos=candidatos,
+            cantidad=cantidad,
+            iniciales=[],
+            ancho_px=ancho_px,
+            alto_px=alto_px,
+            metros_por_pixel=metros_por_pixel,
+            banda=banda,
+            resolucion=resolucion,
+            umbral_objetivo_dbm=umbral_objetivo_dbm,
+            poligono_interes=poligono_interes,
+        )
+
+    def _greedy_desde(
+        self,
+        *,
+        candidatos: list[tuple[float, float]],
+        cantidad: int,
+        iniciales: list[tuple[float, float]],
+        ancho_px: int,
+        alto_px: int,
+        metros_por_pixel: float,
+        banda: str,
+        resolucion: int,
+        umbral_objetivo_dbm: int,
+        poligono_interes: list[dict] | None = None,
+    ) -> list[tuple[float, float]]:
+        seleccionados = iniciales[:cantidad]
+        restantes = [candidato for candidato in candidatos if candidato not in seleccionados]
         while len(seleccionados) < cantidad and restantes:
             mejor = max(
                 restantes,
@@ -227,6 +301,12 @@ class OptimizadorAPService:
                         resolucion=resolucion,
                     ),
                     umbral_objetivo_dbm=umbral_objetivo_dbm,
+                    mascara=mascara_poligono(
+                        poligono=poligono_interes,
+                        ancho_px=ancho_px,
+                        alto_px=alto_px,
+                        resolucion=resolucion,
+                    ),
                 ),
             )
             seleccionados.append(mejor)
@@ -243,6 +323,7 @@ class OptimizadorAPService:
         banda: str,
         resolucion: int,
         umbral_objetivo_dbm: int,
+        poligono_interes: list[dict] | None = None,
     ) -> list[tuple[float, float]]:
         paso = max(20.0, min(ancho_px, alto_px) * 0.08)
         actuales = seleccionados[:]
@@ -260,7 +341,14 @@ class OptimizadorAPService:
                     round(max(0, min(alto_px, vy)), 2),
                 )
                 for vx, vy in vecinos
+                if self._coord_en_poligono(
+                    round(max(0, min(ancho_px, vx)), 2),
+                    round(max(0, min(alto_px, vy)), 2),
+                    poligono_interes,
+                )
             ]
+            if not vecinos:
+                continue
             actuales[idx] = max(
                 vecinos,
                 key=lambda c: self._pct_cobertura(
@@ -273,6 +361,12 @@ class OptimizadorAPService:
                         resolucion=resolucion,
                     ),
                     umbral_objetivo_dbm=umbral_objetivo_dbm,
+                    mascara=mascara_poligono(
+                        poligono=poligono_interes,
+                        ancho_px=ancho_px,
+                        alto_px=alto_px,
+                        resolucion=resolucion,
+                    ),
                 ),
             )
         return actuales
@@ -442,12 +536,65 @@ class OptimizadorAPService:
         matriz: list[list[float]],
         *,
         umbral_objetivo_dbm: int = -70,
+        mascara: list[list[bool]] | None = None,
     ) -> float:
-        valores = [valor for fila in matriz for valor in fila]
+        valores = [
+            valor
+            for fila_idx, fila in enumerate(matriz)
+            for col_idx, valor in enumerate(fila)
+            if mascara is None or mascara[fila_idx][col_idx]
+        ]
         if not valores:
             return 0.0
         cubiertas = sum(1 for valor in valores if valor >= umbral_objetivo_dbm)
         return round(cubiertas * 100 / len(valores), 2)
 
-    def _zonas_muertas(self, matriz: list[list[float]]) -> int:
-        return sum(1 for fila in matriz for valor in fila if valor < -90)
+    def _zonas_muertas(
+        self,
+        matriz: list[list[float]],
+        *,
+        mascara: list[list[bool]] | None = None,
+    ) -> int:
+        return sum(
+            1
+            for fila_idx, fila in enumerate(matriz)
+            for col_idx, valor in enumerate(fila)
+            if valor < -90 and (mascara is None or mascara[fila_idx][col_idx])
+        )
+
+    def _coord_en_poligono(
+        self,
+        x: float,
+        y: float,
+        poligono: list[dict] | None,
+    ) -> bool:
+        return not poligono or punto_en_poligono(x, y, poligono)
+
+    def _centroide_poligono(
+        self,
+        poligono: list[dict] | None,
+    ) -> tuple[float, float] | None:
+        if not poligono:
+            return None
+        return (
+            round(sum(float(p["x"]) for p in poligono) / len(poligono), 2),
+            round(sum(float(p["y"]) for p in poligono) / len(poligono), 2),
+        )
+
+    def _ap_existente_para_recomendacion(
+        self,
+        *,
+        aps_existentes: list[dict] | None,
+        indice: int,
+        poligono_interes: list[dict] | None,
+    ) -> dict | None:
+        if not aps_existentes or indice >= len(aps_existentes):
+            return None
+        ap = aps_existentes[indice]
+        if ap.get("restriccion_movimiento") == "FIJO" and not self._coord_en_poligono(
+            float(ap["coord_x"]),
+            float(ap["coord_y"]),
+            poligono_interes,
+        ):
+            return None
+        return ap

@@ -27,21 +27,25 @@ export interface UsuarioUpdate {
 export interface ClienteBasicoOut {
   id: number;
   nombre: string;
+  email_referencia: string | null;
 }
 
 export interface ClienteOut {
   id: number;
   nombre: string;
+  email_referencia: string | null;
   activo: boolean;
   created_at: string;
 }
 
 export interface ClienteCreate {
   nombre: string;
+  email_referencia?: string | null;
 }
 
 export interface ClienteUpdate {
   nombre?: string;
+  email_referencia?: string | null;
   activo?: boolean;
 }
 
@@ -230,14 +234,28 @@ export interface EscenarioOptimizadoOut {
 export interface RestriccionesEscenarioIn {
   plano_id?: number;
   fuente_entrada?: FuenteEntradaEscenarioIn;
-  max_aps: number;
   bandas: Array<"2.4" | "5">;
   umbral_objetivo_dbm: number;
   resolucion: number;
+  cantidad_recomendaciones: number;
 }
 
 export interface EscenariosGeneradosOut {
-  escenarios: EscenarioOptimizadoOut[];
+  escenarios: EscenarioGeneradoResumenOut[];
+}
+
+export interface EscenarioGeneradoResumenOut {
+  id: number;
+  proyecto_id: number;
+  plano_id: number;
+  conjunto_base_id: number | null;
+  estado_gobernanza: EstadoGobernanzaEscenario | string;
+  nombre: string;
+  pct_cobertura_actual: number;
+  pct_cobertura: number;
+  cantidad_aps: number;
+  confianza: string;
+  created_at: string;
 }
 
 export type EstadoGobernanzaEscenario =
@@ -270,7 +288,17 @@ export interface EnlaceClienteOut {
 export interface EnlaceClienteCrearIn {
   expira_en_dias: number;
   contenido: ContenidoEnlaceIn;
-  email_destino?: string | null;
+  cliente_id?: number | null;
+}
+
+export interface EnlaceClienteEnviarCorreoIn {
+  cliente_id: number;
+}
+
+export interface EnlaceClienteEnviarCorreoOut {
+  enlace_id: number;
+  destinatario: string;
+  enviado: boolean;
 }
 
 export interface PortalProyectoOut {

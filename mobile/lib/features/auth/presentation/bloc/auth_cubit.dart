@@ -103,6 +103,14 @@ class AuthCubit extends Cubit<AuthState> {
     emit(const AuthUnauthenticated());
   }
 
+  /// Marca la sesión como expirada después de que el interceptor JWT limpia
+  /// los tokens locales. Esto evita que el router rebote /login a /proyectos
+  /// usando un estado AuthAuthenticated ya obsoleto.
+  void marcarSesionExpirada() {
+    _conectividadSub?.cancel();
+    emit(const AuthUnauthenticated());
+  }
+
   /// Cierra la sesión activa (CA-4).
   Future<void> logout() async {
     _conectividadSub?.cancel();

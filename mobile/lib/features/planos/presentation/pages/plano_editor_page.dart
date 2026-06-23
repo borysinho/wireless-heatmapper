@@ -62,6 +62,12 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
 
   late Plano _plano;
 
+  bool _modoPoligono = false;
+  bool _guardandoPoligono = false;
+  List<Offset> _poligonoInteres = [];
+  Offset? _ultimoTapPoligono;
+  DateTime? _ultimoTapPoligonoAt;
+
   // ── Modo Regla (ruler) — Sp2-17 / CA-4 PB-11 ──────────────────────────────
   bool _modoRegla = false;
   Offset? _reglaA;
@@ -80,6 +86,8 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
   void initState() {
     super.initState();
     _plano = widget.plano;
+    _poligonoInteres =
+        _plano.poligonoInteres.map((p) => Offset(p.x, p.y)).toList();
     _transformController = TransformationController();
     _transformController.addListener(() {
       final escala = _transformController.value.getMaxScaleOnAxis();
@@ -128,6 +136,48 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
   void _cargarPuntosSiCalibrado() {
     if (!mounted || !_plano.calibrado) return;
     context.read<CapturaCubit>().iniciarSesion(_plano.id);
+  }
+
+  Future<void> _recargarPoligonoInteres() async {
+    try {
+      final puntos =
+          await context.read<CapturaCubit>().obtenerPoligonoInteres(_plano.id);
+      if (!mounted) return;
+      setState(() {
+        _plano = _plano.copyWith(poligonoInteres: puntos);
+        _poligonoInteres = puntos.map((p) => Offset(p.x, p.y)).toList();
+      });
+    } catch (_) {
+      // Mantener el plano actual si no se puede refrescar el área.
+    }
+  }
+
+  void _abrirHeatmapSiListo() {
+    if (_plano.poligonoInteres.length < 3) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Traza y cierra el polígono de interés desde captura antes de ver el heatmap.',
+            ),
+          ),
+        );
+      return;
+    }
+    context.pushNamed(
+      'heatmap',
+      pathParameters: {
+        'id': _plano.proyectoId.toString(),
+        'planoId': _plano.id.toString(),
+      },
+      extra: {
+        'planoId': _plano.id,
+        'imagenUrl': resolverUrlFirmada(_plano.urlFirmada),
+        'anchoPlanoPx': _plano.anchoPx.toDouble(),
+        'altoPlanoPx': _plano.altoPx.toDouble(),
+      },
+    );
   }
 
   List<PuntoMedicion> _puntosDesdeEstado(CapturaState state) {
@@ -189,7 +239,9 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
   void _onTap() {
     final pos = _ultimoTapDown;
     if (pos == null) return;
-    if (_modoCalibracion) {
+    if (_modoPoligono) {
+      _onTapPoligono(pos);
+    } else if (_modoCalibracion) {
       if (_tocaPunto(pos, _puntoA) || _tocaPunto(pos, _puntoB)) return;
       final puntoImagen = _tapAImagen(pos);
       setState(() {
@@ -219,8 +271,103 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
     }
   }
 
+  void _alternarModoPoligono() {
+    if (_guardandoPoligono || !_plano.calibrado) return;
+    setState(() {
+      if (_modoPoligono) {
+        _poligonoInteres =
+            _plano.poligonoInteres.map((p) => Offset(p.x, p.y)).toList();
+      } else {
+        _modoCalibracion = false;
+        _modoRegla = false;
+        _reglaA = null;
+        _reglaB = null;
+      }
+      _modoPoligono = !_modoPoligono;
+      _ultimoTapPoligono = null;
+      _ultimoTapPoligonoAt = null;
+    });
+  }
+
+  void _onTapPoligono(Offset localPos) {
+    if (_guardandoPoligono) return;
+    final puntoImagen = _limitarPuntoImagen(_tapAImagen(localPos));
+    final ahora = DateTime.now();
+    final ultimo = _ultimoTapPoligono;
+    final esDobleTapMismoPunto = ultimo != null &&
+        _ultimoTapPoligonoAt != null &&
+        ahora.difference(_ultimoTapPoligonoAt!).inMilliseconds <= 650 &&
+        (ultimo - puntoImagen).distance <=
+            18 / (_zoomEscala <= 0 ? 1 : _zoomEscala);
+
+    if (esDobleTapMismoPunto) {
+      _cerrarYGuardarPoligono();
+      return;
+    }
+
+    setState(() {
+      if (_plano.poligonoInteres.length >= 3 &&
+          _poligonoInteres.length == _plano.poligonoInteres.length) {
+        _poligonoInteres = [];
+      }
+      _poligonoInteres = [..._poligonoInteres, puntoImagen];
+      _ultimoTapPoligono = puntoImagen;
+      _ultimoTapPoligonoAt = ahora;
+    });
+  }
+
+  Future<void> _cerrarYGuardarPoligono() async {
+    if (_poligonoInteres.length < 3) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('El polígono requiere al menos 3 vértices.'),
+          ),
+        );
+      return;
+    }
+
+    setState(() => _guardandoPoligono = true);
+    try {
+      final guardado =
+          await context.read<CapturaCubit>().guardarPoligonoInteres(
+                planoId: _plano.id,
+                puntos: _poligonoInteres
+                    .map((p) => PuntoPlano(x: p.dx, y: p.dy))
+                    .toList(),
+              );
+      if (!mounted) return;
+      setState(() {
+        _plano = _plano.copyWith(poligonoInteres: guardado);
+        _poligonoInteres = guardado.map((p) => Offset(p.x, p.y)).toList();
+        _modoPoligono = false;
+        _guardandoPoligono = false;
+        _ultimoTapPoligono = null;
+        _ultimoTapPoligonoAt = null;
+      });
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Polígono de interés guardado.')),
+        );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _guardandoPoligono = false);
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: const Text('No se pudo guardar el polígono.'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+    }
+  }
+
   /// Inicia el arrastre si la pulsación larga comienza sobre un punto existente.
   void _onLongPressStart(LongPressStartDetails details) {
+    if (_modoPoligono) return;
     final pos = details.localPosition;
     if (_modoCalibracion) {
       if (_tocaPunto(pos, _puntoA)) {
@@ -380,8 +527,11 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
           setState(() {
             _plano = state.planoAfectado!;
             _modoCalibracion = false;
+            _modoPoligono = false;
             _puntoA = Offset(_plano.calibracionX1!, _plano.calibracionY1!);
             _puntoB = Offset(_plano.calibracionX2!, _plano.calibracionY2!);
+            _poligonoInteres =
+                _plano.poligonoInteres.map((p) => Offset(p.x, p.y)).toList();
           });
           _cargarPuntosSiCalibrado();
         }
@@ -408,19 +558,7 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
                 IconButton(
                   tooltip: 'Ver heatmap',
                   icon: const Icon(Icons.local_fire_department_outlined),
-                  onPressed: () => context.pushNamed(
-                    'heatmap',
-                    pathParameters: {
-                      'id': _plano.proyectoId.toString(),
-                      'planoId': _plano.id.toString(),
-                    },
-                    extra: {
-                      'planoId': _plano.id,
-                      'imagenUrl': resolverUrlFirmada(_plano.urlFirmada),
-                      'anchoPlanoPx': _plano.anchoPx.toDouble(),
-                      'altoPlanoPx': _plano.altoPx.toDouble(),
-                    },
-                  ),
+                  onPressed: _abrirHeatmapSiListo,
                 ),
               if (_plano.calibrado && !_modoCalibracion)
                 IconButton(
@@ -429,6 +567,7 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
                     _modoRegla ? Icons.close : Icons.square_foot,
                   ),
                   onPressed: () => setState(() {
+                    _modoPoligono = false;
                     _modoRegla = !_modoRegla;
                     if (!_modoRegla) {
                       _reglaA = null;
@@ -443,6 +582,7 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
                       : 'Calibrar escala',
                   icon: Icon(_modoCalibracion ? Icons.close : Icons.straighten),
                   onPressed: () => setState(() {
+                    _modoPoligono = false;
                     _modoCalibracion = !_modoCalibracion;
                     if (_modoCalibracion) {
                       _modoRegla = false;
@@ -463,6 +603,9 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
                 plano: _plano,
                 modoCalibracion: _modoCalibracion,
                 modoRegla: _modoRegla,
+                modoPoligono: _modoPoligono,
+                verticesPoligono: _poligonoInteres.length,
+                guardandoPoligono: _guardandoPoligono,
                 distanciaReglaM: _distanciaReglaM,
               ),
               Expanded(
@@ -538,7 +681,8 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
                                                   puntoSeleccionado.id,
                                                 _ => null,
                                               };
-                                      if (puntos.isEmpty) {
+                                      if (puntos.isEmpty &&
+                                          _poligonoInteres.isEmpty) {
                                         return const SizedBox.shrink();
                                       }
                                       return CustomPaint(
@@ -551,6 +695,9 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
                                           puntoSeleccionadoId:
                                               puntoSeleccionadoId,
                                           zoomEscala: _zoomEscala,
+                                          poligonoInteres: _poligonoInteres,
+                                          poligonoCerrado: !_modoPoligono &&
+                                              _poligonoInteres.length >= 3,
                                         ),
                                       );
                                     },
@@ -600,25 +747,51 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
                   label: const Text('Confirmar'),
                 )
               : (_plano.calibrado
-                  ? FloatingActionButton.extended(
-                      onPressed: () async {
-                        await context.pushNamed(
-                          'captura',
-                          pathParameters: {
-                            'id': _plano.proyectoId.toString(),
-                            'planoId': _plano.id.toString(),
-                          },
-                          extra: {
-                            'planoId': _plano.id,
-                            'imagenUrl': resolverUrlFirmada(_plano.urlFirmada),
-                            'anchoPlanoPx': _plano.anchoPx.toDouble(),
-                            'altoPlanoPx': _plano.altoPx.toDouble(),
-                          },
-                        );
-                        _cargarPuntosSiCalibrado();
-                      },
-                      icon: const Icon(Icons.wifi_find),
-                      label: const Text('Iniciar captura'),
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FloatingActionButton.extended(
+                          heroTag: 'area-interes',
+                          onPressed:
+                              _guardandoPoligono ? null : _alternarModoPoligono,
+                          icon: Icon(
+                            _modoPoligono
+                                ? Icons.close
+                                : (_plano.poligonoInteres.length >= 3
+                                    ? Icons.polyline
+                                    : Icons.polyline_outlined),
+                          ),
+                          label: Text(
+                            _modoPoligono ? 'Cancelar' : 'Área',
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        FloatingActionButton.extended(
+                          heroTag: 'iniciar-captura',
+                          onPressed: _modoPoligono
+                              ? null
+                              : () async {
+                                  await context.pushNamed(
+                                    'captura',
+                                    pathParameters: {
+                                      'id': _plano.proyectoId.toString(),
+                                      'planoId': _plano.id.toString(),
+                                    },
+                                    extra: {
+                                      'planoId': _plano.id,
+                                      'imagenUrl':
+                                          resolverUrlFirmada(_plano.urlFirmada),
+                                      'anchoPlanoPx': _plano.anchoPx.toDouble(),
+                                      'altoPlanoPx': _plano.altoPx.toDouble(),
+                                    },
+                                  );
+                                  _cargarPuntosSiCalibrado();
+                                  _recargarPoligonoInteres();
+                                },
+                          icon: const Icon(Icons.wifi_find),
+                          label: const Text('Iniciar captura'),
+                        ),
+                      ],
                     )
                   : null),
         ),
@@ -631,12 +804,18 @@ class _StatusBar extends StatelessWidget {
   final Plano plano;
   final bool modoCalibracion;
   final bool modoRegla;
+  final bool modoPoligono;
+  final int verticesPoligono;
+  final bool guardandoPoligono;
   final double? distanciaReglaM;
 
   const _StatusBar({
     required this.plano,
     required this.modoCalibracion,
     this.modoRegla = false,
+    this.modoPoligono = false,
+    this.verticesPoligono = 0,
+    this.guardandoPoligono = false,
     this.distanciaReglaM,
   });
 
@@ -645,24 +824,32 @@ class _StatusBar extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final (Color bgColor, Color fgColor) = modoCalibracion
-        ? (scheme.tertiaryContainer, scheme.onTertiaryContainer)
-        : modoRegla
-            ? (scheme.secondaryContainer, scheme.onSecondaryContainer)
-            : (plano.calibrado
-                ? (scheme.primaryContainer, scheme.onPrimaryContainer)
-                : (scheme.errorContainer, scheme.onErrorContainer));
+    final (Color bgColor, Color fgColor) = modoPoligono
+        ? (scheme.secondaryContainer, scheme.onSecondaryContainer)
+        : modoCalibracion
+            ? (scheme.tertiaryContainer, scheme.onTertiaryContainer)
+            : modoRegla
+                ? (scheme.secondaryContainer, scheme.onSecondaryContainer)
+                : (plano.calibrado
+                    ? (scheme.primaryContainer, scheme.onPrimaryContainer)
+                    : (scheme.errorContainer, scheme.onErrorContainer));
 
-    final texto = modoCalibracion
-        ? 'Modo calibración: toca para marcar · mantén presionado un punto para moverlo.'
-        : modoRegla
-            ? (distanciaReglaM != null
-                ? 'Distancia: ${distanciaReglaM!.toStringAsFixed(2)} m'
-                : 'Modo regla: toca dos puntos del plano para medir la distancia en metros.')
-            : (plano.calibrado
-                ? 'Calibrado · ${plano.escalaMPorPx!.toStringAsFixed(4)} m/px '
-                    '(${plano.distanciaRealM!.toStringAsFixed(2)} m)'
-                : 'Sin calibrar. Toca el ícono de la regla para iniciar.');
+    final texto = modoPoligono
+        ? (guardandoPoligono
+            ? 'Guardando polígono de interés…'
+            : verticesPoligono < 3
+                ? 'Área de interés: marca al menos 3 vértices sobre el plano.'
+                : 'Área de interés: toca dos veces el último vértice para cerrar.')
+        : modoCalibracion
+            ? 'Modo calibración: toca para marcar · mantén presionado un punto para moverlo.'
+            : modoRegla
+                ? (distanciaReglaM != null
+                    ? 'Distancia: ${distanciaReglaM!.toStringAsFixed(2)} m'
+                    : 'Modo regla: toca dos puntos del plano para medir la distancia en metros.')
+                : (plano.calibrado
+                    ? 'Calibrado · ${plano.escalaMPorPx!.toStringAsFixed(4)} m/px '
+                        '(${plano.distanciaRealM!.toStringAsFixed(2)} m)'
+                    : 'Sin calibrar. Toca el ícono de la regla para iniciar.');
     return Container(
       width: double.infinity,
       color: bgColor,

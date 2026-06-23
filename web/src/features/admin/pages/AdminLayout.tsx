@@ -1,6 +1,6 @@
 /**
  * Layout del panel admin con navegación lateral responsive.
- * Protege rutas admin — redirige a login si no hay sesión.
+ * Protege rutas admin — redirige a login si no hay sesión admin.
  * Sprint 1 — PB-13, PB-18.
  */
 
@@ -63,6 +63,13 @@ export default function AdminLayout() {
   }, [cargarSesion]);
 
   useEffect(() => {
+    if (isAuthenticated && usuario?.rol !== "admin") {
+      void cerrarSesion().finally(() => {
+        navigate("/admin/login", { replace: true });
+      });
+      return;
+    }
+
     if (!isAuthenticated) {
       const timer = setTimeout(() => {
         if (!useAuth.getState().isAuthenticated) {
@@ -71,14 +78,14 @@ export default function AdminLayout() {
       }, 50);
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, navigate]);
+  }, [cerrarSesion, isAuthenticated, navigate, usuario?.rol]);
 
   const handleLogout = async () => {
     await cerrarSesion();
     navigate("/admin/login", { replace: true });
   };
 
-  if (!isAuthenticated) return null;
+  if (!isAuthenticated || usuario?.rol !== "admin") return null;
 
   const sidebar = (
     <nav className={styles.nav} aria-label="Navegación principal">

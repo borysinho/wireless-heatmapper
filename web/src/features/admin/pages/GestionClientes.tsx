@@ -25,9 +25,11 @@ export default function GestionClientes() {
 
   const [mostrarModal, setMostrarModal] = useState(false);
   const [nombre, setNombre] = useState("");
+  const [emailReferencia, setEmailReferencia] = useState("");
   const [errorModal, setErrorModal] = useState<string | null>(null);
   const [clienteEditar, setClienteEditar] = useState<ClienteOut | null>(null);
   const [nombreEditar, setNombreEditar] = useState("");
+  const [emailReferenciaEditar, setEmailReferenciaEditar] = useState("");
   const [errorEditar, setErrorEditar] = useState<string | null>(null);
   const [clienteDesactivar, setClienteDesactivar] = useState<ClienteOut | null>(
     null,
@@ -39,9 +41,13 @@ export default function GestionClientes() {
     if (!nombre.trim()) return;
     setErrorModal(null);
     try {
-      await crearCliente({ nombre: nombre.trim() });
+      await crearCliente({
+        nombre: nombre.trim(),
+        email_referencia: emailReferencia.trim() || null,
+      });
       toast.exito(`Cliente "${nombre.trim()}" creado correctamente.`);
       setNombre("");
+      setEmailReferencia("");
       setMostrarModal(false);
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response
@@ -84,7 +90,10 @@ export default function GestionClientes() {
     try {
       await actualizarCliente({
         id: clienteEditar.id,
-        datos: { nombre: nombreEditar.trim() },
+        datos: {
+          nombre: nombreEditar.trim(),
+          email_referencia: emailReferenciaEditar.trim() || null,
+        },
       });
       toast.exito("Cliente actualizado correctamente.");
       setClienteEditar(null);
@@ -131,6 +140,7 @@ export default function GestionClientes() {
         <Button
           onClick={() => {
             setNombre("");
+            setEmailReferencia("");
             setErrorModal(null);
             setMostrarModal(true);
           }}
@@ -148,6 +158,7 @@ export default function GestionClientes() {
             <thead>
               <tr>
                 <th>Nombre</th>
+                <th>Correo de referencia</th>
                 <th>Estado</th>
                 <th>Creado</th>
                 <th>Acciones</th>
@@ -157,6 +168,9 @@ export default function GestionClientes() {
               {clientes.map((c) => (
                 <tr key={c.id} className={!c.activo ? styles.filaInactiva : ""}>
                   <td className={styles.nombreCliente}>{c.nombre}</td>
+                  <td className={styles.emailReferencia}>
+                    {c.email_referencia ?? "Sin correo registrado"}
+                  </td>
                   <td>
                     <Badge variante={c.activo ? "activo" : "inactivo"} />
                   </td>
@@ -168,6 +182,7 @@ export default function GestionClientes() {
                         tamano="sm"
                         onClick={() => {
                           setNombreEditar(c.nombre);
+                          setEmailReferenciaEditar(c.email_referencia ?? "");
                           setErrorEditar(null);
                           setClienteEditar(c);
                         }}
@@ -240,6 +255,19 @@ export default function GestionClientes() {
                   required
                 />
               </div>
+              <div className={styles.campo}>
+                <label htmlFor="email-referencia-cliente" className={styles.label}>
+                  Correo de referencia
+                </label>
+                <input
+                  id="email-referencia-cliente"
+                  type="email"
+                  value={emailReferencia}
+                  onChange={(e) => setEmailReferencia(e.target.value)}
+                  className={styles.input}
+                  maxLength={255}
+                />
+              </div>
               {errorModal && (
                 <p className={styles.errorModal} role="alert">
                   {errorModal}
@@ -292,6 +320,19 @@ export default function GestionClientes() {
                   maxLength={100}
                   autoFocus
                   required
+                />
+              </div>
+              <div className={styles.campo}>
+                <label htmlFor="email-referencia-editar" className={styles.label}>
+                  Correo de referencia
+                </label>
+                <input
+                  id="email-referencia-editar"
+                  type="email"
+                  value={emailReferenciaEditar}
+                  onChange={(e) => setEmailReferenciaEditar(e.target.value)}
+                  className={styles.input}
+                  maxLength={255}
                 />
               </div>
               {errorEditar && (

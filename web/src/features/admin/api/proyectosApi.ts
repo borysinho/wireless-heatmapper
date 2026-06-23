@@ -7,6 +7,8 @@ import type {
   ComparacionEscenarioOut,
   ConjuntoAPOut,
   EnlaceClienteCrearIn,
+  EnlaceClienteEnviarCorreoIn,
+  EnlaceClienteEnviarCorreoOut,
   EnlaceClienteOut,
   EscenarioOptimizadoOut,
   EscenariosGeneradosOut,
@@ -273,6 +275,17 @@ export async function actualizarEnlaceCliente(
   const { data } = await apiClient.patch<EnlaceClienteOut>(
     `/share/enlaces/${enlaceId}`,
     { revocado },
+  );
+  return data;
+}
+
+export async function enviarCorreoEnlaceCliente(
+  enlaceId: number,
+  body: EnlaceClienteEnviarCorreoIn,
+): Promise<EnlaceClienteEnviarCorreoOut> {
+  const { data } = await apiClient.post<EnlaceClienteEnviarCorreoOut>(
+    `/share/enlaces/${enlaceId}/correo`,
+    body,
   );
   return data;
 }

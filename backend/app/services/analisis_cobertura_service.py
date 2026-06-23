@@ -38,11 +38,18 @@ class AnalisisCoberturaService:
         ancho_px: int,
         alto_px: int,
         aps_referencia: list[dict] | None = None,
+        mascara: list[list[bool]] | None = None,
     ) -> dict:
-        total_celdas = sum(len(fila) for fila in matriz)
-        celdas_cobertura = sum(1 for fila in matriz for rssi in fila if rssi >= -70)
-        celdas_problematicas = sum(1 for fila in matriz for rssi in fila if rssi < -75)
-        celdas_muertas = sum(1 for fila in matriz for rssi in fila if rssi < -90)
+        valores = [
+            rssi
+            for fila_idx, fila in enumerate(matriz)
+            for col_idx, rssi in enumerate(fila)
+            if mascara is None or mascara[fila_idx][col_idx]
+        ]
+        total_celdas = len(valores)
+        celdas_cobertura = sum(1 for rssi in valores if rssi >= -70)
+        celdas_problematicas = sum(1 for rssi in valores if rssi < -75)
+        celdas_muertas = sum(1 for rssi in valores if rssi < -90)
         pct_cobertura = self._porcentaje(celdas_cobertura, total_celdas)
         pct_zonas_problematicas = self._porcentaje(celdas_problematicas, total_celdas)
         pct_zonas_muertas = self._porcentaje(celdas_muertas, total_celdas)

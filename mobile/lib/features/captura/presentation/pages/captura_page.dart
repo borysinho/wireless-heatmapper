@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_tokens.dart';
 import '../../domain/entities/punto_medicion.dart';
+import '../../../planos/domain/entities/plano.dart';
 import '../cubit/captura_cubit.dart';
 import '../cubit/captura_state.dart';
 import '../widgets/plano_puntos_painter.dart';
@@ -70,11 +71,19 @@ class _CapturaPageState extends State<CapturaPage> {
   /// Indica que se espera la confirmación de un nuevo punto en modo continuo.
   bool _esperandoNuevoPuntoContinuo = false;
 
+  bool _modoPoligono = false;
+  bool _poligonoCerrado = false;
+  bool _guardandoPoligono = false;
+  List<Offset> _poligonoInteres = [];
+  Offset? _ultimoTapPoligono;
+  DateTime? _ultimoTapPoligonoAt;
+
   @override
   void initState() {
     super.initState();
     _transformController.addListener(_actualizarZoomEscala);
     context.read<CapturaCubit>().iniciarSesion(widget.planoId);
+    _cargarPoligonoInteres();
   }
 
   @override
@@ -102,6 +111,11 @@ class _CapturaPageState extends State<CapturaPage> {
   void _onTap(TapUpDetails details, List<PuntoMedicion> puntos) {
     final box = _canvasKey.currentContext?.findRenderObject() as RenderBox?;
     if (box == null) return;
+
+    if (_modoPoligono) {
+      _onTapPoligono(details, box.size);
+      return;
+    }
 
     final puntoTocado = PlanoPuntosPainter.puntoEnPosicionPantalla(
       tapOffset: details.localPosition,
@@ -166,6 +180,130 @@ class _CapturaPageState extends State<CapturaPage> {
             posY: posPlano.dy,
           );
     }
+  }
+
+  Future<void> _cargarPoligonoInteres() async {
+    try {
+      final puntos = await context
+          .read<CapturaCubit>()
+          .obtenerPoligonoInteres(widget.planoId);
+      if (!mounted) return;
+      setState(() {
+        _poligonoInteres = puntos.map((p) => Offset(p.x, p.y)).toList();
+        _poligonoCerrado = _poligonoInteres.length >= 3;
+      });
+    } catch (_) {
+      // Si falla la carga del polígono, la captura sigue disponible;
+      // el bloqueo al heatmap mostrará el requisito de área.
+    }
+  }
+
+  void _onTapPoligono(TapUpDetails details, Size canvasSize) {
+    if (_guardandoPoligono) return;
+    final posPlano = PlanoPuntosPainter.pantallaToPlanoCoordenadas(
+      tapOffset: details.localPosition,
+      canvasSize: canvasSize,
+      tamanoPlano: _tamanoPlano,
+    );
+
+    final ahora = DateTime.now();
+    final ultimo = _ultimoTapPoligono;
+    final esDobleTapMismoPunto = ultimo != null &&
+        _ultimoTapPoligonoAt != null &&
+        ahora.difference(_ultimoTapPoligonoAt!).inMilliseconds <= 650 &&
+        (ultimo - posPlano).distance <=
+            18 / (_zoomEscala <= 0 ? 1 : _zoomEscala);
+
+    if (esDobleTapMismoPunto) {
+      _cerrarYGuardarPoligono();
+      return;
+    }
+
+    setState(() {
+      if (_poligonoCerrado) {
+        _poligonoInteres = [];
+        _poligonoCerrado = false;
+      }
+      _poligonoInteres = [..._poligonoInteres, posPlano];
+      _ultimoTapPoligono = posPlano;
+      _ultimoTapPoligonoAt = ahora;
+    });
+  }
+
+  Future<void> _cerrarYGuardarPoligono() async {
+    if (_poligonoInteres.length < 3) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('El polígono requiere al menos 3 vértices.'),
+          ),
+        );
+      return;
+    }
+    setState(() => _guardandoPoligono = true);
+    try {
+      final guardado =
+          await context.read<CapturaCubit>().guardarPoligonoInteres(
+                planoId: widget.planoId,
+                puntos: _poligonoInteres
+                    .map((p) => PuntoPlano(x: p.dx, y: p.dy))
+                    .toList(),
+              );
+      if (!mounted) return;
+      setState(() {
+        _poligonoInteres = guardado.map((p) => Offset(p.x, p.y)).toList();
+        _poligonoCerrado = true;
+        _modoPoligono = false;
+        _guardandoPoligono = false;
+        _ultimoTapPoligono = null;
+        _ultimoTapPoligonoAt = null;
+      });
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Polígono de interés guardado.')),
+        );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _guardandoPoligono = false);
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: const Text('No se pudo guardar el polígono.'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+    }
+  }
+
+  void _abrirHeatmapSiListo() {
+    if (!_poligonoCerrado || _poligonoInteres.length < 3) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Traza y cierra el polígono de interés antes de ver el heatmap.',
+            ),
+          ),
+        );
+      return;
+    }
+    context.pushNamed(
+      'heatmap',
+      pathParameters: {
+        'id': '0',
+        'planoId': widget.planoId.toString(),
+      },
+      extra: {
+        'planoId': widget.planoId,
+        'imagenUrl': widget.imagenUrl,
+        'anchoPlanoPx': widget.anchoPlanoPx,
+        'altoPlanoPx': widget.altoPlanoPx,
+      },
+    );
   }
 
   void _abrirDetalle(PuntoMedicion punto) {
@@ -244,6 +382,15 @@ class _CapturaPageState extends State<CapturaPage> {
       _esperandoNuevoPuntoContinuo = false;
       _segundosRestantesCiclo = 0;
       _lecturasPuntoActivo = 0;
+    });
+  }
+
+  void _alternarModoPoligono() {
+    if (_guardandoPoligono) return;
+    setState(() {
+      _modoPoligono = !_modoPoligono;
+      _ultimoTapPoligono = null;
+      _ultimoTapPoligonoAt = null;
     });
   }
 
@@ -364,19 +511,7 @@ class _CapturaPageState extends State<CapturaPage> {
               IconButton(
                 tooltip: 'Ver heatmap',
                 icon: const Icon(Icons.local_fire_department_outlined),
-                onPressed: () => context.pushNamed(
-                  'heatmap',
-                  pathParameters: {
-                    'id': '0',
-                    'planoId': widget.planoId.toString(),
-                  },
-                  extra: {
-                    'planoId': widget.planoId,
-                    'imagenUrl': widget.imagenUrl,
-                    'anchoPlanoPx': widget.anchoPlanoPx,
-                    'altoPlanoPx': widget.altoPlanoPx,
-                  },
-                ),
+                onPressed: _abrirHeatmapSiListo,
               ),
               // Botón visible únicamente cuando hay un ciclo continuo activo
               if (modoContinuo && _puntoActivoContinuoId != null)
@@ -438,6 +573,8 @@ class _CapturaPageState extends State<CapturaPage> {
                               tamanoPlano: _tamanoPlano,
                               puntoSeleccionadoId: puntoSeleccionadoId,
                               zoomEscala: _zoomEscala,
+                              poligonoInteres: _poligonoInteres,
+                              poligonoCerrado: _poligonoCerrado,
                             ),
                             child: Image.network(
                               widget.imagenUrl,
@@ -480,10 +617,129 @@ class _CapturaPageState extends State<CapturaPage> {
                     ),
                   ),
                 ),
+              Positioned(
+                top: AppSpacing.md,
+                right: AppSpacing.md,
+                child: _BotonPoligonoInteres(
+                  activo: _modoPoligono,
+                  cerrado: _poligonoCerrado,
+                  guardando: _guardandoPoligono,
+                  onPressed: _alternarModoPoligono,
+                ),
+              ),
+              if (_modoPoligono || _guardandoPoligono)
+                Positioned(
+                  left: AppSpacing.md,
+                  right: AppSpacing.md,
+                  bottom: AppSpacing.md,
+                  child: _PoligonoBanner(
+                    vertices: _poligonoInteres.length,
+                    guardando: _guardandoPoligono,
+                    cerrado: _poligonoCerrado,
+                  ),
+                ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+class _BotonPoligonoInteres extends StatelessWidget {
+  final bool activo;
+  final bool cerrado;
+  final bool guardando;
+  final VoidCallback onPressed;
+
+  const _BotonPoligonoInteres({
+    required this.activo,
+    required this.cerrado,
+    required this.guardando,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final label = activo ? 'Cerrar' : (cerrado ? 'Redibujar área' : 'Área');
+    final icon = activo
+        ? Icons.close
+        : cerrado
+            ? Icons.polyline
+            : Icons.polyline_outlined;
+
+    final boton = activo
+        ? FilledButton.icon(
+            onPressed: guardando ? null : onPressed,
+            icon: Icon(icon),
+            label: Text(label),
+          )
+        : FilledButton.tonalIcon(
+            onPressed: guardando ? null : onPressed,
+            icon: Icon(icon),
+            label: Text(label),
+          );
+
+    return SafeArea(
+      child: Material(
+        elevation: 4,
+        borderRadius: BorderRadius.circular(8),
+        color: Colors.transparent,
+        child: boton,
+      ),
+    );
+  }
+}
+
+class _PoligonoBanner extends StatelessWidget {
+  final int vertices;
+  final bool guardando;
+  final bool cerrado;
+
+  const _PoligonoBanner({
+    required this.vertices,
+    required this.guardando,
+    required this.cerrado,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final texto = guardando
+        ? 'Guardando polígono…'
+        : cerrado
+            ? 'Toca para iniciar un nuevo polígono.'
+            : vertices < 3
+                ? 'Marca al menos 3 vértices.'
+                : 'Toca dos veces el último punto para cerrar.';
+    return Material(
+      elevation: 6,
+      borderRadius: BorderRadius.circular(8),
+      color: theme.colorScheme.surface.withValues(alpha: 0.96),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        child: Row(
+          children: [
+            guardando
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Icon(Icons.polyline, color: theme.colorScheme.primary),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                '$vertices vértice(s) · $texto',
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

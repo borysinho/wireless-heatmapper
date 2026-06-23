@@ -64,7 +64,10 @@ def crear_cliente(
 ) -> ClienteOut:
     repo = ClienteRepository(db)
     try:
-        cliente = repo.crear(payload.nombre)
+        email_referencia = (
+            str(payload.email_referencia) if payload.email_referencia else None
+        )
+        cliente = repo.crear(payload.nombre, email_referencia=email_referencia)
         db.commit()
         db.refresh(cliente)
         return cliente  # type: ignore[return-value]
@@ -93,7 +96,17 @@ def actualizar_cliente(
     if not cliente:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado")
     try:
-        cliente = repo.actualizar(cliente, nombre=payload.nombre, activo=payload.activo)
+        actualizar_email = "email_referencia" in payload.model_fields_set
+        email_referencia = (
+            str(payload.email_referencia) if payload.email_referencia else None
+        )
+        cliente = repo.actualizar(
+            cliente,
+            nombre=payload.nombre,
+            email_referencia=email_referencia,
+            actualizar_email_referencia=actualizar_email,
+            activo=payload.activo,
+        )
         db.commit()
         db.refresh(cliente)
         return cliente  # type: ignore[return-value]

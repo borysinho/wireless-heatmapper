@@ -6,7 +6,10 @@
 import { create } from "zustand";
 import { login as apiLogin, logout as apiLogout } from "../api/authApi";
 import type { AuthState, UsuarioOut } from "../types";
-import { STORAGE_REFRESH } from "@/shared/api/client";
+import { STORAGE_ACCESS, STORAGE_REFRESH } from "@/shared/api/client";
+
+const MENSAJE_SOLO_ADMIN =
+  "Solo usuarios administradores pueden ingresar al panel web.";
 
 interface AuthStore extends AuthState {
   iniciarSesion: (email: string, password: string) => Promise<void>;
@@ -29,14 +32,19 @@ export const useAuth = create<AuthStore>((set) => ({
     if (raw && tieneToken) {
       try {
         const usuario: UsuarioOut = JSON.parse(raw);
+        if (usuario.rol !== "admin") {
+          _limpiarSesionWeb();
+          set({ usuario: null, isAuthenticated: false });
+          return;
+        }
         set({ usuario, isAuthenticated: true });
       } catch {
-        localStorage.removeItem("usuario");
+        _limpiarSesionWeb();
       }
     } else if (raw && !tieneToken) {
       // Sesión inconsistente: hay perfil guardado pero los tokens expiraron o
       // fueron eliminados. Limpiar para evitar el bucle login ↔ usuarios.
-      localStorage.removeItem("usuario");
+      _limpiarSesionWeb();
     }
   },
 
@@ -44,6 +52,16 @@ export const useAuth = create<AuthStore>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const data = await apiLogin({ email, password });
+      if (data.usuario.rol !== "admin") {
+        _limpiarSesionWeb();
+        set({
+          usuario: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: MENSAJE_SOLO_ADMIN,
+        });
+        throw new Error(MENSAJE_SOLO_ADMIN);
+      }
       localStorage.setItem("usuario", JSON.stringify(data.usuario));
       set({
         usuario: data.usuario,
@@ -63,11 +81,17 @@ export const useAuth = create<AuthStore>((set) => ({
     try {
       if (refreshToken) await apiLogout(refreshToken);
     } finally {
-      localStorage.removeItem("usuario");
+      _limpiarSesionWeb();
       set({ usuario: null, isAuthenticated: false, error: null });
     }
   },
 }));
+
+function _limpiarSesionWeb() {
+  localStorage.removeItem(STORAGE_ACCESS);
+  localStorage.removeItem(STORAGE_REFRESH);
+  localStorage.removeItem("usuario");
+}
 
 function _extraerMensajeError(err: unknown): string {
   if (
@@ -79,6 +103,9 @@ function _extraerMensajeError(err: unknown): string {
   ) {
     return (err as { response: { data: { detail: string } } }).response.data
       .detail;
+  }
+  if (err instanceof Error && err.message === MENSAJE_SOLO_ADMIN) {
+    return MENSAJE_SOLO_ADMIN;
   }
   return "Error al iniciar sesión. Verifique su conexión e intente nuevamente.";
 }

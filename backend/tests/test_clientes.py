@@ -12,7 +12,7 @@ from app.models.cliente import Cliente
 @pytest.fixture
 def cliente_existente(db_session) -> Cliente:
     """Crea un cliente de prueba en la BD."""
-    c = Cliente(nombre="Bulldog Tech.")
+    c = Cliente(nombre="Bulldog Tech.", email_referencia="cliente@bulldog.bo")
     db_session.add(c)
     db_session.commit()
     db_session.refresh(c)
@@ -36,6 +36,7 @@ class TestListarClientes:
         items = resp.json()
         assert isinstance(items, list)
         assert any(c["nombre"] == "Bulldog Tech." for c in items)
+        assert any(c["email_referencia"] == "cliente@bulldog.bo" for c in items)
 
     def test_tecnico_puede_listar_clientes_activos(
         self,
@@ -80,12 +81,16 @@ class TestCrearCliente:
         """CA-1: admin crea cliente con nombre válido → 201 con objeto cliente."""
         resp = client.post(
             "/admin/clientes",
-            json={"nombre": "Empresa Nueva SRL"},
+            json={
+                "nombre": "Empresa Nueva SRL",
+                "email_referencia": "contacto@empresa.bo",
+            },
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert resp.status_code == 201
         data = resp.json()
         assert data["nombre"] == "Empresa Nueva SRL"
+        assert data["email_referencia"] == "contacto@empresa.bo"
         assert data["activo"] is True
         assert "id" in data
         assert "created_at" in data
@@ -125,6 +130,18 @@ class TestCrearCliente:
         )
         assert resp.status_code == 422
 
+    def test_email_referencia_invalido_retorna_422(
+        self,
+        client: TestClient,
+        admin_token: str,
+    ):
+        resp = client.post(
+            "/admin/clientes",
+            json={"nombre": "Empresa Nueva SRL", "email_referencia": "correo-malo"},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 422
+
     def test_sin_token_retorna_401(self, client: TestClient):
         resp = client.post("/admin/clientes", json={"nombre": "Test"})
         assert resp.status_code == 401
@@ -141,11 +158,29 @@ class TestActualizarCliente:
     ):
         resp = client.put(
             f"/admin/clientes/{cliente_existente.id}",
-            json={"nombre": "Bulldog Tech. Actualizado"},
+            json={
+                "nombre": "Bulldog Tech. Actualizado",
+                "email_referencia": "nuevo@bulldog.bo",
+            },
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert resp.status_code == 200
         assert resp.json()["nombre"] == "Bulldog Tech. Actualizado"
+        assert resp.json()["email_referencia"] == "nuevo@bulldog.bo"
+
+    def test_admin_limpia_email_referencia(
+        self,
+        client: TestClient,
+        admin_token: str,
+        cliente_existente: Cliente,
+    ):
+        resp = client.put(
+            f"/admin/clientes/{cliente_existente.id}",
+            json={"email_referencia": None},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["email_referencia"] is None
 
     def test_actualizar_cliente_inexistente_retorna_404(
         self, client: TestClient, admin_token: str

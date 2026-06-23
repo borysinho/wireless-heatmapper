@@ -15,25 +15,32 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.api.v1.escenarios import _firmar_descarga
-from app.api.v1.heatmaps import _conjunto_out, _mapa_out
+from app.api.v1.heatmaps import _conjunto_out, _generar_heatmap_core, _mapa_out
 from app.api.v1.planos import _firmar as _firmar_plano
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import require_admin
 from app.models.escenario import EscenarioOptimizado, Reporte
 from app.models.heatmap import AnalisisCobertura, ConjuntoAP, MapaCalor
+from app.models.cliente import Cliente
 from app.models.plano import Plano
 from app.models.proyecto import Proyecto
 from app.models.share import TokenEnlaceCliente
 from app.models.usuario import Usuario
 from app.repositories.proyecto_repository import ProyectoRepository
 from app.schemas.escenario import EscenarioOptimizadoOut
-from app.schemas.heatmap import AnalisisCoberturaOut
+from app.schemas.heatmap import (
+    AnalisisCoberturaOut,
+    GenerarHeatmapConjuntoIn,
+    MapaCalorOut,
+)
 from app.schemas.plano import PlanoOut
 from app.schemas.share import (
     ContenidoEnlaceIn,
     EnlaceClienteActualizarIn,
     EnlaceClienteCrearIn,
+    EnlaceClienteEnviarCorreoIn,
+    EnlaceClienteEnviarCorreoOut,
     EnlaceClienteOut,
     PortalClienteOut,
     ProyectoPortalOut,
@@ -114,6 +121,67 @@ def _enlace_out(enlace: TokenEnlaceCliente) -> EnlaceClienteOut:
         ip_ultimo_acceso=enlace.ip_ultimo_acceso,
         contenido=_contenido_from_model(enlace),
         created_at=enlace.created_at,
+    )
+
+
+def _cliente_destino_correo(*, cliente_id: int, db: Session) -> Cliente:
+    cliente = (
+        db.query(Cliente)
+        .filter(Cliente.id == cliente_id, Cliente.activo.is_(True))
+        .first()
+    )
+    if cliente is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cliente no encontrado.",
+        )
+    if not cliente.email_referencia:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El cliente seleccionado no tiene correo de referencia registrado.",
+        )
+    return cliente
+
+
+def _asegurar_correo_configurado(email_service: EmailService) -> None:
+    if not email_service.habilitado:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="El correo transaccional no está configurado.",
+        )
+
+
+def _enviar_correo_enlace_cliente(
+    *,
+    enlace: TokenEnlaceCliente,
+    proyecto: Proyecto,
+    cliente: Cliente,
+    request: Request,
+    email_service: EmailService,
+) -> EnlaceClienteEnviarCorreoOut:
+    _asegurar_correo_configurado(email_service)
+    try:
+        enviado = email_service.enviar_enlace_cliente(
+            destinatario=cliente.email_referencia,
+            nombre_proyecto=proyecto.nombre,
+            cliente=cliente.nombre,
+            url_publica=_url_publica_absoluta(enlace.token, request),
+            expira_en=enlace.expira_en,
+        )
+    except EmailDeliveryError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="No se pudo enviar el correo.",
+        ) from exc
+    if not enviado:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="El correo transaccional no está configurado.",
+        )
+    return EnlaceClienteEnviarCorreoOut(
+        enlace_id=enlace.id,
+        destinatario=cliente.email_referencia,
+        enviado=True,
     )
 
 
@@ -262,6 +330,14 @@ def crear_enlace_cliente(
         contenido=body.contenido,
         db=db,
     )
+    cliente_destino: Cliente | None = None
+    email_service = EmailService()
+    if body.cliente_id is not None:
+        cliente_destino = _cliente_destino_correo(
+            cliente_id=body.cliente_id,
+            db=db,
+        )
+        _asegurar_correo_configurado(email_service)
     enlace = TokenEnlaceCliente(
         proyecto_id=proyecto.id,
         token=_generar_token(),
@@ -272,20 +348,14 @@ def crear_enlace_cliente(
     db.add(enlace)
     db.commit()
     db.refresh(enlace)
-    if body.email_destino is not None:
-        try:
-            EmailService().enviar_enlace_cliente(
-                destinatario=str(body.email_destino),
-                nombre_proyecto=proyecto.nombre,
-                cliente=proyecto.cliente.nombre if proyecto.cliente else None,
-                url_publica=_url_publica_absoluta(enlace.token, request),
-                expira_en=enlace.expira_en,
-            )
-        except EmailDeliveryError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="El enlace fue creado, pero no se pudo enviar el correo.",
-            ) from exc
+    if cliente_destino is not None:
+        _enviar_correo_enlace_cliente(
+            enlace=enlace,
+            proyecto=proyecto,
+            cliente=cliente_destino,
+            request=request,
+            email_service=email_service,
+        )
     return _enlace_out(enlace)
 
 
@@ -328,6 +398,49 @@ def actualizar_enlace_cliente(
     return _enlace_out(enlace)
 
 
+@router.post(
+    "/enlaces/{enlace_id}/correo",
+    response_model=EnlaceClienteEnviarCorreoOut,
+    summary="Enviar enlace existente por correo",
+)
+def enviar_correo_enlace_cliente(
+    enlace_id: int,
+    body: EnlaceClienteEnviarCorreoIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin),
+) -> EnlaceClienteEnviarCorreoOut:
+    enlace = (
+        db.query(TokenEnlaceCliente).filter(TokenEnlaceCliente.id == enlace_id).first()
+    )
+    if enlace is None:
+        raise HTTPException(status_code=404, detail="Enlace no encontrado.")
+    proyecto = _proyecto_admin(
+        proyecto_id=enlace.proyecto_id,
+        current_user=current_user,
+        db=db,
+    )
+    ahora = datetime.now(UTC)
+    if enlace.revocado:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se puede enviar un enlace revocado.",
+        )
+    if _asegurar_utc(enlace.expira_en) < ahora:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se puede enviar un enlace expirado.",
+        )
+    cliente = _cliente_destino_correo(cliente_id=body.cliente_id, db=db)
+    return _enviar_correo_enlace_cliente(
+        enlace=enlace,
+        proyecto=proyecto,
+        cliente=cliente,
+        request=request,
+        email_service=EmailService(),
+    )
+
+
 @router.get("/{token}", response_model=PortalClienteOut)
 def obtener_portal_cliente(
     token: str,
@@ -338,6 +451,17 @@ def obtener_portal_cliente(
     contenido = _contenido_from_model(enlace)
     proyecto = enlace.proyecto
     plano_ids = {plano.id for plano in proyecto.planos}
+    conjuntos = (
+        db.query(ConjuntoAP)
+        .filter(
+            ConjuntoAP.id.in_(contenido.conjunto_ids),
+            ConjuntoAP.plano_id.in_(plano_ids),
+            ConjuntoAP.estado_gobernanza == "publicado_cliente",
+        )
+        .all()
+        if contenido.conjunto_ids
+        else []
+    )
     mapas = (
         db.query(MapaCalor)
         .filter(MapaCalor.id.in_(contenido.mapa_ids), MapaCalor.plano_id.in_(plano_ids))
@@ -346,7 +470,6 @@ def obtener_portal_cliente(
         if contenido.mapa_ids
         else []
     )
-    planos_mapa = {mapa.plano_id for mapa in mapas}
     escenarios = (
         db.query(EscenarioOptimizado)
         .filter(
@@ -359,17 +482,33 @@ def obtener_portal_cliente(
         if contenido.escenario_ids
         else []
     )
-    conjuntos = (
-        db.query(ConjuntoAP)
-        .filter(
-            ConjuntoAP.id.in_(contenido.conjunto_ids),
-            ConjuntoAP.plano_id.in_(plano_ids),
-            ConjuntoAP.estado_gobernanza == "publicado_cliente",
+    mapa_ids_escenarios = {
+        escenario.mapa_proyectado_id
+        for escenario in escenarios
+        if escenario.mapa_proyectado_id is not None
+    }
+    if mapa_ids_escenarios:
+        mapas_escenarios = (
+            db.query(MapaCalor)
+            .filter(
+                MapaCalor.id.in_(mapa_ids_escenarios),
+                MapaCalor.plano_id.in_(plano_ids),
+            )
+            .order_by(MapaCalor.created_at.desc(), MapaCalor.id.desc())
+            .all()
         )
-        .all()
-        if contenido.conjunto_ids
-        else []
-    )
+        mapas_por_id = {mapa.id: mapa for mapa in mapas}
+        for mapa in mapas_escenarios:
+            mapas_por_id.setdefault(mapa.id, mapa)
+        mapas = sorted(
+            mapas_por_id.values(),
+            key=lambda item: (
+                item.created_at or datetime.min.replace(tzinfo=UTC),
+                item.id,
+            ),
+            reverse=True,
+        )
+    planos_mapa = {mapa.plano_id for mapa in mapas}
     analisis = (
         db.query(AnalisisCobertura)
         .join(MapaCalor, AnalisisCobertura.mapa_calor_id == MapaCalor.id)
@@ -381,12 +520,14 @@ def obtener_portal_cliente(
         if contenido.analisis_ids
         else []
     )
+    planos_visibles = planos_mapa | {conjunto.plano_id for conjunto in conjuntos}
+    planos_visibles.update(escenario.plano_id for escenario in escenarios)
     planos = (
         db.query(Plano)
-        .filter(Plano.id.in_(planos_mapa))
+        .filter(Plano.id.in_(planos_visibles))
         .order_by(Plano.created_at.desc(), Plano.id.desc())
         .all()
-        if planos_mapa
+        if planos_visibles
         else []
     )
     reporte_disponible = False
@@ -420,6 +561,97 @@ def obtener_portal_cliente(
         analisis=[AnalisisCoberturaOut.model_validate(item) for item in analisis],
         escenarios=[EscenarioOptimizadoOut.model_validate(item) for item in escenarios],
         reporte_disponible=reporte_disponible,
+    )
+
+
+@router.post(
+    "/{token}/conjuntos/{conjunto_id}/heatmaps",
+    response_model=MapaCalorOut,
+)
+def generar_heatmap_portal(
+    token: str,
+    conjunto_id: int,
+    body: GenerarHeatmapConjuntoIn,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> MapaCalorOut:
+    enlace = _obtener_enlace_publico(token=token, db=db)
+    contenido = _contenido_from_model(enlace)
+    if conjunto_id not in contenido.conjunto_ids:
+        raise HTTPException(status_code=404, detail="Conjunto no disponible.")
+
+    proyecto = enlace.proyecto
+    plano_ids = {plano.id for plano in proyecto.planos}
+    conjunto = (
+        db.query(ConjuntoAP)
+        .filter(
+            ConjuntoAP.id == conjunto_id,
+            ConjuntoAP.plano_id.in_(plano_ids),
+            ConjuntoAP.estado_gobernanza == "publicado_cliente",
+        )
+        .first()
+    )
+    if conjunto is None:
+        raise HTTPException(status_code=404, detail="Conjunto no disponible.")
+
+    bssids_conjunto = [item.bssid.lower() for item in conjunto.items]
+    bssids_solicitados = [bssid.strip().lower() for bssid in (body.bssids or [])]
+    if body.modo == "CONJUNTO_COMPLETO":
+        bssids_generacion = bssids_conjunto
+    elif body.modo == "INDIVIDUAL":
+        if len(bssids_solicitados) != 1:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="El modo INDIVIDUAL requiere exactamente un AP del conjunto.",
+            )
+        bssids_generacion = bssids_solicitados
+    else:
+        if not bssids_solicitados:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="El modo SUBCONJUNTO requiere al menos un AP del conjunto.",
+            )
+        bssids_generacion = bssids_solicitados
+
+    fuera_del_conjunto = [
+        bssid for bssid in bssids_generacion if bssid not in bssids_conjunto
+    ]
+    if fuera_del_conjunto:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Uno o más APs seleccionados no pertenecen al conjunto.",
+        )
+
+    items_por_bssid = {item.bssid.lower(): item for item in conjunto.items}
+    ap_pos_x = [
+        items_por_bssid[bssid].pos_x
+        for bssid in bssids_generacion
+        if items_por_bssid[bssid].pos_x is not None
+    ]
+    ap_pos_y = [
+        items_por_bssid[bssid].pos_y
+        for bssid in bssids_generacion
+        if items_por_bssid[bssid].pos_y is not None
+    ]
+    posiciones_completas = len(ap_pos_x) == len(bssids_generacion) and len(
+        ap_pos_y
+    ) == len(bssids_generacion)
+    tecnico = db.query(Usuario).filter(Usuario.id == proyecto.tecnico_id).first()
+    if tecnico is None:
+        raise HTTPException(status_code=404, detail="Proyecto no disponible.")
+
+    return _generar_heatmap_core(
+        plano_id=conjunto.plano_id,
+        request=request,
+        bssid=bssids_generacion,
+        ap_pos_x=ap_pos_x if posiciones_completas else None,
+        ap_pos_y=ap_pos_y if posiciones_completas else None,
+        algoritmo=body.algoritmo,
+        resolucion=body.resolucion,
+        db=db,
+        current_user=tecnico,
+        conjunto_ap_id=conjunto.id,
+        modo_generacion=body.modo,
     )
 
 

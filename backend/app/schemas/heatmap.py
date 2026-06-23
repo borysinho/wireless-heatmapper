@@ -37,6 +37,11 @@ class PuntoLecturaHeatmapOut(BaseModel):
     rssi: float
 
 
+class PuntoPlanoOut(BaseModel):
+    x: float
+    y: float
+
+
 class APDisponibleOut(BaseModel):
     bssid: str
     ssid: str
@@ -71,6 +76,7 @@ class MapaCalorOut(BaseModel):
     rssi_max: float
     rssi_promedio: float
     puntos_lectura: list[PuntoLecturaHeatmapOut]
+    poligono_interes: list[PuntoPlanoOut]
     advertencias: list[str]
     created_at: datetime
 

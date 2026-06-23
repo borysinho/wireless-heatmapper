@@ -1,11 +1,11 @@
 import { render, screen } from "@testing-library/react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import type { PortalClienteOut } from "@/features/admin/types";
 import PortalCliente from "./PortalCliente";
 
-vi.mock("@tanstack/react-query", () => ({ useQuery: vi.fn() }));
+vi.mock("@tanstack/react-query", () => ({ useMutation: vi.fn(), useQuery: vi.fn() }));
 vi.mock("react-router-dom", () => ({ useParams: vi.fn() }));
 
 const portal: PortalClienteOut = {
@@ -58,11 +58,18 @@ describe("PortalCliente", () => {
       isLoading: false,
       isError: false,
     } as ReturnType<typeof useQuery>);
+    vi.mocked(useMutation).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useMutation>);
 
     render(<PortalCliente />);
 
+    expect(screen.getByRole("heading", { name: "Datos reales relevados en sitio" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Subconjuntos y escenarios del modelo IA" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "APs planta alta" })).toBeVisible();
     expect(screen.getByText("Validar cobertura del área administrativa")).toBeVisible();
-    expect(screen.getByText(/aa:bb:cc:dd:ee:01/)).toBeVisible();
+    expect(screen.getAllByText(/aa:bb:cc:dd:ee:01/).length).toBeGreaterThan(0);
   });
 });

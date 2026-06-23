@@ -41,10 +41,10 @@ class RestriccionesEscenarioIn(BaseModel):
 
     plano_id: int | None = Field(default=None, gt=0)
     fuente_entrada: FuenteEntradaEscenarioIn | None = None
-    max_aps: int = Field(default=3, ge=1, le=5)
     bandas: list[BandaWifi] = Field(default_factory=lambda: ["2.4", "5"], min_length=1)
     umbral_objetivo_dbm: int = Field(default=-70, ge=-90, le=-50)
     resolucion: int = Field(default=64, ge=32, le=128)
+    cantidad_recomendaciones: int = Field(default=3, ge=1, le=5)
 
 
 class RecomendacionAPOut(BaseModel):
@@ -106,6 +106,26 @@ class EscenarioOptimizadoOut(BaseModel):
 
 class EscenariosGeneradosOut(BaseModel):
     escenarios: list[EscenarioOptimizadoOut]
+
+
+class EscenarioGeneradoResumenOut(BaseModel):
+    id: int
+    proyecto_id: int
+    plano_id: int
+    conjunto_base_id: int | None
+    estado_gobernanza: str
+    nombre: str
+    pct_cobertura_actual: float
+    pct_cobertura: float
+    cantidad_aps: int
+    confianza: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class EscenariosGeneradosResumenOut(BaseModel):
+    escenarios: list[EscenarioGeneradoResumenOut]
 
 
 class CambiarEstadoEscenarioIn(BaseModel):

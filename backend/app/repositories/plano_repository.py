@@ -79,6 +79,17 @@ class PlanoRepository:
         self._db.refresh(plano)
         return plano
 
+    def actualizar_poligono_interes(
+        self,
+        *,
+        plano: Plano,
+        poligono: list[dict] | None,
+    ) -> Plano:
+        plano.poligono_interes = poligono
+        self._db.commit()
+        self._db.refresh(plano)
+        return plano
+
     def eliminar(self, *, plano: Plano) -> None:
         self._db.delete(plano)
         self._db.commit()

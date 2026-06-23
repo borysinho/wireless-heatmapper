@@ -230,13 +230,22 @@ class InterpolacionService:
 class HeatmapImageService:
     """Renderiza una matriz RSSI como PNG RGBA translúcido."""
 
-    def render_png(self, matriz: list[list[float]], *, alpha: int = 153) -> bytes:
+    def render_png(
+        self,
+        matriz: list[list[float]],
+        *,
+        alpha: int = 153,
+        mascara: list[list[bool]] | None = None,
+    ) -> bytes:
         alto = len(matriz)
         ancho = len(matriz[0]) if alto else 0
         image = Image.new("RGBA", (ancho, alto), (0, 0, 0, 0))
         pix = image.load()
         for y, fila in enumerate(matriz):
             for x, rssi in enumerate(fila):
+                if mascara is not None and not mascara[y][x]:
+                    pix[x, y] = (0, 0, 0, 0)
+                    continue
                 r, g, b = self._color_para_rssi(rssi)
                 pix[x, y] = (r, g, b, alpha)
 

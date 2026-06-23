@@ -79,6 +79,7 @@ Future<void> main() async {
   // redirige al usuario a la pantalla de login.
   DioClient.onSessionExpired = () {
     unawaited(sl<ServicioNotificacionesPush>().invalidarTokenLocal());
+    sl<AuthCubit>().marcarSesionExpirada();
     AppRouter.router.go('/login');
   };
 

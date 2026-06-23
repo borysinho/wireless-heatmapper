@@ -31,6 +31,7 @@ class PlanoOut(BaseModel):
     calibracion_y1: float | None = None
     calibracion_x2: float | None = None
     calibracion_y2: float | None = None
+    poligono_interes: list["PuntoPlano"] = Field(default_factory=list)
     warning: str | None = None
     created_at: datetime
     updated_at: datetime
@@ -68,10 +69,25 @@ class PlanoOut(BaseModel):
             calibracion_y1=p.calibracion_y1,
             calibracion_x2=p.calibracion_x2,
             calibracion_y2=p.calibracion_y2,
+            poligono_interes=[
+                PuntoPlano(x=float(punto["x"]), y=float(punto["y"]))
+                for punto in (p.poligono_interes or [])
+            ],
             warning=warning,
             created_at=p.created_at,
             updated_at=p.updated_at,
         )
+
+
+class PuntoPlano(BaseModel):
+    x: float = Field(..., ge=0)
+    y: float = Field(..., ge=0)
+
+
+class PlanoPoligonoInteresIn(BaseModel):
+    """Entrada para definir el polígono operativo del plano."""
+
+    puntos: list[PuntoPlano] = Field(..., min_length=3)
 
 
 class PlanoCalibracionIn(BaseModel):

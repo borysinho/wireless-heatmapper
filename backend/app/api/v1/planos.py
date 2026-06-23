@@ -29,7 +29,13 @@ from app.core.security import get_current_user
 from app.models.usuario import Usuario
 from app.repositories.plano_repository import PlanoRepository
 from app.repositories.proyecto_repository import ProyectoRepository
-from app.schemas.plano import PlanoCalibracionIn, PlanoOut, UrlFirmadaOut
+from app.schemas.plano import (
+    PlanoCalibracionIn,
+    PlanoOut,
+    PlanoPoligonoInteresIn,
+    UrlFirmadaOut,
+)
+from app.services.geometria_service import area_poligono, normalizar_poligono
 from app.services.pdf_service import PdfService
 from app.storage import LocalFilesystemStorage, generar_url_firmada, verificar_firma
 
@@ -115,6 +121,36 @@ def _verificar_ownership_plano(
         db=db,
     )
     return plano
+
+
+def _validar_poligono_interes(
+    *,
+    body: PlanoPoligonoInteresIn,
+    ancho_px: int,
+    alto_px: int,
+) -> list[dict[str, float]]:
+    poligono = normalizar_poligono([punto.model_dump() for punto in body.puntos])
+    if len(poligono) < 3:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El polígono de interés requiere al menos 3 vértices.",
+        )
+    fuera = [
+        punto
+        for punto in poligono
+        if punto["x"] > ancho_px or punto["y"] > alto_px
+    ]
+    if fuera:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Todos los vértices deben estar dentro de los límites del plano.",
+        )
+    if area_poligono(poligono) < 4:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El polígono de interés no puede tener área cero.",
+        )
+    return poligono
 
 
 @router_proyectos.post(
@@ -352,6 +388,43 @@ def calibrar_plano(
         y2=body.y2,
         distancia_real_m=body.distancia_real_m,
         escala_m_por_px=escala,
+    )
+    return PlanoOut.from_plano(
+        plano,
+        url_firmada=_firmar(plano.ruta_storage, request),
+        cantidad_puntos=plano_repo.contar_puntos(plano_id=plano.id),
+    )
+
+
+@router_planos.patch(
+    "/{plano_id}/poligono-interes",
+    response_model=PlanoOut,
+    summary="Definir polígono de interés del plano",
+    description=(
+        "Registra el área operativa que delimita heatmaps y recomendaciones IA."
+    ),
+)
+def actualizar_poligono_interes(
+    plano_id: int,
+    body: PlanoPoligonoInteresIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> PlanoOut:
+    plano = _verificar_ownership_plano(
+        plano_id=plano_id,
+        current_user=current_user,
+        db=db,
+    )
+    poligono = _validar_poligono_interes(
+        body=body,
+        ancho_px=plano.ancho_px,
+        alto_px=plano.alto_px,
+    )
+    plano_repo = PlanoRepository(db)
+    plano = plano_repo.actualizar_poligono_interes(
+        plano=plano,
+        poligono=poligono,
     )
     return PlanoOut.from_plano(
         plano,

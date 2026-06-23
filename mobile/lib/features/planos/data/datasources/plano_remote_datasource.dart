@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 
+import '../../domain/entities/plano.dart';
 import '../../domain/repositories/plano_repository.dart';
 import '../models/plano_model.dart';
 
@@ -121,6 +122,25 @@ class PlanoRemoteDatasource {
           'x2': x2,
           'y2': y2,
           'distancia_real_m': distanciaRealM,
+        },
+      );
+      return PlanoModel.fromJson(response.data!);
+    } on DioException catch (e) {
+      _mapearError(e, planoId: planoId);
+      rethrow;
+    }
+  }
+
+  /// Guarda el área operativa delimitada por el técnico.
+  Future<PlanoModel> guardarPoligonoInteres({
+    required int planoId,
+    required List<PuntoPlano> puntos,
+  }) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/planos/$planoId/poligono-interes',
+        data: {
+          'puntos': puntos.map((p) => {'x': p.x, 'y': p.y}).toList(),
         },
       );
       return PlanoModel.fromJson(response.data!);

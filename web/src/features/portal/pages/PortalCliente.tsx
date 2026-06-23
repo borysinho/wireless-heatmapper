@@ -1,26 +1,34 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import {
-  Activity,
+  BarChart3,
+  BrainCircuit,
+  Building2,
   Download,
+  Eye,
+  EyeOff,
   Layers3,
+  Loader2,
   MapPinned,
   Minus,
   Plus,
   RadioTower,
+  Sparkles,
+  Target,
+  TrendingUp,
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { obtenerPortalCliente, urlReportePortal } from "../api/shareClient";
+import { resolverUrlApi } from "@/shared/api/urlApi";
+import { generarHeatmapPortal, obtenerPortalCliente } from "../api/shareClient";
 import type {
-  AnalisisCoberturaOut,
-  EscenarioOptimizadoOut,
   MapaCalorPortalOut,
+  PlanoOut,
   PortalClienteOut,
 } from "@/features/admin/types";
 import styles from "./PortalCliente.module.css";
 
-const CANVAS_W = 960;
-const CANVAS_H = 560;
+type ModoGeneracion = "INDIVIDUAL" | "SUBCONJUNTO" | "CONJUNTO_COMPLETO";
+type PartePortal = "RELEVAMIENTO" | "IA";
 
 export default function PortalCliente() {
   const { token = "" } = useParams();
@@ -30,22 +38,99 @@ export default function PortalCliente() {
     enabled: token.length > 0,
     retry: false,
   });
-  const [mapaActivoId, setMapaActivoId] = useState<number | null>(null);
+  const [conjuntoActivoId, setConjuntoActivoId] = useState<number | null>(null);
+  const [modo, setModo] = useState<ModoGeneracion>("CONJUNTO_COMPLETO");
+  const [bssidsSeleccionados, setBssidsSeleccionados] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [mapaActivo, setMapaActivo] = useState<MapaCalorPortalOut | null>(null);
+  const [parteActiva, setParteActiva] = useState<PartePortal>("RELEVAMIENTO");
+  const [escenarioActivoId, setEscenarioActivoId] = useState<number | null>(null);
 
-  const mapaActivo = useMemo(
+  const conjuntosRelevados = useMemo(
+    () => data?.conjuntos.filter((conjunto) => conjunto.origen !== "ia") ?? [],
+    [data?.conjuntos],
+  );
+  const conjuntosIA = useMemo(
+    () => data?.conjuntos.filter((conjunto) => conjunto.origen === "ia") ?? [],
+    [data?.conjuntos],
+  );
+  const hayContenidoIA = conjuntosIA.length > 0 || (data?.escenarios.length ?? 0) > 0;
+  const parteVisible =
+    parteActiva === "RELEVAMIENTO" && conjuntosRelevados.length === 0 && hayContenidoIA
+      ? "IA"
+      : parteActiva;
+  const conjuntosParte = parteVisible === "IA" ? conjuntosIA : conjuntosRelevados;
+
+  const conjuntoActivo = useMemo(
     () =>
-      data?.heatmaps.find((mapa) => mapa.id === mapaActivoId) ??
-      data?.heatmaps[0] ??
+      conjuntosParte.find((conjunto) => conjunto.id === conjuntoActivoId) ??
+      conjuntosParte[0] ??
       null,
-    [data?.heatmaps, mapaActivoId],
+    [conjuntoActivoId, conjuntosParte],
   );
-  const analisisActivo = useMemo(
+
+  const escenarioActivo = useMemo(
     () =>
-      mapaActivo
-        ? data?.analisis.find((item) => item.mapa_calor_id === mapaActivo.id) ?? null
-        : null,
-    [data?.analisis, mapaActivo],
+      data?.escenarios.find((escenario) => escenario.id === escenarioActivoId) ??
+      data?.escenarios[0] ??
+      null,
+    [data?.escenarios, escenarioActivoId],
   );
+  const mapaEscenarioActivo = useMemo(
+    () =>
+      escenarioActivo?.mapa_proyectado_id
+        ? data?.heatmaps.find(
+            (mapa) => mapa.id === escenarioActivo.mapa_proyectado_id,
+          ) ?? null
+        : null,
+    [data?.heatmaps, escenarioActivo],
+  );
+  const mapaMostrado =
+    mapaActivo ?? (parteVisible === "IA" ? mapaEscenarioActivo : null);
+
+  const bssidsEfectivos = useMemo(() => {
+    if (!conjuntoActivo) return new Set<string>();
+    const bssids = conjuntoActivo.items.map((ap) => ap.bssid);
+    if (modo === "CONJUNTO_COMPLETO") {
+      return new Set(bssids);
+    }
+    const seleccionDisponibles = Array.from(bssidsSeleccionados).filter((bssid) =>
+      bssids.includes(bssid),
+    );
+    if (modo === "INDIVIDUAL") {
+      return new Set(
+        seleccionDisponibles.length > 0
+          ? seleccionDisponibles.slice(0, 1)
+          : bssids.slice(0, 1),
+      );
+    }
+    return new Set(
+      seleccionDisponibles.length > 0
+        ? seleccionDisponibles
+        : bssids.slice(0, Math.min(2, bssids.length)),
+    );
+  }, [bssidsSeleccionados, conjuntoActivo, modo]);
+
+  const generarHeatmap = useMutation({
+    mutationFn: () => {
+      if (!conjuntoActivo) throw new Error("Conjunto requerido.");
+      const bssids = Array.from(bssidsEfectivos);
+      return generarHeatmapPortal(token, conjuntoActivo.id, {
+        modo,
+        bssids: modo === "CONJUNTO_COMPLETO" ? undefined : bssids,
+        algoritmo: "IDW",
+        resolucion: 128,
+      });
+    },
+    onSuccess: (mapa) => setMapaActivo(mapa),
+  });
+
+  const seleccionValida =
+    !!conjuntoActivo &&
+    (modo === "CONJUNTO_COMPLETO" ||
+      (modo === "INDIVIDUAL" && bssidsEfectivos.size === 1) ||
+      (modo === "SUBCONJUNTO" && bssidsEfectivos.size > 0));
 
   if (isLoading) {
     return <div className={styles.estado}>Cargando publicación...</div>;
@@ -66,182 +151,501 @@ export default function PortalCliente() {
         <div>
           <span className={styles.marca}>Bulldog Tech.</span>
           <h1>{data.proyecto.nombre}</h1>
-          <p>{data.proyecto.cliente ?? "Cliente"}</p>
+          <p>{data.proyecto.cliente ?? "Cliente"} · Portal ejecutivo de cobertura WiFi</p>
         </div>
         {data.reporte_disponible && (
-          <a className={styles.descarga} href={urlReportePortal(token)}>
-            <Download size={18} aria-hidden="true" />
+          <a className={styles.descarga} href={`/api/share/${token}/reporte`}>
+            <Download size={16} aria-hidden="true" />
             Descargar reporte
           </a>
         )}
       </header>
 
+      <section className={styles.tableroEjecutivo} aria-label="Resumen ejecutivo">
+        <Indicador icono={<Building2 size={18} />} etiqueta="Planos" valor={data.planos.length} />
+        <Indicador
+          icono={<RadioTower size={18} />}
+          etiqueta="Conjuntos reales"
+          valor={conjuntosRelevados.length}
+        />
+        <Indicador
+          icono={<BrainCircuit size={18} />}
+          etiqueta="Subconjuntos IA"
+          valor={conjuntosIA.length}
+        />
+        <Indicador
+          icono={<TrendingUp size={18} />}
+          etiqueta="Escenarios IA"
+          valor={data.escenarios.length}
+        />
+      </section>
+
       <section className={styles.layout}>
         <div className={styles.panelMapa}>
           <div className={styles.panelHeader}>
             <MapPinned size={18} aria-hidden="true" />
-            <h2>Heatmaps publicados</h2>
+            <div>
+              <h2>{parteVisible === "IA" ? "Vista del modelo IA" : "Vista del relevamiento en sitio"}</h2>
+              <p>
+                {parteVisible === "IA" && escenarioActivo
+                  ? `${escenarioActivo.nombre} · heatmap proyectado`
+                  : conjuntoActivo
+                  ? `${conjuntoActivo.nombre} · ${_labelModo(modo)}`
+                  : "Seleccione un conjunto publicado para explorar el mapa."}
+              </p>
+            </div>
           </div>
 
-          {data.heatmaps.length === 0 ? (
-            <div className={styles.vacio}>No hay heatmaps publicados en este enlace.</div>
-          ) : (
+          {mapaMostrado ? (
             <>
-              <div className={styles.tabs}>
-                {data.heatmaps.map((mapa) => (
-                  <button
-                    key={mapa.id}
-                    className={mapa.id === mapaActivo?.id ? styles.tabActiva : ""}
-                    onClick={() => setMapaActivoId(mapa.id)}
-                    type="button"
-                  >
-                    {mapa.ssid || mapa.bssid || `Mapa #${mapa.id}`}
-                  </button>
-                ))}
+              <div className={styles.mapaResumen}>
+                <strong>{_labelModo(mapaMostrado.modo_generacion)}</strong>
+                <span>
+                  {mapaMostrado.cantidad_puntos} puntos ·{" "}
+                  {mapaMostrado.rssi_promedio.toFixed(1)} dBm promedio
+                </span>
               </div>
-              {mapaActivo && <HeatmapCanvas mapa={mapaActivo} />}
+              <HeatmapCanvas
+                mapa={mapaMostrado}
+                plano={
+                  data.planos.find((plano) => plano.id === mapaMostrado.plano_id) ??
+                  null
+                }
+              />
             </>
+          ) : (
+            <div className={styles.vacio}>
+              {parteVisible === "IA"
+                ? "Seleccione una propuesta IA publicada para revisar su heatmap proyectado."
+                : "Seleccione una parte, elija un conjunto y genere el heatmap interactivo."}
+            </div>
           )}
         </div>
 
         <aside className={styles.panelLateral}>
-          <ResumenProyecto data={data} />
-          {analisisActivo && <AnalisisResumen analisis={analisisActivo} />}
+          <section className={styles.resumen}>
+            <h2>Áreas de análisis</h2>
+            <div className={styles.selectorPartes}>
+              <button
+                type="button"
+                className={parteVisible === "RELEVAMIENTO" ? styles.parteActiva : ""}
+                onClick={() => {
+                  setParteActiva("RELEVAMIENTO");
+                  setConjuntoActivoId(conjuntosRelevados[0]?.id ?? null);
+                  setBssidsSeleccionados(new Set());
+                  setMapaActivo(null);
+                }}
+              >
+                <BarChart3 size={16} aria-hidden="true" />
+                <span>
+                  <strong>Datos relevados</strong>
+                  <small>{conjuntosRelevados.length} conjunto(s) de campo</small>
+                </span>
+              </button>
+              <button
+                type="button"
+                className={parteVisible === "IA" ? styles.parteActiva : ""}
+                onClick={() => {
+                  setParteActiva("IA");
+                  setConjuntoActivoId(conjuntosIA[0]?.id ?? null);
+                  setEscenarioActivoId(data.escenarios[0]?.id ?? null);
+                  setBssidsSeleccionados(new Set());
+                  setMapaActivo(null);
+                }}
+              >
+                <BrainCircuit size={16} aria-hidden="true" />
+                <span>
+                  <strong>Modelo IA</strong>
+                  <small>
+                    {conjuntosIA.length + data.escenarios.length} elemento(s) publicados
+                  </small>
+                </span>
+              </button>
+            </div>
+          </section>
+          <section className={styles.resumen}>
+            <h2>{parteVisible === "IA" ? "Propuestas IA" : "Generación"}</h2>
+            {parteVisible === "IA" ? (
+              data.escenarios.length === 0 ? (
+                <p>No hay propuestas IA publicadas para este enlace.</p>
+              ) : (
+                <div className={styles.formGenerador}>
+                  <label>
+                    Propuesta
+                    <select
+                      value={escenarioActivo?.id ?? ""}
+                      onChange={(event) => {
+                        setEscenarioActivoId(Number(event.target.value));
+                        setMapaActivo(null);
+                      }}
+                    >
+                      {data.escenarios.map((escenario) => (
+                        <option key={escenario.id} value={escenario.id}>
+                          {escenario.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {!mapaEscenarioActivo && (
+                    <p>La propuesta seleccionada no tiene heatmap proyectado publicado.</p>
+                  )}
+                </div>
+              )
+            ) : conjuntosParte.length === 0 ? (
+              <p>
+                No hay conjuntos relevados publicados para este enlace.
+              </p>
+            ) : (
+              <div className={styles.formGenerador}>
+                <label>
+                  Conjunto
+                  <select
+                    value={conjuntoActivo?.id ?? ""}
+                    onChange={(event) => {
+                      setConjuntoActivoId(Number(event.target.value));
+                      setBssidsSeleccionados(new Set());
+                      setMapaActivo(null);
+                    }}
+                  >
+                    {conjuntosParte.map((conjunto) => (
+                      <option key={conjunto.id} value={conjunto.id}>
+                        {conjunto.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className={styles.modosHeatmap}>
+                  {(["CONJUNTO_COMPLETO", "SUBCONJUNTO", "INDIVIDUAL"] as ModoGeneracion[]).map(
+                    (modoItem) => (
+                      <button
+                        key={modoItem}
+                        type="button"
+                        className={modo === modoItem ? styles.modoActivo : ""}
+                        onClick={() => {
+                          setModo(modoItem);
+                          setBssidsSeleccionados(new Set());
+                          setMapaActivo(null);
+                        }}
+                      >
+                        {_labelModo(modoItem)}
+                      </button>
+                    ),
+                  )}
+                </div>
+
+                {conjuntoActivo && (
+                  <div className={styles.apSelectorPortal}>
+                    {conjuntoActivo.items.map((ap) => (
+                      <label key={ap.bssid}>
+                        <input
+                          type={modo === "INDIVIDUAL" ? "radio" : "checkbox"}
+                          name="ap-portal"
+                          checked={bssidsEfectivos.has(ap.bssid)}
+                          disabled={modo === "CONJUNTO_COMPLETO"}
+                          onChange={() =>
+                            setBssidsSeleccionados(
+                              _toggleBssid(new Set(bssidsEfectivos), ap.bssid, modo),
+                            )
+                          }
+                        />
+                        <span>
+                          <strong>{ap.ssid || "SSID oculto"}</strong>
+                          <small>{ap.bssid}</small>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  className={styles.botonGenerar}
+                  disabled={!seleccionValida || generarHeatmap.isPending}
+                  onClick={() => generarHeatmap.mutate()}
+                >
+                  {generarHeatmap.isPending ? (
+                    <Loader2 size={16} aria-hidden="true" />
+                  ) : (
+                    <RadioTower size={16} aria-hidden="true" />
+                  )}
+                  Generar heatmap
+                </button>
+                {generarHeatmap.isError && (
+                  <p className={styles.errorGeneracion}>
+                    No se pudo generar el heatmap con la selección actual.
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
         </aside>
       </section>
 
-      <section className={styles.bloque}>
-        <div className={styles.panelHeader}>
-          <Layers3 size={18} aria-hidden="true" />
-          <h2>Conjuntos de APs publicados</h2>
-        </div>
-        {data.conjuntos.length === 0 ? (
-          <div className={styles.vacio}>No hay conjuntos publicados en este enlace.</div>
-        ) : (
-          <div className={styles.conjuntos}>
-            {data.conjuntos.map((conjunto) => (
-              <article key={conjunto.id} className={styles.conjunto}>
-                <div>
-                  <h3>{conjunto.nombre}</h3>
-                  <p>{conjunto.proposito}</p>
-                  {conjunto.descripcion && <p>{conjunto.descripcion}</p>}
-                </div>
-                <div className={styles.apsConjunto}>
-                  {conjunto.items.map((ap) => (
-                    <span key={ap.bssid}>
-                      {ap.ssid || "SSID oculto"} · {ap.bssid}
-                    </span>
-                  ))}
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
+      <section className={styles.partes}>
+        <BloqueConjuntos
+          titulo="Datos reales relevados en sitio"
+          descripcion="Subconjuntos publicados desde las mediciones capturadas por el equipo técnico."
+          icono={<Layers3 size={18} aria-hidden="true" />}
+          conjuntos={conjuntosRelevados}
+          conjuntoActivoId={conjuntoActivo?.id ?? null}
+          onSeleccionar={(id) => {
+            setParteActiva("RELEVAMIENTO");
+            setConjuntoActivoId(id);
+            setBssidsSeleccionados(new Set());
+            setMapaActivo(null);
+          }}
+        />
 
-      {data.analisis.length > 0 && (
         <section className={styles.bloque}>
           <div className={styles.panelHeader}>
-            <Activity size={18} aria-hidden="true" />
-            <h2>Análisis publicados</h2>
+            <BrainCircuit size={18} aria-hidden="true" />
+            <div>
+              <h2>Subconjuntos y escenarios del modelo IA</h2>
+              <p>Alternativas publicadas para revisar impacto, cobertura y recomendaciones.</p>
+            </div>
           </div>
-          <div className={styles.analisisPublicados}>
-            {data.analisis.map((analisis) => (
-              <AnalisisResumen key={analisis.id} analisis={analisis} />
-            ))}
-          </div>
-        </section>
-      )}
 
-      <section className={styles.bloque}>
-        <div className={styles.panelHeader}>
-          <RadioTower size={18} aria-hidden="true" />
-          <h2>Alternativas publicadas</h2>
-        </div>
-        {data.escenarios.length === 0 ? (
-          <div className={styles.vacio}>No hay alternativas IA publicadas en este enlace.</div>
-        ) : (
-          <div className={styles.escenarios}>
-            {data.escenarios.map((escenario) => (
-              <EscenarioCard key={escenario.id} escenario={escenario} />
-            ))}
-          </div>
-        )}
+          {conjuntosIA.length === 0 && data.escenarios.length === 0 ? (
+            <div className={styles.vacio}>No hay resultados IA publicados en este enlace.</div>
+          ) : (
+            <div className={styles.iaGrid}>
+              {conjuntosIA.map((conjunto) => (
+                <button
+                  key={conjunto.id}
+                  type="button"
+                  className={`${styles.conjunto} ${
+                    conjunto.id === conjuntoActivo?.id ? styles.conjuntoActivo : ""
+                  }`}
+                  onClick={() => {
+                    setParteActiva("IA");
+                    setConjuntoActivoId(conjunto.id);
+                    setBssidsSeleccionados(new Set());
+                    setMapaActivo(null);
+                  }}
+                >
+                  <span className={styles.etiquetaIA}>
+                    <Sparkles size={14} aria-hidden="true" />
+                    Subconjunto IA
+                  </span>
+                  <span>
+                    <h3>{conjunto.nombre}</h3>
+                    <small>{conjunto.proposito}</small>
+                    {conjunto.descripcion && <small>{conjunto.descripcion}</small>}
+                  </span>
+                  <span className={styles.apsConjunto}>
+                    {conjunto.items.map((ap) => (
+                      <i key={ap.bssid}>
+                        {ap.ssid || "SSID oculto"} · {ap.bssid}
+                      </i>
+                    ))}
+                  </span>
+                </button>
+              ))}
+
+              {data.escenarios.map((escenario) => (
+                <button
+                  key={escenario.id}
+                  type="button"
+                  className={`${styles.escenario} ${
+                    escenario.id === escenarioActivo?.id ? styles.escenarioActivo : ""
+                  }`}
+                  onClick={() => {
+                    setParteActiva("IA");
+                    setEscenarioActivoId(escenario.id);
+                    setMapaActivo(null);
+                  }}
+                >
+                  <span className={styles.etiquetaIA}>
+                    <Target size={14} aria-hidden="true" />
+                    Escenario IA
+                  </span>
+                  <h3>{escenario.nombre}</h3>
+                  <p>{escenario.resumen}</p>
+                  <div className={styles.metricas}>
+                    <span>Actual {_porcentaje(escenario.pct_cobertura_actual)}</span>
+                    <span>Proyectada {_porcentaje(escenario.pct_cobertura)}</span>
+                    <span>{escenario.cantidad_aps} AP(s)</span>
+                    <span>{escenario.confianza}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
       </section>
     </main>
   );
 }
 
-function HeatmapCanvas({ mapa }: { mapa: MapaCalorPortalOut }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const dragRef = useRef(false);
+function Indicador({
+  icono,
+  etiqueta,
+  valor,
+}: {
+  icono: ReactNode;
+  etiqueta: string;
+  valor: number;
+}) {
+  return (
+    <div className={styles.indicador}>
+      {icono}
+      <span>{etiqueta}</span>
+      <strong>{valor}</strong>
+    </div>
+  );
+}
+
+function BloqueConjuntos({
+  titulo,
+  descripcion,
+  icono,
+  conjuntos,
+  conjuntoActivoId,
+  onSeleccionar,
+}: {
+  titulo: string;
+  descripcion: string;
+  icono: ReactNode;
+  conjuntos: PortalClienteOut["conjuntos"];
+  conjuntoActivoId: number | null;
+  onSeleccionar: (id: number) => void;
+}) {
+  return (
+    <section className={styles.bloque}>
+      <div className={styles.panelHeader}>
+        {icono}
+        <div>
+          <h2>{titulo}</h2>
+          <p>{descripcion}</p>
+        </div>
+      </div>
+      {conjuntos.length === 0 ? (
+        <div className={styles.vacio}>No hay conjuntos publicados en esta parte.</div>
+      ) : (
+        <div className={styles.conjuntos}>
+          {conjuntos.map((conjunto) => (
+            <button
+              key={conjunto.id}
+              type="button"
+              className={`${styles.conjunto} ${
+                conjunto.id === conjuntoActivoId ? styles.conjuntoActivo : ""
+              }`}
+              onClick={() => onSeleccionar(conjunto.id)}
+            >
+              <span>
+                <h3>{conjunto.nombre}</h3>
+                <small>{conjunto.proposito}</small>
+                {conjunto.descripcion && <small>{conjunto.descripcion}</small>}
+              </span>
+              <span className={styles.apsConjunto}>
+                {conjunto.items.map((ap) => (
+                  <i key={ap.bssid}>
+                    {ap.ssid || "SSID oculto"} · {ap.bssid}
+                  </i>
+                ))}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function HeatmapCanvas({
+  mapa,
+  plano,
+}: {
+  mapa: MapaCalorPortalOut;
+  plano: PlanoOut | null;
+}) {
+  const dragRef = useRef<{ x: number; y: number } | null>(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [tooltip, setTooltip] = useState<{
+  const [verHeatmap, setVerHeatmap] = useState(true);
+  const [verAps, setVerAps] = useState(true);
+  const [verPuntos, setVerPuntos] = useState(true);
+  const [hint, setHint] = useState<{
     x: number;
     y: number;
-    valor: number;
+    titulo: string;
+    lineas: string[];
   } | null>(null);
+  const anchoReferencia = plano?.ancho_px ?? mapa.resolucion;
+  const altoReferencia = plano?.alto_px ?? mapa.resolucion;
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-
-    ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
-    ctx.fillStyle = "#f7f8fa";
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-
+  const actualizarTooltip = (event: PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
     const filas = mapa.matriz.length;
     const columnas = mapa.matriz[0]?.length ?? 0;
     if (filas === 0 || columnas === 0) return;
 
-    const celda = Math.min(CANVAS_W / columnas, CANVAS_H / filas) * zoom;
-    const origenX = (CANVAS_W - columnas * celda) / 2 + offset.x;
-    const origenY = (CANVAS_H - filas * celda) / 2 + offset.y;
-
-    mapa.matriz.forEach((fila, y) => {
-      fila.forEach((valor, x) => {
-        ctx.fillStyle = _colorRssi(valor, mapa.escala);
-        ctx.fillRect(origenX + x * celda, origenY + y * celda, celda + 0.4, celda + 0.4);
-      });
-    });
-
-    ctx.fillStyle = "#111827";
-    mapa.puntos_lectura.forEach((punto) => {
-      const x = origenX + (punto.pos_x / Math.max(mapa.resolucion - 1, 1)) * columnas * celda;
-      const y = origenY + (punto.pos_y / Math.max(mapa.resolucion - 1, 1)) * filas * celda;
-      ctx.beginPath();
-      ctx.arc(x, y, 3.5, 0, Math.PI * 2);
-      ctx.fill();
-    });
-  }, [mapa, offset, zoom]);
-
-  const actualizarTooltip = (event: PointerEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const xCanvas = ((event.clientX - rect.left) / rect.width) * CANVAS_W;
-    const yCanvas = ((event.clientY - rect.top) / rect.height) * CANVAS_H;
-    const filas = mapa.matriz.length;
-    const columnas = mapa.matriz[0]?.length ?? 0;
-    if (filas === 0 || columnas === 0) return;
-
-    const celda = Math.min(CANVAS_W / columnas, CANVAS_H / filas) * zoom;
-    const origenX = (CANVAS_W - columnas * celda) / 2 + offset.x;
-    const origenY = (CANVAS_H - filas * celda) / 2 + offset.y;
-    const col = Math.floor((xCanvas - origenX) / celda);
-    const row = Math.floor((yCanvas - origenY) / celda);
+    const xLocal = event.clientX - rect.left;
+    const yLocal = event.clientY - rect.top;
+    const col = Math.floor(((xLocal - offset.x) / zoom / rect.width) * columnas);
+    const row = Math.floor(((yLocal - offset.y) / zoom / rect.height) * filas);
     const valor = mapa.matriz[row]?.[col];
-    setTooltip(
+    setHint(
       typeof valor === "number"
-        ? { x: event.clientX - rect.left, y: event.clientY - rect.top, valor }
+        ? {
+            x: xLocal,
+            y: yLocal,
+            titulo: "RSSI estimado",
+            lineas: [`${valor.toFixed(1)} dBm`, nivelCobertura(valor)],
+          }
         : null,
     );
   };
 
+  const mostrarHint = (
+    event: PointerEvent<SVGElement>,
+    titulo: string,
+    lineas: string[],
+  ) => {
+    const rect = event.currentTarget.ownerSVGElement
+      ?.closest(`.${styles.heatmapImagen}`)
+      ?.getBoundingClientRect();
+    if (!rect) return;
+    setHint({
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+      titulo,
+      lineas,
+    });
+  };
+
   return (
     <div className={styles.canvasWrap}>
+      <div className={styles.capasMapa} aria-label="Capas del heatmap">
+        <button
+          type="button"
+          className={verHeatmap ? styles.capaActiva : ""}
+          onClick={() => setVerHeatmap((prev) => !prev)}
+          title={verHeatmap ? "Ocultar heatmap" : "Mostrar heatmap"}
+        >
+          {verHeatmap ? <Eye size={15} aria-hidden="true" /> : <EyeOff size={15} aria-hidden="true" />}
+          Heatmap
+        </button>
+        <button
+          type="button"
+          className={verAps ? styles.capaActiva : ""}
+          onClick={() => setVerAps((prev) => !prev)}
+          title={verAps ? "Ocultar APs" : "Mostrar APs"}
+        >
+          {verAps ? <Eye size={15} aria-hidden="true" /> : <EyeOff size={15} aria-hidden="true" />}
+          APs
+        </button>
+        <button
+          type="button"
+          className={verPuntos ? styles.capaActiva : ""}
+          onClick={() => setVerPuntos((prev) => !prev)}
+          title={verPuntos ? "Ocultar puntos" : "Mostrar puntos"}
+        >
+          {verPuntos ? <Eye size={15} aria-hidden="true" /> : <EyeOff size={15} aria-hidden="true" />}
+          Puntos
+        </button>
+      </div>
       <div className={styles.toolbarMapa}>
         <button type="button" onClick={() => setZoom((prev) => Math.max(prev - 0.2, 0.6))}>
           <Minus size={16} aria-hidden="true" />
@@ -251,29 +655,119 @@ function HeatmapCanvas({ mapa }: { mapa: MapaCalorPortalOut }) {
           <Plus size={16} aria-hidden="true" />
         </button>
       </div>
-      <canvas
-        ref={canvasRef}
-        width={CANVAS_W}
-        height={CANVAS_H}
+      <div
+        className={styles.heatmapImagen}
+        style={{
+          aspectRatio: plano
+            ? `${plano.ancho_px} / ${plano.alto_px}`
+            : `${mapa.resolucion} / ${mapa.resolucion}`,
+        }}
         onPointerDown={(event) => {
-          dragRef.current = true;
+          dragRef.current = { x: event.clientX, y: event.clientY };
           event.currentTarget.setPointerCapture(event.pointerId);
         }}
-        onPointerLeave={() => setTooltip(null)}
+        onPointerLeave={() => setHint(null)}
         onPointerMove={(event) => {
           if (dragRef.current) {
-            setOffset((prev) => ({ x: prev.x + event.movementX, y: prev.y + event.movementY }));
+            setOffset((prev) => ({
+              x: prev.x + event.clientX - dragRef.current!.x,
+              y: prev.y + event.clientY - dragRef.current!.y,
+            }));
+            dragRef.current = { x: event.clientX, y: event.clientY };
           }
-          actualizarTooltip(event);
+          if (!dragRef.current) actualizarTooltip(event);
         }}
         onPointerUp={(event) => {
-          dragRef.current = false;
+          dragRef.current = null;
           event.currentTarget.releasePointerCapture(event.pointerId);
         }}
-      />
-      {tooltip && (
-        <div className={styles.tooltip} style={{ left: tooltip.x + 12, top: tooltip.y + 12 }}>
-          {tooltip.valor.toFixed(1)} dBm
+        onPointerCancel={() => {
+          dragRef.current = null;
+        }}
+      >
+        {plano && (
+          <img
+            className={styles.planoHeatmap}
+            src={resolverUrlApi(plano.url_firmada)}
+            alt={`Plano ${plano.nombre}`}
+            draggable={false}
+            style={{
+              transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
+            }}
+          />
+        )}
+        {verHeatmap && (
+          <img
+            className={styles.capaHeatmap}
+            src={resolverUrlApi(mapa.url_imagen)}
+            alt="Heatmap generado"
+            draggable={false}
+            style={{
+              transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
+            }}
+          />
+        )}
+        <svg
+          className={styles.puntosLectura}
+          viewBox={`0 0 ${anchoReferencia} ${altoReferencia}`}
+          preserveAspectRatio="none"
+          style={{
+            transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
+          }}
+        >
+          {verPuntos &&
+            mapa.puntos_lectura.map((punto) => (
+              <circle
+                key={punto.punto_id}
+                className={styles.puntoLectura}
+                cx={limitar(punto.pos_x, 0, anchoReferencia)}
+                cy={limitar(punto.pos_y, 0, altoReferencia)}
+                r={Math.max(anchoReferencia, altoReferencia) * 0.006}
+                fill={colorRssi(punto.rssi)}
+                onPointerDown={(event) => event.stopPropagation()}
+                onPointerMove={(event) => {
+                  event.stopPropagation();
+                  mostrarHint(event, `Punto #${punto.punto_id}`, [
+                    `${punto.rssi.toFixed(1)} dBm`,
+                    nivelCobertura(punto.rssi),
+                    `Posición ${punto.pos_x.toFixed(0)}, ${punto.pos_y.toFixed(0)} px`,
+                  ]);
+                }}
+                onPointerLeave={() => setHint(null)}
+              />
+            ))}
+          {verAps &&
+            mapa.aps_interes.map((ap) => (
+              <g
+                key={ap.bssid}
+                className={styles.apMapa}
+                transform={`translate(${limitar(ap.pos_x, 0, anchoReferencia)} ${limitar(ap.pos_y, 0, altoReferencia)})`}
+                onPointerDown={(event) => event.stopPropagation()}
+                onPointerMove={(event) => {
+                  event.stopPropagation();
+                  mostrarHint(event, ap.ssid || "SSID oculto", [
+                    ap.bssid,
+                    `${ap.rssi_promedio.toFixed(1)} dBm promedio`,
+                    nivelCobertura(ap.rssi_promedio),
+                    ap.canal ? `Canal ${ap.canal}` : "Canal s/d",
+                    ap.frecuencia_mhz ? `${ap.frecuencia_mhz} MHz` : "Frecuencia s/d",
+                    `${ap.cantidad_puntos} punto(s) asociados`,
+                  ]);
+                }}
+                onPointerLeave={() => setHint(null)}
+              >
+                <circle r={Math.max(anchoReferencia, altoReferencia) * 0.017} />
+                <RadioTowerIcon escala={Math.max(anchoReferencia, altoReferencia)} />
+              </g>
+            ))}
+        </svg>
+      </div>
+      {hint && (
+        <div className={styles.tooltip} style={{ left: hint.x + 12, top: hint.y + 12 }}>
+          <strong>{hint.titulo}</strong>
+          {hint.lineas.map((linea) => (
+            <span key={linea}>{linea}</span>
+          ))}
         </div>
       )}
       <div className={styles.leyenda}>
@@ -288,87 +782,67 @@ function HeatmapCanvas({ mapa }: { mapa: MapaCalorPortalOut }) {
   );
 }
 
-function ResumenProyecto({ data }: { data: PortalClienteOut }) {
-  return (
-    <section className={styles.resumen}>
-      <h2>Resumen</h2>
-      <dl>
-        <div>
-          <dt>Planos</dt>
-          <dd>{data.planos.length}</dd>
-        </div>
-        <div>
-          <dt>Conjuntos</dt>
-          <dd>{data.conjuntos.length}</dd>
-        </div>
-        <div>
-          <dt>Heatmaps</dt>
-          <dd>{data.heatmaps.length}</dd>
-        </div>
-        <div>
-          <dt>Alternativas</dt>
-          <dd>{data.escenarios.length}</dd>
-        </div>
-      </dl>
-    </section>
-  );
+function _toggleBssid(
+  previo: Set<string>,
+  bssid: string,
+  modo: ModoGeneracion,
+): Set<string> {
+  if (modo === "INDIVIDUAL") return new Set([bssid]);
+  if (modo === "CONJUNTO_COMPLETO") return new Set(previo);
+  const siguiente = new Set(previo);
+  if (siguiente.has(bssid)) {
+    siguiente.delete(bssid);
+  } else {
+    siguiente.add(bssid);
+  }
+  return siguiente;
 }
 
-function AnalisisResumen({ analisis }: { analisis: AnalisisCoberturaOut }) {
-  return (
-    <section className={styles.resumen}>
-      <h2>Análisis</h2>
-      <p>{analisis.resumen}</p>
-      <dl>
-        <div>
-          <dt>Cobertura</dt>
-          <dd>{analisis.pct_cobertura.toFixed(1)}%</dd>
-        </div>
-        <div>
-          <dt>Zonas muertas</dt>
-          <dd>{analisis.pct_zonas_muertas.toFixed(1)}%</dd>
-        </div>
-        <div>
-          <dt>APs detectados</dt>
-          <dd>{analisis.aps_detectados.length}</dd>
-        </div>
-      </dl>
-    </section>
-  );
+function _labelModo(modo: string): string {
+  const labels: Record<string, string> = {
+    INDIVIDUAL: "Un AP",
+    SUBCONJUNTO: "Subconjunto",
+    CONJUNTO_COMPLETO: "Todos",
+  };
+  return labels[modo] ?? modo;
 }
 
-function EscenarioCard({ escenario }: { escenario: EscenarioOptimizadoOut }) {
-  return (
-    <article className={styles.escenario}>
-      <div>
-        <h3>{escenario.nombre}</h3>
-        <p>{escenario.resumen}</p>
-      </div>
-      <div className={styles.metricas}>
-        <span>{escenario.pct_cobertura.toFixed(1)}% cobertura</span>
-        <span>{escenario.cantidad_aps} APs</span>
-        <span>{escenario.bandas.join(" / ")} GHz</span>
-        <span>Confianza {escenario.confianza}</span>
-      </div>
-      <div className={styles.recomendaciones}>
-        {escenario.recomendaciones.map((rec) => (
-          <span key={rec.id}>
-            {rec.accion}: x {rec.coord_x.toFixed(0)} / y {rec.coord_y.toFixed(0)}
-          </span>
-        ))}
-      </div>
-    </article>
-  );
+function _porcentaje(valor: number): string {
+  return `${valor.toFixed(1)}%`;
 }
 
-function _colorRssi(
-  valor: number,
-  escala: Array<{ desde: number; hasta: number; color: string }>,
-): string {
-  const tramo = escala.find((item) => valor >= item.desde && valor <= item.hasta);
-  if (tramo) return tramo.color;
-  if (valor >= -70) return "#2ecc71";
-  if (valor >= -80) return "#f1c40f";
-  if (valor >= -90) return "#e67e22";
-  return "#c0392b";
+function nivelCobertura(rssi: number): string {
+  if (rssi >= -60) return "Excelente";
+  if (rssi >= -67) return "Muy buena";
+  if (rssi >= -70) return "Objetivo CWNA-107";
+  if (rssi >= -80) return "Aceptable";
+  if (rssi >= -90) return "Débil";
+  return "Zona muerta CWNA-107";
+}
+
+function colorRssi(rssi: number): string {
+  if (rssi >= -60) return "#0B7A3B";
+  if (rssi >= -67) return "#57B65A";
+  if (rssi >= -70) return "#A7C957";
+  if (rssi >= -75) return "#F4D35E";
+  if (rssi >= -80) return "#F08A24";
+  if (rssi >= -90) return "#D95D39";
+  return "#D7263D";
+}
+
+function limitar(valor: number, minimo: number, maximo: number): number {
+  return Math.min(maximo, Math.max(minimo, valor));
+}
+
+function RadioTowerIcon({ escala }: { escala: number }) {
+  const tamano = escala * 0.015;
+  return (
+    <>
+      <path
+        d={`M ${-tamano * 0.7} ${tamano * 0.75} L 0 ${-tamano * 0.75} L ${tamano * 0.7} ${tamano * 0.75}`}
+      />
+      <path d={`M ${-tamano * 0.35} ${0} H ${tamano * 0.35}`} />
+      <path d={`M ${-tamano * 0.5} ${-tamano * 0.35} Q 0 ${-tamano * 0.75} ${tamano * 0.5} ${-tamano * 0.35}`} />
+    </>
+  );
 }

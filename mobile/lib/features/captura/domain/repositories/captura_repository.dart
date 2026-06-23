@@ -1,5 +1,6 @@
 import '../entities/punto_medicion.dart';
 import '../entities/resultado_escaneo.dart';
+import '../../../planos/domain/entities/plano.dart';
 
 /// Contrato del repositorio de captura WiFi.
 /// Sprint 3 — PB-03, PB-04.
@@ -15,6 +16,15 @@ abstract class CapturaRepository {
 
   /// Lista los puntos de medición de un plano.
   Future<List<PuntoMedicion>> listarPuntos(int planoId);
+
+  /// Obtiene el polígono de interés asociado al plano.
+  Future<List<PuntoPlano>> obtenerPoligonoInteres(int planoId);
+
+  /// Guarda el polígono de interés asociado al plano.
+  Future<List<PuntoPlano>> guardarPoligonoInteres({
+    required int planoId,
+    required List<PuntoPlano> puntos,
+  });
 
   /// Obtiene el detalle de un punto con todas sus mediciones.
   Future<PuntoMedicion> obtenerPunto(int puntoId);

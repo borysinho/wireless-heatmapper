@@ -1,6 +1,7 @@
 import '../../domain/entities/punto_medicion.dart';
 import '../../domain/entities/resultado_escaneo.dart';
 import '../../domain/repositories/captura_repository.dart';
+import '../../../planos/domain/entities/plano.dart';
 import '../datasources/medicion_remote_datasource.dart';
 
 /// Implementación concreta del repositorio de captura.
@@ -27,6 +28,17 @@ class CapturaRepositoryImpl implements CapturaRepository {
   @override
   Future<List<PuntoMedicion>> listarPuntos(int planoId) =>
       _datasource.listarPuntos(planoId);
+
+  @override
+  Future<List<PuntoPlano>> obtenerPoligonoInteres(int planoId) =>
+      _datasource.obtenerPoligonoInteres(planoId);
+
+  @override
+  Future<List<PuntoPlano>> guardarPoligonoInteres({
+    required int planoId,
+    required List<PuntoPlano> puntos,
+  }) =>
+      _datasource.guardarPoligonoInteres(planoId: planoId, puntos: puntos);
 
   @override
   Future<PuntoMedicion> obtenerPunto(int puntoId) =>

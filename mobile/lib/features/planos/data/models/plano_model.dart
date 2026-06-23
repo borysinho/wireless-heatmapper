@@ -21,6 +21,7 @@ class PlanoModel extends Plano {
     super.calibracionY1,
     super.calibracionX2,
     super.calibracionY2,
+    super.poligonoInteres,
     super.warning,
     required super.createdAt,
     required super.updatedAt,
@@ -47,9 +48,21 @@ class PlanoModel extends Plano {
       calibracionY1: toDouble(json['calibracion_y1']),
       calibracionX2: toDouble(json['calibracion_x2']),
       calibracionY2: toDouble(json['calibracion_y2']),
+      poligonoInteres: _poligonoDesdeJson(json['poligono_interes']),
       warning: json['warning'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
+  }
+
+  static List<PuntoPlano> _poligonoDesdeJson(dynamic json) {
+    if (json is! List<dynamic>) return const [];
+    return json.map((item) {
+      final data = item as Map<String, dynamic>;
+      return PuntoPlano(
+        x: (data['x'] as num).toDouble(),
+        y: (data['y'] as num).toDouble(),
+      );
+    }).toList();
   }
 }

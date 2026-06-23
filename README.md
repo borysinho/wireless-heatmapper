@@ -21,21 +21,23 @@ Sistema integrado de relevamiento y análisis de cobertura WiFi.
 cp .env.example .env
 # Editar .env con valores reales (al menos SECRET_KEY y POSTGRES_PASSWORD)
 
-# 2. Levantar todos los servicios (db + backend + web + nginx)
+# 2. Levantar servicios de desarrollo (db + backend + web)
 docker compose up --build
 
 # 3. Verificar que el backend está operativo
-curl http://localhost/api/health
+curl http://localhost:8000/health
 # Respuesta esperada: {"status":"ok","version":"0.1.0","db":"ok"}
 ```
 
 Servicios disponibles tras `docker compose up`:
 
-| Servicio              | URL                       |
-| --------------------- | ------------------------- |
-| Panel web (React)     | http://localhost          |
-| API REST (FastAPI)    | http://localhost/api      |
-| Documentación OpenAPI | http://localhost/api/docs |
+| Servicio              | URL                            |
+| --------------------- | ------------------------------ |
+| Panel web (React)     | http://localhost:5173          |
+| API REST (FastAPI)    | http://localhost:8000          |
+| Documentación OpenAPI | http://localhost:8000/api/docs |
+
+> En desarrollo local el reverse proxy Nginx no se levanta por defecto, porque la configuración productiva usa certificados TLS reales de la VM. Vite enruta `/api` hacia el backend mediante `VITE_PROXY_TARGET=http://backend:8000`.
 
 ---
 

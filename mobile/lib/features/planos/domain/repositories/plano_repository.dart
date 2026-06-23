@@ -37,6 +37,12 @@ abstract class PlanoRepository {
     required double distanciaRealM,
   });
 
+  /// Guarda el polígono de interés operativo del plano.
+  Future<Plano> guardarPoligonoInteres({
+    required int planoId,
+    required List<PuntoPlano> puntos,
+  });
+
   /// Elimina el plano. Lanza [PlanoNoEncontradoException] en 404.
   Future<void> eliminar(int planoId);
 }

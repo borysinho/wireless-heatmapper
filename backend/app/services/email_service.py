@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import smtplib
+from html import escape
 from datetime import datetime
 from email.message import EmailMessage
 
@@ -65,6 +66,7 @@ class EmailService:
     ) -> bool:
         asunto = f"Resultados WiFi disponibles: {nombre_proyecto}"
         saludo = f"Hola {cliente}," if cliente else "Hola,"
+        fecha_expiracion = f"{expira_en:%Y-%m-%d %H:%M}"
         cuerpo = "\n".join(
             [
                 saludo,
@@ -74,16 +76,34 @@ class EmailService:
                 "",
                 f"Proyecto: {nombre_proyecto}",
                 f"Enlace: {url_publica}",
-                f"Vigente hasta: {expira_en:%Y-%m-%d %H:%M}",
+                f"Vigente hasta: {fecha_expiracion}",
                 "",
                 "El enlace muestra únicamente el contenido autorizado para cliente.",
                 "",
                 "Wireless HeatMapper",
             ]
         )
-        return self.enviar(destinatario=destinatario, asunto=asunto, cuerpo=cuerpo)
+        html = _plantilla_enlace_cliente_html(
+            cliente=cliente,
+            nombre_proyecto=nombre_proyecto,
+            url_publica=url_publica,
+            fecha_expiracion=fecha_expiracion,
+        )
+        return self.enviar(
+            destinatario=destinatario,
+            asunto=asunto,
+            cuerpo=cuerpo,
+            html=html,
+        )
 
-    def enviar(self, *, destinatario: str, asunto: str, cuerpo: str) -> bool:
+    def enviar(
+        self,
+        *,
+        destinatario: str,
+        asunto: str,
+        cuerpo: str,
+        html: str | None = None,
+    ) -> bool:
         if not self.habilitado:
             logger.info("Correo transaccional omitido: SMTP no habilitado.")
             return False
@@ -94,6 +114,8 @@ class EmailService:
         mensaje["To"] = destinatario
         mensaje["Subject"] = asunto
         mensaje.set_content(cuerpo)
+        if html is not None:
+            mensaje.add_alternative(html, subtype="html")
 
         try:
             with smtplib.SMTP(
@@ -113,3 +135,66 @@ class EmailService:
             raise EmailDeliveryError("No se pudo enviar el correo.") from exc
 
         return True
+
+
+def _plantilla_enlace_cliente_html(
+    *,
+    cliente: str | None,
+    nombre_proyecto: str,
+    url_publica: str,
+    fecha_expiracion: str,
+) -> str:
+    saludo = f"Hola {escape(cliente)}," if cliente else "Hola,"
+    proyecto = escape(nombre_proyecto)
+    url = escape(url_publica, quote=True)
+    expiracion = escape(fecha_expiracion)
+    return f"""\
+<!doctype html>
+<html lang="es">
+  <body style="margin:0;padding:0;background:#f4f7fb;font-family:Arial,sans-serif;color:#172033;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f7fb;padding:28px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #d8e2ef;border-radius:8px;overflow:hidden;">
+            <tr>
+              <td style="background:#0f3d5e;padding:22px 28px;color:#ffffff;">
+                <div style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:#b9d7ea;">Bulldog Tech.</div>
+                <h1 style="margin:8px 0 0;font-size:22px;line-height:1.25;font-weight:700;">Resultados WiFi disponibles</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px;">
+                <p style="margin:0 0 16px;font-size:16px;line-height:1.5;">{saludo}</p>
+                <p style="margin:0 0 20px;font-size:15px;line-height:1.6;color:#3a4658;">
+                  Bulldog Tech. compartió contigo los resultados publicados del relevamiento WiFi.
+                </p>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 22px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;">
+                  <tr>
+                    <td style="padding:16px 18px;">
+                      <div style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#64748b;">Proyecto</div>
+                      <div style="margin-top:4px;font-size:17px;font-weight:700;color:#172033;">{proyecto}</div>
+                      <div style="margin-top:12px;font-size:13px;color:#64748b;">Vigente hasta: <strong style="color:#172033;">{expiracion}</strong></div>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:0 0 24px;text-align:center;">
+                  <a href="{url}" style="display:inline-block;background:#1f6f9f;color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:12px 22px;border-radius:6px;">Ver resultados</a>
+                </p>
+                <p style="margin:0 0 10px;font-size:13px;line-height:1.5;color:#64748b;">
+                  Si el botón no abre, copia y pega este enlace en tu navegador:
+                </p>
+                <p style="margin:0;font-size:13px;line-height:1.5;word-break:break-all;color:#1f6f9f;">{url}</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 28px;background:#f8fafc;border-top:1px solid #e2e8f0;color:#64748b;font-size:12px;line-height:1.5;">
+                El enlace muestra únicamente el contenido autorizado para cliente. Wireless HeatMapper.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
+"""

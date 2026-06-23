@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import secrets
 from pathlib import Path
@@ -34,6 +35,7 @@ from app.schemas.escenario import (
     ComparacionEscenarioOut,
     EscenarioOptimizadoOut,
     EscenariosGeneradosOut,
+    EscenariosGeneradosResumenOut,
     ReporteCrearIn,
     ReporteOut,
     RestriccionesEscenarioIn,
@@ -46,6 +48,7 @@ from app.services.interpolacion_service import (
     InterpolacionService,
     PuntoRSSI,
 )
+from app.services.geometria_service import mascara_poligono
 from app.services.reporte_service import ReporteService
 from app.storage import LocalFilesystemStorage, generar_url_firmada, verificar_firma
 
@@ -330,22 +333,32 @@ def _conjunto_fuente_entrada(
     return conjunto
 
 
+def _limite_aps_derivado(
+    *,
+    conjunto_fuente: ConjuntoAP | None,
+    bssids_seleccionados: list[str] | None,
+    aps_existentes: list[dict],
+) -> int:
+    if conjunto_fuente is not None:
+        cantidad_base = len(conjunto_fuente.items)
+    elif bssids_seleccionados is not None:
+        cantidad_base = len(bssids_seleccionados)
+    elif aps_existentes:
+        cantidad_base = len(aps_existentes)
+    else:
+        cantidad_base = 5
+    return max(1, min(3, cantidad_base))
+
+
 def _mapa_actual(
     *,
     plano: Plano,
     db: Session,
     bssids_seleccionados: list[str] | None = None,
+    conjunto_ap_id: int | None = None,
 ) -> tuple[MapaCalor, list[PuntoRSSI]]:
     mapa_repo = MapaCalorRepository(db)
     med_repo = MedicionRepository(db)
-    mapa = next(
-        (
-            item
-            for item in mapa_repo.listar_recientes_por_plano(plano_id=plano.id)
-            if item.modo_generacion != "PROYECTADO"
-        ),
-        None,
-    )
     aps = med_repo.listar_aps_por_plano(plano_id=plano.id)
     bssids = bssids_seleccionados or [ap["bssid"] for ap in aps]
     if not bssids:
@@ -359,8 +372,30 @@ def _mapa_actual(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Se requieren al menos 5 puntos de medición para IA.",
         )
-    if mapa is not None and bssids_seleccionados is None:
-        return mapa, puntos
+    poligono_interes = _requerir_poligono_interes(plano)
+    bssids_firma = ",".join(sorted(set(bssids)))
+    poligono_firma = json.dumps(
+        poligono_interes,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    firma = hashlib.sha1(
+        (
+            f"sp5-actual:{plano.id}:conjunto:{conjunto_ap_id or 'sin-conjunto'}:"
+            f"bssids:{bssids_firma}:"
+            f"area:{poligono_firma}:"
+            f"{med_repo.firma_mediciones_plano(plano_id=plano.id)}"
+        ).encode(),
+        usedforsecurity=False,
+    ).hexdigest()
+    mapa_cache = mapa_repo.obtener_cache(
+        plano_id=plano.id,
+        algoritmo="IDW",
+        resolucion=64,
+        firma_mediciones=firma,
+    )
+    if mapa_cache is not None:
+        return mapa_cache, puntos
 
     matriz = InterpolacionService().interpolar(
         puntos=puntos,
@@ -369,15 +404,18 @@ def _mapa_actual(
         resolucion=64,
         algoritmo="IDW",
     )
+    mascara = mascara_poligono(
+        poligono=poligono_interes,
+        ancho_px=plano.ancho_px,
+        alto_px=plano.alto_px,
+        resolucion=64,
+    )
     ruta = f"heatmaps/sp5_actual_{plano.id}_{secrets.token_hex(8)}.png"
-    _storage().save(HeatmapImageService().render_png(matriz), ruta)
-    firma = hashlib.sha1(
-        f"sp5-actual:{plano.id}:{med_repo.firma_mediciones_plano(plano_id=plano.id)}".encode(),
-        usedforsecurity=False,
-    ).hexdigest()
+    _storage().save(HeatmapImageService().render_png(matriz, mascara=mascara), ruta)
     aps_interes = [ap for ap in aps if ap["bssid"] in set(bssids)]
     mapa = mapa_repo.crear(
         plano_id=plano.id,
+        conjunto_ap_id=conjunto_ap_id,
         modo_generacion="SUBCONJUNTO",
         algoritmo="IDW",
         resolucion=64,
@@ -396,6 +434,18 @@ def _mapa_actual(
         firma_mediciones=firma,
     )
     return mapa, puntos
+
+
+def _requerir_poligono_interes(plano: Plano) -> list[dict]:
+    poligono = plano.poligono_interes or []
+    if len(poligono) < 3:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Debe definir un polígono de interés antes de generar recomendaciones IA."
+            ),
+        )
+    return poligono
 
 
 def _modelo_calibrado_para_plano(
@@ -439,7 +489,7 @@ def _modelo_calibrado_para_plano(
 
 @router_proyectos_escenarios.post(
     "/{proyecto_id}/escenarios",
-    response_model=EscenariosGeneradosOut,
+    response_model=EscenariosGeneradosResumenOut,
     status_code=status.HTTP_201_CREATED,
 )
 def generar_escenarios(
@@ -452,6 +502,11 @@ def generar_escenarios(
         proyecto_id=proyecto_id, current_user=current_user, db=db
     )
     plano = _plano_escenario(proyecto=proyecto, plano_id=body.plano_id, db=db)
+    if body.fuente_entrada is None or body.fuente_entrada.tipo != "CONJUNTO_EXISTENTE":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La IA solo acepta un conjunto de APs existente como entrada.",
+        )
     conjunto_fuente = (
         _conjunto_fuente_entrada(plano_id=plano.id, body=body, db=db)
         if body.fuente_entrada is not None
@@ -463,6 +518,7 @@ def generar_escenarios(
         plano=plano,
         db=db,
         bssids_seleccionados=bssids_seleccionados,
+        conjunto_ap_id=conjunto_fuente.id if conjunto_fuente else None,
     )
     mapas_actuales_por_banda = _mapas_actuales_por_banda(
         plano=plano,
@@ -477,7 +533,13 @@ def generar_escenarios(
         bssids_seleccionados=bssids_seleccionados,
     )
     optimizador = OptimizadorAPService(modelo=modelo_propagacion)
+    poligono_interes = _requerir_poligono_interes(plano)
     aps_existentes = _aps_existentes_para_ia(plano_id=plano.id, body=body, db=db)
+    limite_aps = _limite_aps_derivado(
+        conjunto_fuente=conjunto_fuente,
+        bssids_seleccionados=bssids_seleccionados,
+        aps_existentes=aps_existentes,
+    )
     banda_objetivo = "5" if "5" in body.bandas else body.bandas[0]
     alternativas = optimizador.optimizar(
         puntos_actuales=puntos,
@@ -485,18 +547,34 @@ def generar_escenarios(
         ancho_px=plano.ancho_px,
         alto_px=plano.alto_px,
         metros_por_pixel=plano.escala_m_por_px or 1.0,
-        max_aps=body.max_aps,
+        max_aps=limite_aps,
         banda=banda_objetivo,
         resolucion=body.resolucion,
         umbral_objetivo_dbm=body.umbral_objetivo_dbm,
         bandas=body.bandas,
         aps_existentes=aps_existentes,
+        cantidad_recomendaciones=body.cantidad_recomendaciones,
+        poligono_interes=poligono_interes,
     )
     observados_por_banda = _observados_por_punto_y_banda(db=db, plano_id=plano.id)
     mapa_repo = MapaCalorRepository(db)
     escenario_repo = EscenarioRepository(db)
     escenarios: list[EscenarioOptimizado] = []
+    restricciones = body.model_dump(exclude_none=True)
+    if conjunto_fuente is not None:
+        fuente_restricciones = restricciones.setdefault("fuente_entrada", {})
+        fuente_restricciones["nombre"] = conjunto_fuente.nombre
+        fuente_restricciones["proposito"] = conjunto_fuente.proposito
+        fuente_restricciones["bssids"] = [
+            item.bssid.lower() for item in conjunto_fuente.items
+        ]
+    restricciones["limite_aps_derivado"] = limite_aps
     for idx, alternativa in enumerate(alternativas, start=1):
+        nombre_escenario = (
+            f"{conjunto_fuente.nombre} · Propuesta {idx}"
+            if conjunto_fuente
+            else alternativa.nombre
+        )
         for valor in alternativa.valores_proyectados:
             observado = observados_por_banda.get(
                 (valor["punto_medicion_id"], valor["banda"])
@@ -508,18 +586,30 @@ def generar_escenarios(
                 else None
             )
         ruta = f"heatmaps/sp5_proyectado_{proyecto.id}_{idx}_{secrets.token_hex(8)}.png"
-        _storage().save(HeatmapImageService().render_png(alternativa.matriz), ruta)
+        _storage().save(
+            HeatmapImageService().render_png(
+                alternativa.matriz,
+                mascara=mascara_poligono(
+                    poligono=poligono_interes,
+                    ancho_px=plano.ancho_px,
+                    alto_px=plano.alto_px,
+                    resolucion=body.resolucion,
+                ),
+            ),
+            ruta,
+        )
         firma = hashlib.sha1(
             f"sp5-proyectado:{proyecto.id}:{idx}:{secrets.token_hex(8)}".encode(),
             usedforsecurity=False,
         ).hexdigest()
         mapa_proyectado = mapa_repo.crear(
             plano_id=plano.id,
+            conjunto_ap_id=conjunto_fuente.id if conjunto_fuente else None,
             modo_generacion="PROYECTADO",
             algoritmo="FSPL",
             resolucion=body.resolucion,
             bssid=f"sp5:{idx:02d}:00:00:00",
-            ssid=alternativa.nombre,
+            ssid=nombre_escenario,
             ap_pos_x=alternativa.recomendaciones[0]["coord_x"],
             ap_pos_y=alternativa.recomendaciones[0]["coord_y"],
             aps_interes=[
@@ -554,7 +644,7 @@ def generar_escenarios(
             mapa_proyectado_id=mapa_proyectado.id,
             conjunto_base_id=conjunto_fuente.id if conjunto_fuente else None,
             generado_por_id=current_user.id,
-            nombre=alternativa.nombre,
+            nombre=nombre_escenario,
             banda=alternativa.banda,
             modelo_ap=alternativa.modelo_ap,
             pct_cobertura_actual=alternativa.pct_cobertura_actual,
@@ -562,7 +652,7 @@ def generar_escenarios(
             costo_estimado=alternativa.costo_estimado,
             cantidad_aps=alternativa.cantidad_aps,
             resumen=alternativa.resumen,
-            restricciones=body.model_dump(),
+            restricciones=restricciones,
             metricas={
                 **alternativa.metricas,
                 "calibracion_modelo": modelo_propagacion.resumen_calibracion(),

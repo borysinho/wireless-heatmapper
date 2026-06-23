@@ -9,7 +9,6 @@ import {
   GitCompareArrows,
   Map as MapIcon,
   RadioTower,
-  Search,
   Send,
   Sparkles,
   Trash2,
@@ -25,7 +24,6 @@ import {
 } from "@/shared/components";
 import { resolverUrlApi } from "@/shared/api/urlApi";
 import {
-  useAPsPlano,
   useCambiarEstadoEscenario,
   useComparacionEscenario,
   useConjuntosPorPlanos,
@@ -36,18 +34,19 @@ import {
   usePlanosProyecto,
 } from "../hooks/useProyectosOrg";
 import type {
-  APDisponibleOut,
   EscenarioOptimizadoOut,
   EstadoGobernanzaEscenario,
+  PlanoOut,
   RestriccionesEscenarioIn,
 } from "../types";
+import { MapaCalorInteractivo } from "../components/MapaCalorInteractivo";
 import styles from "./EscenariosProyecto.module.css";
 
 const DEFAULT_FORM: RestriccionesEscenarioIn = {
-  max_aps: 3,
   bandas: ["2.4", "5"],
   umbral_objetivo_dbm: -70,
   resolucion: 64,
+  cantidad_recomendaciones: 3,
 };
 
 interface GrupoEscenarios {
@@ -65,17 +64,6 @@ export default function EscenariosProyecto() {
 
   const [form, setForm] = useState<RestriccionesEscenarioIn>(DEFAULT_FORM);
   const [planoId, setPlanoId] = useState<number | null>(null);
-  const [nombreConjunto, setNombreConjunto] = useState("Conjunto IA");
-  const [propositoConjunto, setPropositoConjunto] = useState(
-    "Fuente de entrada para alternativas IA",
-  );
-  const [filtroAPs, setFiltroAPs] = useState("");
-  const [bssidsSeleccionados, setBssidsSeleccionados] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [tipoFuente, setTipoFuente] = useState<
-    "SELECCION_APS_MAPA" | "CONJUNTO_EXISTENTE"
-  >("SELECCION_APS_MAPA");
   const [conjuntoFuenteId, setConjuntoFuenteId] = useState<number | null>(null);
   const [escenarioComparacionId, setEscenarioComparacionId] = useState<number | null>(
     null,
@@ -116,11 +104,8 @@ export default function EscenariosProyecto() {
         conjunto.plano_id === planoSeleccionadoId &&
         conjunto.estado_gobernanza !== "descartado",
     );
-  const {
-    data: apsDisponibles,
-    isLoading: cargandoAPs,
-    isError: errorAPs,
-  } = useAPsPlano(planoSeleccionadoId);
+  const conjuntoFuenteSeleccionado =
+    conjuntosPlano.find((conjunto) => conjunto.id === conjuntoFuenteId) ?? null;
   const { data: escenarios, isLoading, isError } = useEscenariosProyecto(proyectoId);
   const { mutateAsync: generar, isPending: generando } =
     useGenerarEscenariosProyecto(proyectoId);
@@ -136,20 +121,9 @@ export default function EscenariosProyecto() {
     isError: errorComparacion,
   } = useComparacionEscenario(escenarioComparacionId);
 
-  const apsMapa = apsDisponibles ?? [];
-  const filtroNormalizado = filtroAPs.trim().toLowerCase();
-  const apsFiltrados = filtroNormalizado
-    ? apsMapa.filter((ap) => _apCoincideConFiltro(ap, filtroNormalizado))
-    : apsMapa;
-  const todosSeleccionados =
-    apsMapa.length > 0 && bssidsSeleccionados.size === apsMapa.length;
   const puedeGenerar =
     Boolean(planoSeleccionado?.calibrado) &&
-    (tipoFuente === "CONJUNTO_EXISTENTE"
-      ? conjuntoFuenteId !== null
-      : bssidsSeleccionados.size > 0 &&
-        nombreConjunto.trim().length > 0 &&
-        propositoConjunto.trim().length > 0) &&
+    conjuntoFuenteSeleccionado !== null &&
     !generando;
 
   const escenariosOrdenados = useMemo(
@@ -191,24 +165,6 @@ export default function EscenariosProyecto() {
     [escenariosOrdenados],
   );
 
-  const handleToggleAP = (bssid: string) => {
-    setBssidsSeleccionados((prev) => {
-      const siguiente = new Set(prev);
-      if (siguiente.has(bssid)) {
-        siguiente.delete(bssid);
-      } else {
-        siguiente.add(bssid);
-      }
-      return siguiente;
-    });
-  };
-
-  const handleToggleTodos = () => {
-    setBssidsSeleccionados(
-      todosSeleccionados ? new Set() : new Set(apsMapa.map((ap) => ap.bssid)),
-    );
-  };
-
   const handleToggleBanda = (banda: "2.4" | "5") => {
     setForm((prev) => {
       const bandas = prev.bandas.includes(banda)
@@ -221,44 +177,34 @@ export default function EscenariosProyecto() {
   const handleGenerar = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!planoSeleccionado?.calibrado) {
-      toast.error("Seleccione un plano calibrado antes de generar alternativas IA.");
+      toast.error("Seleccione un plano calibrado antes de generar la recomendación IA.");
       return;
     }
-    if (tipoFuente === "SELECCION_APS_MAPA" && bssidsSeleccionados.size === 0) {
-      toast.error("Seleccione al menos un AP detectado sobre el mapa.");
-      return;
-    }
-    if (
-      tipoFuente === "SELECCION_APS_MAPA" &&
-      (!nombreConjunto.trim() || !propositoConjunto.trim())
-    ) {
-      toast.error("Nombre y propósito del conjunto de entrada son obligatorios.");
+    if (!conjuntoFuenteSeleccionado) {
+      toast.error("Seleccione un conjunto de APs completo para IA.");
       return;
     }
     try {
       const respuesta = await generar({
         ...form,
         plano_id: planoSeleccionado.id,
-        fuente_entrada:
-          tipoFuente === "CONJUNTO_EXISTENTE"
-            ? {
-                tipo: "CONJUNTO_EXISTENTE",
-                ap_ids: [],
-                bssids: [],
-                conjunto_id: conjuntoFuenteId,
-              }
-            : {
-                tipo: "SELECCION_APS_MAPA",
-                nombre: nombreConjunto.trim(),
-                proposito: propositoConjunto.trim(),
-                ap_ids: [],
-                bssids: Array.from(bssidsSeleccionados),
-                conjunto_id: null,
-              },
+        fuente_entrada: {
+          tipo: "CONJUNTO_EXISTENTE",
+          nombre: conjuntoFuenteSeleccionado.nombre,
+          proposito: conjuntoFuenteSeleccionado.proposito,
+          ap_ids: [],
+          bssids: [],
+          conjunto_id: conjuntoFuenteSeleccionado.id,
+        },
       });
-      toast.exito(`${respuesta.escenarios.length} alternativa(s) IA generada(s).`);
-    } catch {
-      toast.error("No se pudieron generar alternativas IA. Revise plano, APs y mediciones.");
+      toast.exito(`${respuesta.escenarios.length} recomendación IA generada.`);
+    } catch (error) {
+      toast.error(
+        _detalleError(
+          error,
+          "No se pudo generar la recomendación IA. Revise plano, conjunto y mediciones.",
+        ),
+      );
     }
   };
 
@@ -299,10 +245,10 @@ export default function EscenariosProyecto() {
   const handleEliminarTodos = async () => {
     try {
       const respuesta = await eliminarTodos();
-      toast.exito(`${respuesta.eliminados} alternativa(s) eliminada(s).`);
+      toast.exito(`${respuesta.eliminados} recomendación(es) eliminada(s).`);
       setConfirmarEliminarTodos(false);
     } catch {
-      toast.error("No se pudieron eliminar permanentemente las alternativas IA.");
+      toast.error("No se pudieron eliminar permanentemente las recomendaciones IA.");
     }
   };
 
@@ -314,11 +260,11 @@ export default function EscenariosProyecto() {
         await eliminarEscenario(escenario.id);
       }
       toast.exito(
-        `${grupoEliminar.escenarios.length} alternativa(s) eliminada(s).`,
+        `${grupoEliminar.escenarios.length} recomendación(es) eliminada(s).`,
       );
       setGrupoEliminar(null);
     } catch {
-      toast.error("No se pudo eliminar el grupo de alternativas IA.");
+      toast.error("No se pudo eliminar el grupo de recomendaciones IA.");
     } finally {
       setEliminandoGrupo(false);
     }
@@ -330,7 +276,7 @@ export default function EscenariosProyecto() {
         <div>
           <h2>Generación y revisión de escenarios IA</h2>
           <p>
-            Las alternativas nacen como resultados internos y solo pasan al cliente
+            Las recomendaciones nacen como resultados internos y solo pasan al cliente
             desde la publicación del proyecto.
           </p>
         </div>
@@ -340,11 +286,16 @@ export default function EscenariosProyecto() {
         <div className={styles.panelHeader}>
           <div>
             <h3>Preparación de entrada</h3>
-            <p>{planoSeleccionado?.nombre ?? "Sin mapa"} · {bssidsSeleccionados.size} APs</p>
+            <p>
+              {planoSeleccionado?.nombre ?? "Sin mapa"} ·{" "}
+              {conjuntoFuenteSeleccionado
+                ? `${conjuntoFuenteSeleccionado.nombre} · ${conjuntoFuenteSeleccionado.cantidad_aps} APs`
+                : "sin conjunto seleccionado"}
+            </p>
           </div>
           <Button type="submit" isLoading={generando} disabled={!puedeGenerar}>
             <Sparkles size={16} aria-hidden="true" />
-            Generar alternativas
+            Generar recomendación
           </Button>
         </div>
 
@@ -372,7 +323,6 @@ export default function EscenariosProyecto() {
                       }`}
                       onClick={() => {
                         setPlanoId(plano.id);
-                        setBssidsSeleccionados(new Set());
                         setConjuntoFuenteId(null);
                       }}
                     >
@@ -390,57 +340,30 @@ export default function EscenariosProyecto() {
             <section className={styles.banda}>
               <div className={styles.seccionHeader}>
                 <RadioTower size={18} aria-hidden="true" />
-                <h2>APs de entrada</h2>
+                <h2>Conjunto completo de entrada</h2>
               </div>
               {planoSeleccionadoId === null ? (
-                <EmptyState mensaje="Seleccione un mapa para ver sus APs." />
-              ) : cargandoAPs ? (
-                <div className={styles.skeleton} />
-              ) : errorAPs ? (
-                <EmptyState mensaje="No se pudieron cargar los APs detectados del mapa." />
-              ) : apsMapa.length === 0 ? (
-                <EmptyState mensaje="Este mapa aún no tiene APs detectados en sus mediciones." />
+                <EmptyState mensaje="Seleccione un mapa para ver sus conjuntos." />
+              ) : conjuntosPlano.length === 0 ? (
+                <EmptyState mensaje="Este mapa todavía no tiene conjuntos de APs disponibles para IA." />
               ) : (
-                <div className={styles.conjuntoEditor}>
-                  <div className={styles.selectorHeader}>
-                    <strong>
-                      APs seleccionados: {bssidsSeleccionados.size}/{apsMapa.length}
-                    </strong>
-                    <Button
+                <div className={styles.conjuntosGrid}>
+                  {conjuntosPlano.map((conjunto) => (
+                    <button
                       type="button"
-                      variante="secondary"
-                      tamano="sm"
-                      onClick={handleToggleTodos}
+                      key={conjunto.id}
+                      className={`${styles.conjuntoCard} ${
+                        conjunto.id === conjuntoFuenteId ? styles.conjuntoActivo : ""
+                      }`}
+                      onClick={() => setConjuntoFuenteId(conjunto.id)}
                     >
-                      {todosSeleccionados ? "Desmarcar todos" : "Marcar todos"}
-                    </Button>
-                  </div>
-
-                  <label className={styles.filtroAPs}>
-                    <Search size={16} aria-hidden="true" />
-                    <input
-                      value={filtroAPs}
-                      onChange={(e) => setFiltroAPs(e.target.value)}
-                      placeholder="Filtrar APs"
-                    />
-                  </label>
-
-                  {apsFiltrados.length === 0 ? (
-                    <p className={styles.sinCoincidencias}>
-                      No hay APs que coincidan con el filtro.
-                    </p>
-                  ) : (
-                    <div className={styles.listaAPs}>
-                      {apsFiltrados.map((ap) => (
-                        <APMapaRow
-                          key={ap.bssid}
-                          ap={ap}
-                          seleccionado={bssidsSeleccionados.has(ap.bssid)}
-                          onToggle={() => handleToggleAP(ap.bssid)}
-                        />
-                      ))}
-                    </div>
-                  )}
+                      <span>{conjunto.nombre}</span>
+                      <small>
+                        {conjunto.proposito} · {conjunto.cantidad_aps} APs ·{" "}
+                        {_labelEstadoGobernanza(conjunto.estado_gobernanza)}
+                      </small>
+                    </button>
+                  ))}
                 </div>
               )}
             </section>
@@ -451,54 +374,13 @@ export default function EscenariosProyecto() {
               <Sparkles size={18} aria-hidden="true" />
               <h2>Parámetros IA</h2>
             </div>
-            <div className={styles.formularioConjunto}>
-              <label>
-                Fuente de entrada
-                <select
-                  value={tipoFuente}
-                  onChange={(e) =>
-                    setTipoFuente(e.target.value as typeof tipoFuente)
-                  }
-                >
-                  <option value="SELECCION_APS_MAPA">Selección directa del mapa</option>
-                  <option value="CONJUNTO_EXISTENTE">Conjunto existente</option>
-                </select>
-              </label>
-              {tipoFuente === "CONJUNTO_EXISTENTE" && (
-                <label>
-                  Conjunto
-                  <select
-                    value={conjuntoFuenteId ?? ""}
-                    onChange={(e) =>
-                      setConjuntoFuenteId(Number(e.target.value) || null)
-                    }
-                  >
-                    <option value="">Seleccione un conjunto</option>
-                    {conjuntosPlano.map((conjunto) => (
-                      <option key={conjunto.id} value={conjunto.id}>
-                        {conjunto.nombre} · {conjunto.cantidad_aps} APs
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-            </div>
-            {tipoFuente === "SELECCION_APS_MAPA" && (
-              <div className={styles.formularioConjunto}>
-                <label>
-                  Nombre
-                  <input
-                    value={nombreConjunto}
-                    onChange={(e) => setNombreConjunto(e.target.value)}
-                  />
-                </label>
-                <label>
-                  Propósito
-                  <input
-                    value={propositoConjunto}
-                    onChange={(e) => setPropositoConjunto(e.target.value)}
-                  />
-                </label>
+            {conjuntoFuenteSeleccionado && (
+              <div className={styles.detalleConjunto}>
+                <strong>{conjuntoFuenteSeleccionado.nombre}</strong>
+                <span>
+                  {conjuntoFuenteSeleccionado.cantidad_aps} APs serán evaluados como
+                  conjunto completo para mostrar las mejores recomendaciones.
+                </span>
               </div>
             )}
 
@@ -524,19 +406,6 @@ export default function EscenariosProyecto() {
               </fieldset>
 
               <label>
-                Máximo APs
-                <input
-                  type="number"
-                  min={1}
-                  max={5}
-                  value={form.max_aps}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, max_aps: Number(e.target.value) }))
-                  }
-                />
-              </label>
-
-              <label>
                 Umbral RSSI objetivo
                 <input
                   type="number"
@@ -547,6 +416,22 @@ export default function EscenariosProyecto() {
                     setForm((prev) => ({
                       ...prev,
                       umbral_objetivo_dbm: Number(e.target.value),
+                    }))
+                  }
+                />
+              </label>
+
+              <label>
+                Cantidad de recomendaciones
+                <input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={form.cantidad_recomendaciones}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      cantidad_recomendaciones: Number(e.target.value),
                     }))
                   }
                 />
@@ -573,7 +458,7 @@ export default function EscenariosProyecto() {
       <section className={styles.resultados}>
         <div className={styles.resultadosHeader}>
           <div>
-            <h2>Resultados IA</h2>
+            <h2>Recomendaciones IA</h2>
             <p>
               {resumenEscenarios.total} total · {resumenEscenarios.pendientes} pendientes ·{" "}
               {resumenEscenarios.aprobados} aprobados · {resumenEscenarios.publicados} publicados ·{" "}
@@ -619,7 +504,7 @@ export default function EscenariosProyecto() {
         ) : isError ? (
           <EmptyState mensaje="No se pudieron cargar los escenarios IA." />
         ) : escenariosOrdenados.length === 0 ? (
-          <EmptyState mensaje="Aún no hay alternativas IA para este proyecto." />
+          <EmptyState mensaje="Aún no hay recomendaciones IA para este proyecto." />
         ) : (
           <div className={styles.grupos}>
             {gruposEscenarios.map((grupo) => (
@@ -628,7 +513,7 @@ export default function EscenariosProyecto() {
                   <div>
                     <h3>{grupo.nombre}</h3>
                     <p>
-                      {grupo.tipo} · {grupo.escenarios.length} alternativa(s) ·{" "}
+                      {grupo.tipo} · {grupo.escenarios.length} recomendación(es) ·{" "}
                       {grupo.cantidadAps > 0
                         ? `${grupo.cantidadAps} APs de entrada`
                         : "APs de entrada registrados en la fuente"}
@@ -649,79 +534,85 @@ export default function EscenariosProyecto() {
                 <div className={styles.lista}>
                   {grupo.escenarios.map((escenario) => (
                     <article key={escenario.id} className={styles.escenario}>
-                  <div className={styles.escenarioHeader}>
-                    <div>
-                      <h2>{escenario.nombre}</h2>
-                      <p>
-                        Plano #{escenario.plano_id} · {_fuenteEscenario(escenario)} ·{" "}
-                        {escenario.resumen}
-                      </p>
-                    </div>
-                    <Badge
-                      variante="en_progreso"
-                      etiqueta={_labelEstadoGobernanza(escenario.estado_gobernanza)}
-                    />
-                  </div>
-
-                  <div className={styles.metricas}>
-                    <span>{escenario.pct_cobertura.toFixed(1)}% cobertura</span>
-                    <span>{escenario.cantidad_aps} APs</span>
-                    <span>Confianza {escenario.confianza}</span>
-                    <span>{escenario.bandas.join(" / ")} GHz</span>
-                  </div>
-
-                  <div className={styles.recomendaciones}>
-                    {escenario.recomendaciones.map((rec) => (
-                      <div key={rec.id} className={styles.recomendacion}>
-                        <RadioTower size={16} aria-hidden="true" />
+                      <div className={styles.escenarioHeader}>
                         <div>
-                          <strong>
-                            {rec.accion} · x {rec.coord_x.toFixed(0)} / y{" "}
-                            {rec.coord_y.toFixed(0)}
-                          </strong>
-                          <p>{rec.justificacion}</p>
+                          <h2>{escenario.nombre}</h2>
+                          <p>
+                            Plano #{escenario.plano_id} · {_fuenteEscenario(escenario)} ·{" "}
+                            {escenario.resumen}
+                          </p>
                         </div>
+                        <Badge
+                          variante="en_progreso"
+                          etiqueta={_labelEstadoGobernanza(escenario.estado_gobernanza)}
+                        />
                       </div>
-                    ))}
-                  </div>
 
-                  <div className={styles.accionesEscenario}>
-                    <Button
-                      variante="ghost"
-                      tamano="sm"
-                      onClick={() => setEscenarioComparacionId(escenario.id)}
-                    >
-                      <GitCompareArrows size={14} aria-hidden="true" />
-                      Comparar
-                    </Button>
-                    <Button
-                      variante="secondary"
-                      tamano="sm"
-                      disabled={cambiandoEstado}
-                      onClick={() => handleEstado(escenario, "aprobado_interno")}
-                    >
-                      <CheckCircle2 size={14} aria-hidden="true" />
-                      Aprobar
-                    </Button>
-                    <Button
-                      variante="secondary"
-                      tamano="sm"
-                      disabled={cambiandoEstado}
-                      onClick={() => handleEstado(escenario, "publicado_cliente")}
-                    >
-                      <Send size={14} aria-hidden="true" />
-                      Publicar
-                    </Button>
-                    <Button
-                      variante="ghost"
-                      tamano="sm"
-                      disabled={cambiandoEstado}
-                      onClick={() => handleEstado(escenario, "descartado")}
-                    >
-                      <XCircle size={14} aria-hidden="true" />
-                      Descartar
-                    </Button>
-                  </div>
+                      <div className={styles.metricas}>
+                        <span>{escenario.pct_cobertura_actual.toFixed(1)}% actual</span>
+                        <span>{escenario.pct_cobertura.toFixed(1)}% proyectada</span>
+                        <span>{escenario.cantidad_aps} APs</span>
+                        <span>Confianza {escenario.confianza}</span>
+                        <span>{escenario.bandas.join(" / ")} GHz</span>
+                      </div>
+
+                      <VistaHeatmapsEscenario
+                        escenario={escenario}
+                        planos={planosOrdenados}
+                      />
+
+                      <div className={styles.recomendacionesCompactas}>
+                        {escenario.recomendaciones.map((rec) => (
+                          <div key={rec.id} className={styles.recomendacionCompacta}>
+                            <RadioTower size={16} aria-hidden="true" />
+                            <span>
+                              <strong>AP sugerido {rec.orden}</strong>
+                              <small>
+                                {_labelAccion(rec.accion)} · {rec.banda} GHz · RSSI{" "}
+                                {rec.rssi_proyectado.toFixed(1)} dBm
+                              </small>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className={styles.accionesEscenario}>
+                        <Button
+                          variante="ghost"
+                          tamano="sm"
+                          onClick={() => setEscenarioComparacionId(escenario.id)}
+                        >
+                          <GitCompareArrows size={14} aria-hidden="true" />
+                          Ampliar comparación
+                        </Button>
+                        <Button
+                          variante="secondary"
+                          tamano="sm"
+                          disabled={cambiandoEstado}
+                          onClick={() => handleEstado(escenario, "aprobado_interno")}
+                        >
+                          <CheckCircle2 size={14} aria-hidden="true" />
+                          Aprobar
+                        </Button>
+                        <Button
+                          variante="secondary"
+                          tamano="sm"
+                          disabled={cambiandoEstado}
+                          onClick={() => handleEstado(escenario, "publicado_cliente")}
+                        >
+                          <Send size={14} aria-hidden="true" />
+                          Publicar
+                        </Button>
+                        <Button
+                          variante="ghost"
+                          tamano="sm"
+                          disabled={cambiandoEstado}
+                          onClick={() => handleEstado(escenario, "descartado")}
+                        >
+                          <XCircle size={14} aria-hidden="true" />
+                          Descartar
+                        </Button>
+                      </div>
                     </article>
                   ))}
                 </div>
@@ -789,8 +680,8 @@ export default function EscenariosProyecto() {
       )}
       {confirmarEliminarTodos && (
         <ConfirmDialog
-          titulo="¿Borrar permanentemente todas las alternativas IA?"
-          descripcion={`Se eliminarán ${escenariosOrdenados.length} alternativa(s) y sus recomendaciones. Use esta acción solo cuando quiera limpiar por completo los resultados generados.`}
+          titulo="¿Borrar permanentemente todas las recomendaciones IA?"
+          descripcion={`Se eliminarán ${escenariosOrdenados.length} recomendación(es) y sus ubicaciones sugeridas. Use esta acción solo cuando quiera limpiar por completo los resultados generados.`}
           textoConfirmar="Borrar todo"
           cargando={eliminandoTodos}
           onCancelar={() => setConfirmarEliminarTodos(false)}
@@ -800,7 +691,7 @@ export default function EscenariosProyecto() {
       {grupoEliminar && (
         <ConfirmDialog
           titulo={`¿Borrar "${grupoEliminar.nombre}"?`}
-          descripcion={`Se eliminarán permanentemente ${grupoEliminar.escenarios.length} alternativa(s) de este grupo.`}
+          descripcion={`Se eliminarán permanentemente ${grupoEliminar.escenarios.length} recomendación(es) de este grupo.`}
           textoConfirmar="Borrar grupo"
           cargando={eliminandoGrupo}
           onCancelar={() => setGrupoEliminar(null)}
@@ -811,52 +702,115 @@ export default function EscenariosProyecto() {
   );
 }
 
-function APMapaRow({
-  ap,
-  seleccionado,
-  onToggle,
+function VistaHeatmapsEscenario({
+  escenario,
+  planos,
 }: {
-  ap: APDisponibleOut;
-  seleccionado: boolean;
-  onToggle: () => void;
+  escenario: EscenarioOptimizadoOut;
+  planos: PlanoOut[];
 }) {
-  const frecuencia = ap.frecuencia_mhz ? `${ap.frecuencia_mhz} MHz` : "sin frecuencia";
-  const canal = ap.canal ? `canal ${ap.canal}` : "sin canal";
-  return (
-    <label className={`${styles.apRow} ${seleccionado ? styles.apActivo : ""}`}>
-      <input type="checkbox" checked={seleccionado} onChange={onToggle} />
-      <span>
-        <strong>{ap.ssid || "SSID oculto"}</strong>
-        <small>
-          {ap.bssid} · {canal} · {frecuencia} · {ap.rssi_promedio.toFixed(1)} dBm ·{" "}
-          {ap.cantidad_puntos} puntos · x {ap.pos_x.toFixed(0)} / y {ap.pos_y.toFixed(0)}
-        </small>
-      </span>
-    </label>
-  );
-}
+  const {
+    data: comparacion,
+    isLoading,
+    isError,
+  } = useComparacionEscenario(escenario.id);
+  const plano = planos.find((item) => item.id === escenario.plano_id);
 
-function _apCoincideConFiltro(ap: APDisponibleOut, filtro: string): boolean {
-  const texto = [
-    ap.ssid,
-    ap.bssid,
-    ap.canal?.toString() ?? "",
-    ap.frecuencia_mhz?.toString() ?? "",
-  ]
-    .join(" ")
-    .toLowerCase();
-  return texto.includes(filtro);
+  if (isLoading) {
+    return <div className={styles.skeletonHeatmap} />;
+  }
+
+  if (isError || !comparacion || !plano) {
+    return (
+      <div className={styles.heatmapNoDisponible}>
+        No se pudo cargar la visualización del escenario.
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.heatmapsEscenario}>
+      <MapaCalorInteractivo
+        mapa={comparacion.heatmap_actual}
+        plano={plano}
+        titulo="Cobertura actual observada"
+        compacto
+      />
+      <MapaCalorInteractivo
+        mapa={comparacion.heatmap_proyectado}
+        plano={plano}
+        titulo="Cobertura proyectada por IA"
+        apHints={_hintsRecomendaciones(escenario)}
+        compacto
+      />
+    </div>
+  );
 }
 
 function _fuenteEscenario(escenario: EscenarioOptimizadoOut): string {
   const fuente = escenario.restricciones.fuente_entrada as
-    | { tipo?: string; nombre?: string; ap_ids?: number[]; bssids?: string[] }
+    | {
+        tipo?: string;
+        nombre?: string;
+        ap_ids?: number[];
+        bssids?: string[];
+        conjunto_id?: number | null;
+      }
     | undefined;
+  if (fuente?.tipo === "CONJUNTO_EXISTENTE") {
+    const cantidad = fuente.bssids?.length ?? escenario.cantidad_aps;
+    return `${fuente.nombre ?? `Conjunto AP #${fuente.conjunto_id ?? escenario.conjunto_base_id}`} · ${cantidad} APs`;
+  }
   if (fuente?.tipo === "SELECCION_APS_MAPA") {
     const cantidad = fuente.bssids?.length ?? fuente.ap_ids?.length ?? 0;
     return `${fuente.nombre ?? "Conjunto IA"} · ${cantidad} APs`;
   }
   return "fuente IA registrada";
+}
+
+function _hintsRecomendaciones(escenario: EscenarioOptimizadoOut) {
+  return escenario.recomendaciones.map((rec) => ({
+    titulo: `AP sugerido ${rec.orden}`,
+    resumen: `${_labelAccion(rec.accion)} · ${rec.banda} GHz · RSSI ${rec.rssi_proyectado.toFixed(1)} dBm`,
+    detalles: [
+      `Acción: ${_labelAccion(rec.accion)}`,
+      `Montaje: ${_capitalizar(rec.tipo_montaje)} · ${rec.altura_m.toFixed(1)} m`,
+      `Banda: ${rec.banda} GHz`,
+      `RSSI: ${rec.rssi_proyectado.toFixed(1)} dBm`,
+    ],
+  }));
+}
+
+function _labelAccion(accion: string): string {
+  const mapa: Record<string, string> = {
+    AGREGAR: "Agregar AP",
+    MANTENER: "Mantener AP",
+    MOVER: "Mover AP",
+    RECONFIGURAR: "Reconfigurar AP",
+    CAMBIAR_MODELO: "Cambiar modelo",
+    RETIRAR: "Retirar AP",
+  };
+  return mapa[accion] ?? accion;
+}
+
+function _capitalizar(valor: string): string {
+  const limpio = valor.replaceAll("_", " ").toLowerCase();
+  return limpio.charAt(0).toUpperCase() + limpio.slice(1);
+}
+
+function _detalleError(error: unknown, alternativo: string): string {
+  const detail = (error as { response?: { data?: { detail?: unknown } } })?.response
+    ?.data?.detail;
+  if (typeof detail === "string" && detail.trim().length > 0) {
+    return detail;
+  }
+  if (Array.isArray(detail) && detail.length > 0) {
+    return "La solicitud de generación IA tiene datos inválidos.";
+  }
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+  return alternativo;
 }
 
 function _labelEstadoGobernanza(estado: string): string {
@@ -899,14 +853,17 @@ function _agruparEscenariosPorFuente(
     const existente = grupos.get(clave);
     if (existente) {
       existente.escenarios.push(escenario);
-      existente.cantidadAps = Math.max(existente.cantidadAps, _cantidadFuente(fuente));
+      existente.cantidadAps = Math.max(
+        existente.cantidadAps,
+        _cantidadFuente(fuente, escenario),
+      );
       continue;
     }
     grupos.set(clave, {
       id: clave,
       nombre,
       tipo: _labelTipoFuente(tipoFuente),
-      cantidadAps: _cantidadFuente(fuente),
+      cantidadAps: _cantidadFuente(fuente, escenario),
       escenarios: [escenario],
     });
   }
@@ -921,8 +878,9 @@ function _cantidadFuente(
   fuente:
     | { bssids?: string[]; ap_ids?: number[]; conjunto_id?: number | null }
     | undefined,
+  escenario: EscenarioOptimizadoOut,
 ): number {
-  return fuente?.bssids?.length ?? fuente?.ap_ids?.length ?? 0;
+  return fuente?.bssids?.length ?? fuente?.ap_ids?.length ?? escenario.cantidad_aps;
 }
 
 function _labelTipoFuente(tipo: string): string {

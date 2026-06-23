@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 
 import 'ap_disponible.dart';
 import 'escala_heatmap.dart';
+import '../../../planos/domain/entities/plano.dart';
 
 /// Mapa de calor generado por el backend. Sprint 4 — PB-05.
 class MapaCalor extends Equatable {
@@ -25,6 +26,7 @@ class MapaCalor extends Equatable {
   final double rssiMax;
   final double rssiPromedio;
   final List<PuntoLecturaHeatmap> puntosLectura;
+  final List<PuntoPlano> poligonoInteres;
   final List<String> advertencias;
   final DateTime createdAt;
 
@@ -49,6 +51,7 @@ class MapaCalor extends Equatable {
     required this.rssiMax,
     required this.rssiPromedio,
     required this.puntosLectura,
+    this.poligonoInteres = const [],
     required this.advertencias,
     required this.createdAt,
   });
@@ -73,6 +76,7 @@ class MapaCalor extends Equatable {
         rssiMax,
         rssiPromedio,
         puntosLectura,
+        poligonoInteres,
         advertencias,
         createdAt,
       ];

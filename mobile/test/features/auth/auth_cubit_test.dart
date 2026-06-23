@@ -248,4 +248,19 @@ void main() {
       expect: () => [const AuthUnauthenticated()],
     );
   });
+
+  group('marcarSesionExpirada', () {
+    blocTest<AuthCubit, AuthState>(
+      'emite [AuthUnauthenticated] desde una sesión autenticada obsoleta',
+      build: () => _buildCubit(
+        login: mockLogin,
+        logout: mockLogout,
+        getActivo: mockGetActivo,
+        connectivity: mockConnectivity,
+      ),
+      seed: () => const AuthAuthenticated(_usuario),
+      act: (cubit) => cubit.marcarSesionExpirada(),
+      expect: () => [const AuthUnauthenticated()],
+    );
+  });
 }

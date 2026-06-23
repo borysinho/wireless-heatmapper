@@ -4,6 +4,8 @@ import '../../domain/entities/nivel_senal.dart';
 import '../../domain/entities/punto_medicion.dart';
 import '../../domain/entities/resultado_escaneo.dart';
 import '../../domain/repositories/captura_repository.dart';
+import '../../../planos/data/models/plano_model.dart';
+import '../../../planos/domain/entities/plano.dart';
 import '../models/punto_medicion_model.dart';
 
 /// Datasource remoto de captura. Consume la API REST del backend.
@@ -62,6 +64,40 @@ class MedicionRemoteDatasource {
       return (response.data ?? [])
           .map((e) => PuntoMedicionModel.fromJson(e as Map<String, dynamic>))
           .toList();
+    } on DioException catch (e) {
+      throw CapturaApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  /// Obtiene el polígono operativo guardado en el plano.
+  Future<List<PuntoPlano>> obtenerPoligonoInteres(int planoId) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>('/planos/$planoId');
+      return PlanoModel.fromJson(response.data!).poligonoInteres;
+    } on DioException catch (e) {
+      throw CapturaApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  /// Guarda el polígono operativo del plano.
+  Future<List<PuntoPlano>> guardarPoligonoInteres({
+    required int planoId,
+    required List<PuntoPlano> puntos,
+  }) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/planos/$planoId/poligono-interes',
+        data: {
+          'puntos': puntos.map((p) => {'x': p.x, 'y': p.y}).toList(),
+        },
+      );
+      return PlanoModel.fromJson(response.data!).poligonoInteres;
     } on DioException catch (e) {
       throw CapturaApiException(
         _mensajeDesdeError(e),

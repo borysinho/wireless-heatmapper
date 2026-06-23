@@ -1,4 +1,5 @@
 import '../../domain/entities/mapa_calor.dart';
+import '../../../planos/domain/entities/plano.dart';
 import 'ap_disponible_model.dart';
 import 'escala_heatmap_model.dart';
 
@@ -24,6 +25,7 @@ class MapaCalorModel extends MapaCalor {
     required super.rssiMax,
     required super.rssiPromedio,
     required super.puntosLectura,
+    required super.poligonoInteres,
     required super.advertencias,
     required super.createdAt,
   });
@@ -64,11 +66,23 @@ class MapaCalorModel extends MapaCalor {
                   (json['rssi_max'] as num).toDouble()) /
               2),
       puntosLectura: _puntosLecturaDesdeJson(json),
+      poligonoInteres: _poligonoDesdeJson(json['poligono_interes']),
       advertencias: (json['advertencias'] as List<dynamic>? ?? const [])
           .map((item) => item.toString())
           .toList(),
       createdAt: DateTime.parse(json['created_at'] as String),
     );
+  }
+
+  static List<PuntoPlano> _poligonoDesdeJson(dynamic json) {
+    if (json is! List<dynamic>) return const [];
+    return json.map((item) {
+      final data = item as Map<String, dynamic>;
+      return PuntoPlano(
+        x: (data['x'] as num).toDouble(),
+        y: (data['y'] as num).toDouble(),
+      );
+    }).toList();
   }
 
   static List<PuntoLecturaHeatmap> _puntosLecturaDesdeJson(

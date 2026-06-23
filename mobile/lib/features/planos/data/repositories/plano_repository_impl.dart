@@ -66,6 +66,20 @@ class PlanoRepositoryImpl implements PlanoRepository {
   }
 
   @override
+  Future<Plano> guardarPoligonoInteres({
+    required int planoId,
+    required List<PuntoPlano> puntos,
+  }) {
+    if (puntos.length < 3) {
+      throw const PlanoPuntosInvalidosException();
+    }
+    return _remote.guardarPoligonoInteres(
+      planoId: planoId,
+      puntos: puntos,
+    );
+  }
+
+  @override
   Future<void> eliminar(int planoId) {
     return _remote.eliminar(planoId);
   }

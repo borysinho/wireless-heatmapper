@@ -9,6 +9,7 @@ interface Props {
   plano: PlanoOut;
   titulo: string;
   compacto?: boolean;
+  apHints?: APHint[];
 }
 
 interface Posicion {
@@ -16,7 +17,24 @@ interface Posicion {
   y: number;
 }
 
-export function MapaCalorInteractivo({ mapa, plano, titulo, compacto = false }: Props) {
+interface APHint {
+  titulo: string;
+  resumen: string;
+  detalles: string[];
+}
+
+interface APHintActivo extends APHint {
+  x: number;
+  y: number;
+}
+
+export function MapaCalorInteractivo({
+  mapa,
+  plano,
+  titulo,
+  compacto = false,
+  apHints,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const visorRef = useRef<HTMLDivElement | null>(null);
   const arrastreRef = useRef<Posicion | null>(null);
@@ -28,6 +46,7 @@ export function MapaCalorInteractivo({ mapa, plano, titulo, compacto = false }: 
   const [verAps, setVerAps] = useState(true);
   const [arrastrando, setArrastrando] = useState(false);
   const [detalle, setDetalle] = useState<string | null>(null);
+  const [hintAp, setHintAp] = useState<APHintActivo | null>(null);
   const [rssiCursor, setRssiCursor] = useState<{ x: number; y: number; valor: number } | null>(null);
   const [tamanoLienzo, setTamanoLienzo] = useState<Posicion>({
     x: plano.ancho_px,
@@ -119,7 +138,7 @@ export function MapaCalorInteractivo({ mapa, plano, titulo, compacto = false }: 
   const cambiarZoom = (siguiente: number) => setZoom(Math.min(5, Math.max(0.5, siguiente)));
 
   return (
-    <figure className={styles.contenedor}>
+    <figure className={`${styles.contenedor} ${compacto ? styles.compacto : ""}`}>
       <figcaption className={styles.encabezado}>
         <div>
           <strong>{titulo}</strong>
@@ -147,7 +166,7 @@ export function MapaCalorInteractivo({ mapa, plano, titulo, compacto = false }: 
         onPointerMove={moverArrastre}
         onPointerUp={(event) => { arrastreRef.current = null; setArrastrando(false); event.currentTarget.releasePointerCapture(event.pointerId); }}
         onPointerCancel={() => { arrastreRef.current = null; setArrastrando(false); }}
-        onPointerLeave={() => setRssiCursor(null)}
+        onPointerLeave={() => { setRssiCursor(null); setHintAp(null); }}
       >
         <div
           className={styles.lienzo}
@@ -173,19 +192,57 @@ export function MapaCalorInteractivo({ mapa, plano, titulo, compacto = false }: 
                 onClick={(event) => { event.stopPropagation(); setDetalle(`Medición #${punto.punto_id} · ${punto.rssi.toFixed(1)} dBm · (${punto.pos_x.toFixed(0)}, ${punto.pos_y.toFixed(0)}) px`); }}
               />
             ))}
-            {verAps && mapa.aps_interes.map((ap) => (
+            {verAps && mapa.aps_interes.map((ap, indice) => {
+              const hint = apHints?.[indice];
+              return (
               <g
                 key={ap.bssid}
                 className={styles.ap}
                 transform={`translate(${ap.pos_x} ${ap.pos_y})`}
                 onPointerDown={(event) => event.stopPropagation()}
-                onClick={(event) => { event.stopPropagation(); setDetalle(`${ap.ssid || "SSID oculto"} · ${ap.bssid} · ${ap.rssi_promedio.toFixed(1)} dBm · ${ap.canal ? `canal ${ap.canal}` : "canal s/d"} · ${ap.cantidad_puntos} puntos`); }}
+                onPointerEnter={() => {
+                  if (!hint) return;
+                  setHintAp({ ...hint, x: ap.pos_x, y: ap.pos_y });
+                }}
+                onPointerLeave={() => setHintAp(null)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setDetalle(
+                    hint
+                      ? `${hint.titulo} · ${hint.resumen}`
+                      : `${ap.ssid || "SSID oculto"} · ${ap.bssid} · ${ap.rssi_promedio.toFixed(1)} dBm · ${ap.canal ? `canal ${ap.canal}` : "canal s/d"} · ${ap.cantidad_puntos} puntos`,
+                  );
+                }}
               >
                 <circle r={Math.max(plano.ancho_px, plano.alto_px) * 0.017} />
                 <text textAnchor="middle" dominantBaseline="central">AP</text>
               </g>
-            ))}
+              );
+            })}
           </svg>
+          {hintAp && !arrastrando && (
+            <div
+              className={styles.apHint}
+              style={{
+                left: `${(hintAp.x / plano.ancho_px) * 100}%`,
+                top: `${(hintAp.y / plano.alto_px) * 100}%`,
+              }}
+            >
+              <strong>{hintAp.titulo}</strong>
+              <span>{hintAp.resumen}</span>
+              <dl>
+                {hintAp.detalles.map((detalleItem) => {
+                  const [etiqueta, valor] = detalleItem.split(": ");
+                  return (
+                    <div key={detalleItem}>
+                      <dt>{valor ? etiqueta : "Detalle"}</dt>
+                      <dd>{valor ?? detalleItem}</dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            </div>
+          )}
           {rssiCursor && !arrastrando && (
             <span className={styles.tooltip} style={{ left: rssiCursor.x + 12, top: rssiCursor.y + 12 }}>{rssiCursor.valor.toFixed(1)} dBm</span>
           )}

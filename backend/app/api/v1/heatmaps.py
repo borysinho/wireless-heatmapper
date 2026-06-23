@@ -46,6 +46,7 @@ from app.services.interpolacion_service import (
     InterpolacionService,
     PuntoRSSI,
 )
+from app.services.geometria_service import mascara_poligono
 from app.storage import LocalFilesystemStorage, generar_url_firmada, verificar_firma
 
 router_planos_heatmap = APIRouter(prefix="/planos", tags=["heatmaps"])
@@ -170,6 +171,10 @@ def _mapa_out(
                 rssi=punto.rssi,
             )
             for punto in puntos_lectura
+        ],
+        poligono_interes=[
+            {"x": float(punto["x"]), "y": float(punto["y"])}
+            for punto in (mapa.plano.poligono_interes or [])
         ],
         advertencias=_advertencias_heatmap(
             cantidad_puntos=len(puntos_lectura) or mapa.cantidad_puntos,
@@ -358,6 +363,7 @@ def _firma_aps_interes(
     *,
     firma_base: str,
     aps_interes: list[dict],
+    poligono_interes: list[dict] | None = None,
     conjunto_ap_id: int | None = None,
     modo_generacion: str = "SUBCONJUNTO",
 ) -> str:
@@ -366,6 +372,7 @@ def _firma_aps_interes(
         "firma_base": firma_base,
         "conjunto_ap_id": conjunto_ap_id,
         "modo_generacion": modo_generacion,
+        "poligono_interes": poligono_interes or [],
         "aps": [
             {
                 "bssid": ap["bssid"],
@@ -377,6 +384,18 @@ def _firma_aps_interes(
     }
     serializado = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return f"aps:{hashlib.sha256(serializado.encode()).hexdigest()}"
+
+
+def _requerir_poligono_interes(plano) -> list[dict]:
+    poligono = plano.poligono_interes or []
+    if len(poligono) < 3:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Debe definir un polígono de interés antes de generar heatmaps."
+            ),
+        )
+    return poligono
 
 
 @router_planos_heatmap.get(
@@ -446,6 +465,7 @@ def _generar_heatmap_core(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="El plano debe estar calibrado antes de generar el heatmap.",
         )
+    poligono_interes = _requerir_poligono_interes(plano)
 
     med_repo = MedicionRepository(db)
     bssids_norm = _normalizar_bssids(bssid)
@@ -483,6 +503,7 @@ def _generar_heatmap_core(
     firma = _firma_aps_interes(
         firma_base=firma_base,
         aps_interes=aps_interes,
+        poligono_interes=poligono_interes,
         conjunto_ap_id=conjunto_ap_id,
         modo_generacion=modo_norm,
     )
@@ -504,7 +525,13 @@ def _generar_heatmap_core(
         resolucion=resolucion,
         algoritmo=algoritmo_norm,
     )
-    png = HeatmapImageService().render_png(matriz)
+    mascara = mascara_poligono(
+        poligono=poligono_interes,
+        ancho_px=plano.ancho_px,
+        alto_px=plano.alto_px,
+        resolucion=resolucion,
+    )
+    png = HeatmapImageService().render_png(matriz, mascara=mascara)
     ruta = (
         f"heatmaps/{plano_id}/"
         f"{secrets.token_hex(8)}_{algoritmo_norm.lower()}_{resolucion}.png"
@@ -905,6 +932,12 @@ def analizar_mapa(
         ancho_px=plano.ancho_px,
         alto_px=plano.alto_px,
         aps_referencia=aps_referencia,
+        mascara=mascara_poligono(
+            poligono=plano.poligono_interes,
+            ancho_px=plano.ancho_px,
+            alto_px=plano.alto_px,
+            resolucion=mapa.resolucion,
+        ),
     )
     analisis = AnalisisCoberturaRepository(db).reemplazar(
         mapa=mapa,
