@@ -46,6 +46,49 @@ def test_tecnico_registra_y_desregistra_dispositivo(
     assert dispositivo.activo is False
 
 
+def test_admin_diagnostica_notificaciones_de_tecnico(
+    client,
+    admin_token,
+    tecnico_usuario,
+    db_session,
+):
+    db_session.add(
+        DispositivoPush(
+            usuario_id=tecnico_usuario.id,
+            token="token-fcm-diagnostico-abcdefghijklmnopqrstuvwxyz",
+            plataforma="android",
+            activo=True,
+        )
+    )
+    db_session.commit()
+
+    respuesta = client.get(
+        f"/notificaciones/diagnostico/{tecnico_usuario.id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert respuesta.status_code == 200
+    data = respuesta.json()
+    assert data["usuario_id"] == tecnico_usuario.id
+    assert data["tokens_activos"] == 1
+    assert data["tokens_inactivos"] == 0
+    assert data["ultimo_registro"] is not None
+    assert "firebase_admin_configurado" in data
+
+
+def test_tecnico_no_puede_ver_diagnostico_notificaciones(
+    client,
+    tecnico_token,
+    tecnico_usuario,
+):
+    respuesta = client.get(
+        f"/notificaciones/diagnostico/{tecnico_usuario.id}",
+        headers={"Authorization": f"Bearer {tecnico_token}"},
+    )
+
+    assert respuesta.status_code == 403
+
+
 def test_admin_crea_proyecto_y_notifica_al_tecnico(
     client,
     admin_token,

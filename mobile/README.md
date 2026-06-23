@@ -31,6 +31,9 @@ flutter run --dart-define-from-file=dart-defines/debug-dispositivo-fisico.json
 # Debug apuntando a una IP específica de la red
 flutter run --dart-define-from-file=dart-defines/debug-ip.json
 
+# Debug apuntando a producción
+flutter run --dart-define-from-file=dart-defines/debug-produccion.json
+
 # Build release (usa la URL de dart-defines/release.json)
 flutter build apk --release --dart-define-from-file=dart-defines/release.json
 ```
@@ -65,7 +68,8 @@ usar `--dart-define-from-file` con uno de estos perfiles:
 | `dart-defines/debug-emulador.json`           | Debug en emulador Android contra backend local  |
 | `dart-defines/debug-dispositivo-fisico.json` | Debug en teléfono por cable con `adb reverse`   |
 | `dart-defines/debug-ip.json`                 | Debug contra una IP específica de la red        |
-| `dart-defines/release.json`                  | Build release                                   |
+| `dart-defines/debug-produccion.json`         | Debug contra producción                         |
+| `dart-defines/release.json`                  | Build release contra producción                 |
 
 Para cambiar la IP de debug por red, modificar solamente `dart-defines/debug-ip.json`.
-Para cambiar la IP de release, modificar solamente `dart-defines/release.json`.
+Para cambiar el dominio de release, modificar solamente `dart-defines/release.json`.

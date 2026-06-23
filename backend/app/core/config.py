@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +18,17 @@ class Settings(BaseSettings):
     debug: bool = False
     cors_origins: list[str] = ["http://localhost", "http://localhost:5173"]
 
+    @field_validator("debug", mode="before")
+    @classmethod
+    def normalizar_debug(cls, valor: object) -> object:
+        if isinstance(valor, str) and valor.strip().lower() in {
+            "release",
+            "prod",
+            "production",
+        }:
+            return False
+        return valor
+
     # Storage de planos (Sprint 2)
     storage_root: str = "/var/lib/heatmapper/planos"
     storage_url_secret: str = "cambia_esto_secreto_para_firmar_urls"
@@ -29,6 +41,18 @@ class Settings(BaseSettings):
     firebase_project_id: str = ""
     firebase_credentials_path: str = ""
     firebase_credentials_json: str = ""
+
+    # Correo transaccional (cuentas creadas y enlaces de cliente)
+    email_notifications_enabled: bool = False
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_use_tls: bool = True
+    smtp_timeout_seconds: int = 10
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_from_email: str = ""
+    smtp_from_name: str = "Wireless HeatMapper"
+    public_web_url: str = ""
 
 
 settings = Settings()

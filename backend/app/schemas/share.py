@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from app.schemas.escenario import EscenarioOptimizadoOut
 from app.schemas.heatmap import AnalisisCoberturaOut, ConjuntoAPOut, MapaCalorOut
@@ -25,6 +25,7 @@ class ContenidoEnlaceIn(BaseModel):
 class EnlaceClienteCrearIn(BaseModel):
     expira_en_dias: int = Field(default=7, ge=1, le=365)
     contenido: ContenidoEnlaceIn
+    email_destino: EmailStr | None = None
 
 
 class EnlaceClienteActualizarIn(BaseModel):

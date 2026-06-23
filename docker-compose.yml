@@ -34,6 +34,15 @@ services:
       STORAGE_URL_SECRET: ${STORAGE_URL_SECRET:-cambia_esto_por_un_secreto_de_storage}
       STORAGE_URL_TTL_SECONDS: ${STORAGE_URL_TTL_SECONDS:-3600}
       PUBLIC_API_URL: ${PUBLIC_API_URL:-}
+      EMAIL_NOTIFICATIONS_ENABLED: ${EMAIL_NOTIFICATIONS_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-Wireless HeatMapper}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-}
       FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
       FIREBASE_CREDENTIALS_PATH: /run/secrets/firebase-admin.json
     volumes:

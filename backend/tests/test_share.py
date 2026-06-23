@@ -7,6 +7,7 @@ from app.models.heatmap import AnalisisCobertura, APDetectado, MapaCalor
 from app.models.plano import Plano
 from app.models.proyecto import Proyecto
 from app.models.share import TokenEnlaceCliente
+from app.services.email_service import EmailService
 
 
 def _crear_proyecto_publicable(db, tecnico):
@@ -179,6 +180,41 @@ def test_enlace_cliente_expone_solo_contenido_autorizado(
     reporte_response = client.get(f"/share/{token}/reporte", follow_redirects=False)
     assert reporte_response.status_code == 302
     assert "/reportes/archivo/" in reporte_response.headers["location"]
+
+
+def test_enlace_cliente_envia_correo_si_recibe_destinatario(
+    client,
+    db_session,
+    admin_token,
+    tecnico_usuario,
+    monkeypatch,
+):
+    proyecto, mapa, _, _, _ = _crear_proyecto_publicable(db_session, tecnico_usuario)
+    envios: list[dict[str, str]] = []
+
+    def fake_enviar_enlace_cliente(self, **kwargs):
+        envios.append(kwargs)
+        return True
+
+    monkeypatch.setattr(
+        EmailService,
+        "enviar_enlace_cliente",
+        fake_enviar_enlace_cliente,
+    )
+    respuesta = client.post(
+        f"/share/proyectos/{proyecto.id}/enlaces",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "expira_en_dias": 7,
+            "email_destino": "cliente@test.bo",
+            "contenido": {"mapa_ids": [mapa.id]},
+        },
+    )
+
+    assert respuesta.status_code == 201
+    assert envios[0]["destinatario"] == "cliente@test.bo"
+    assert envios[0]["nombre_proyecto"] == "Portal Cliente Bulldog"
+    assert envios[0]["url_publica"].startswith("http://testserver/portal/")
 
 
 def test_enlace_cliente_revocado_o_expirado_devuelve_404(

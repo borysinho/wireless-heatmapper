@@ -37,7 +37,7 @@ import {
   reasignarTecnico,
 } from "../api/proyectosApi";
 import type {
-  ContenidoEnlaceIn,
+  EnlaceClienteCrearIn,
   EstadoGobernanzaConjunto,
   EstadoGobernanzaEscenario,
   ProyectoReasignarIn,
@@ -277,10 +277,8 @@ export function useEnlacesCliente(proyectoId: number) {
 export function useCrearEnlaceCliente(proyectoId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: {
-      expira_en_dias: number;
-      contenido: ContenidoEnlaceIn;
-    }) => crearEnlaceCliente(proyectoId, body),
+    mutationFn: (body: EnlaceClienteCrearIn) =>
+      crearEnlaceCliente(proyectoId, body),
     onSuccess: () =>
       qc.invalidateQueries({
         queryKey: ["admin", "proyectos", proyectoId, "enlaces-cliente"],

@@ -25,6 +25,12 @@ class NotificacionPushService:
         try:
             tokens = repo.listar_tokens_activos(usuario_id=tecnico_id)
             if not tokens:
+                logger.warning(
+                    "No hay dispositivos push activos para el técnico %s; "
+                    "se omite notificación del proyecto %s.",
+                    tecnico_id,
+                    proyecto_id,
+                )
                 return False
 
             app, messaging = self._firebase()
@@ -57,11 +63,18 @@ class NotificacionPushService:
             ]
             repo.desactivar_tokens(invalidos)
             if respuesta.failure_count:
+                errores = [
+                    str(resultado.exception)[:160]
+                    for resultado in respuesta.responses
+                    if not resultado.success and resultado.exception is not None
+                ][:3]
                 logger.warning(
-                    "FCM no entregó %s de %s notificaciones para el técnico %s.",
+                    "FCM no entregó %s de %s notificaciones para el técnico %s. "
+                    "Muestras de error: %s",
                     respuesta.failure_count,
                     len(tokens),
                     tecnico_id,
+                    errores,
                 )
             return respuesta.success_count > 0
         except Exception:

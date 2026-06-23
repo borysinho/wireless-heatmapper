@@ -5,8 +5,8 @@ import type {
   APDisponibleOut,
   AnalisisCoberturaOut,
   ComparacionEscenarioOut,
-  ContenidoEnlaceIn,
   ConjuntoAPOut,
+  EnlaceClienteCrearIn,
   EnlaceClienteOut,
   EscenarioOptimizadoOut,
   EscenariosGeneradosOut,
@@ -257,7 +257,7 @@ export async function listarEnlacesCliente(
 
 export async function crearEnlaceCliente(
   proyectoId: number,
-  body: { expira_en_dias: number; contenido: ContenidoEnlaceIn },
+  body: EnlaceClienteCrearIn,
 ): Promise<EnlaceClienteOut> {
   const { data } = await apiClient.post<EnlaceClienteOut>(
     `/share/proyectos/${proyectoId}/enlaces`,

@@ -61,6 +61,31 @@ class DispositivoPushRepository:
         )
         return [fila[0] for fila in filas]
 
+    def resumir_usuario(self, *, usuario_id: int) -> tuple[int, int, datetime | None]:
+        tokens_activos = (
+            self._db.query(DispositivoPush)
+            .filter(
+                DispositivoPush.usuario_id == usuario_id,
+                DispositivoPush.activo.is_(True),
+            )
+            .count()
+        )
+        tokens_inactivos = (
+            self._db.query(DispositivoPush)
+            .filter(
+                DispositivoPush.usuario_id == usuario_id,
+                DispositivoPush.activo.is_(False),
+            )
+            .count()
+        )
+        ultimo = (
+            self._db.query(DispositivoPush.ultimo_registro)
+            .filter(DispositivoPush.usuario_id == usuario_id)
+            .order_by(DispositivoPush.ultimo_registro.desc())
+            .first()
+        )
+        return tokens_activos, tokens_inactivos, ultimo[0] if ultimo else None
+
     def desactivar_tokens(self, tokens: list[str]) -> None:
         if not tokens:
             return

@@ -14,6 +14,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core.config import settings
 from app.core.database import Base, get_db
 from app.core.security import hash_password
 from app.models.usuario import Usuario
@@ -91,6 +92,8 @@ class SyncASGIClient:
 
 @pytest.fixture(autouse=True)
 def crear_tablas():
+    settings.email_notifications_enabled = False
+    settings.public_web_url = ""
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield

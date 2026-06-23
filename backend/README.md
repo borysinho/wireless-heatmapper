@@ -74,6 +74,14 @@ tests/
 | `FIREBASE_PROJECT_ID`         | vacío                                                      | Id del proyecto Firebase para FCM |
 | `FIREBASE_CREDENTIALS_PATH`   | vacío                                                      | Ruta al JSON de cuenta de servicio Firebase |
 | `FIREBASE_CREDENTIALS_JSON`   | vacío                                                      | JSON de cuenta de servicio (útil en contenedores/CI) |
+| `EMAIL_NOTIFICATIONS_ENABLED` | `false`                                                    | Habilita correos transaccionales |
+| `SMTP_HOST`                   | `smtp.gmail.com`                                           | Servidor SMTP |
+| `SMTP_PORT`                   | `587`                                                      | Puerto SMTP |
+| `SMTP_USERNAME`               | vacío                                                      | Usuario SMTP |
+| `SMTP_PASSWORD`               | vacío                                                      | Contraseña de aplicación SMTP |
+| `SMTP_FROM_EMAIL`             | vacío                                                      | Remitente visible |
+| `SMTP_FROM_NAME`              | `Wireless HeatMapper`                                      | Nombre del remitente |
+| `PUBLIC_WEB_URL`              | vacío                                                      | URL pública del frontend para enlaces enviados por correo |
 
 La configuración generada por FlutterFire habilita el cliente Android, pero el
 backend necesita además credenciales de Firebase Admin. En desarrollo puede

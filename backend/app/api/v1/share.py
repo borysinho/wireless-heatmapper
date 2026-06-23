@@ -38,6 +38,7 @@ from app.schemas.share import (
     PortalClienteOut,
     ProyectoPortalOut,
 )
+from app.services.email_service import EmailDeliveryError, EmailService
 
 router = APIRouter(prefix="/share", tags=["portal-cliente"])
 
@@ -67,6 +68,18 @@ def _token_valido_formato(token: str) -> bool:
 
 def _url_publica(token: str) -> str:
     return f"/portal/{token}"
+
+
+def _origen_publico(request: Request) -> str:
+    if settings.public_web_url:
+        return settings.public_web_url.rstrip("/")
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+    host = request.headers.get("host") or request.url.netloc
+    return f"{proto}://{host}".rstrip("/")
+
+
+def _url_publica_absoluta(token: str, request: Request) -> str:
+    return f"{_origen_publico(request)}{_url_publica(token)}"
 
 
 def _contenido_dict(contenido: ContenidoEnlaceIn) -> dict:
@@ -235,6 +248,7 @@ def _obtener_enlace_publico(
 def crear_enlace_cliente(
     proyecto_id: int,
     body: EnlaceClienteCrearIn,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(require_admin),
 ) -> EnlaceClienteOut:
@@ -258,6 +272,20 @@ def crear_enlace_cliente(
     db.add(enlace)
     db.commit()
     db.refresh(enlace)
+    if body.email_destino is not None:
+        try:
+            EmailService().enviar_enlace_cliente(
+                destinatario=str(body.email_destino),
+                nombre_proyecto=proyecto.nombre,
+                cliente=proyecto.cliente.nombre if proyecto.cliente else None,
+                url_publica=_url_publica_absoluta(enlace.token, request),
+                expira_en=enlace.expira_en,
+            )
+        except EmailDeliveryError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="El enlace fue creado, pero no se pudo enviar el correo.",
+            ) from exc
     return _enlace_out(enlace)
 
 

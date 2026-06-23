@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.models.usuario import Usuario
+from app.services.email_service import EmailService
 
 
 class TestCrearUsuario:
@@ -30,6 +31,38 @@ class TestCrearUsuario:
         assert data["email"] == "nuevo@test.bo"
         assert data["activo"] is True
         assert "password_hash" not in data  # CA-5
+
+    def test_crear_usuario_envia_correo_de_bienvenida(
+        self,
+        client: TestClient,
+        admin_token: str,
+        monkeypatch: pytest.MonkeyPatch,
+    ):
+        """Al crear cuenta se envía correo con credenciales iniciales."""
+        envios: list[tuple[str, str]] = []
+
+        def fake_enviar_cuenta_creada(self, *, usuario, password_temporal):
+            envios.append((usuario.email, password_temporal))
+            return True
+
+        monkeypatch.setattr(
+            EmailService,
+            "enviar_cuenta_creada",
+            fake_enviar_cuenta_creada,
+        )
+        resp = client.post(
+            "/admin/usuarios",
+            json={
+                "nombre": "Técnico Correo",
+                "email": "correo@test.bo",
+                "password": "Pass1234!",
+                "rol": "tecnico",
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+
+        assert resp.status_code == 201
+        assert envios == [("correo@test.bo", "Pass1234!")]
 
     def test_email_duplicado_retorna_409(self, client: TestClient, admin_token: str, admin_usuario: Usuario):
         """CA-3: Email ya registrado → 409 Conflict."""

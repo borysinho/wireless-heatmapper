@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Copy, ExternalLink, Link2, RotateCcw, XCircle } from "lucide-react";
+import { Copy, ExternalLink, Link2, Mail, RotateCcw, XCircle } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
 import { Button, EmptyState, useToast } from "@/shared/components";
 import {
@@ -27,6 +27,7 @@ export default function PublicacionClienteProyecto() {
   }>();
   const toast = useToast();
   const [diasEnlace, setDiasEnlace] = useState(7);
+  const [emailDestino, setEmailDestino] = useState("");
   const [ultimoEnlace, setUltimoEnlace] = useState<string | null>(null);
   const [escenariosSeleccionados, setEscenariosSeleccionados] = useState<Set<number>>(
     () => new Set(),
@@ -113,6 +114,7 @@ export default function PublicacionClienteProyecto() {
     try {
       const enlace = await crearEnlace({
         expira_en_dias: diasEnlace,
+        email_destino: emailDestino.trim() || null,
         contenido: {
           conjunto_ids: conjuntos.map((item) => item.id),
           escenario_ids: escenarios.map((item) => item.id),
@@ -125,10 +127,13 @@ export default function PublicacionClienteProyecto() {
       setUltimoEnlace(url);
       const copiado = await _copiar(url);
       toast.exito(
-        copiado
-          ? "Enlace de cliente creado y copiado."
-          : "Enlace de cliente creado.",
+        emailDestino.trim()
+          ? "Enlace creado y enviado al cliente."
+          : copiado
+            ? "Enlace de cliente creado y copiado."
+            : "Enlace de cliente creado.",
       );
+      if (emailDestino.trim()) setEmailDestino("");
     } catch {
       toast.error("No se pudo crear el enlace de cliente.");
     }
@@ -173,14 +178,27 @@ export default function PublicacionClienteProyecto() {
               <option value={90}>90 días</option>
             </select>
           </label>
+          <label>
+            Email cliente
+            <input
+              type="email"
+              value={emailDestino}
+              onChange={(event) => setEmailDestino(event.target.value)}
+              placeholder="cliente@empresa.com"
+            />
+          </label>
           <Button
             type="button"
             disabled={totalSeleccionado === 0}
             isLoading={creandoEnlace}
             onClick={handleCrearEnlace}
           >
-            <Link2 size={16} aria-hidden="true" />
-            Generar enlace
+            {emailDestino.trim() ? (
+              <Mail size={16} aria-hidden="true" />
+            ) : (
+              <Link2 size={16} aria-hidden="true" />
+            )}
+            {emailDestino.trim() ? "Enviar enlace" : "Generar enlace"}
           </Button>
         </div>
       </div>

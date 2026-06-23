@@ -10,6 +10,7 @@ from app.core.security import hash_password
 from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.usuario_repository import UsuarioRepository
 from app.schemas.usuario import UsuarioCreate, UsuarioOut, UsuarioUpdate
+from app.services.email_service import EmailDeliveryError, EmailService
 
 
 class UsuarioService:
@@ -32,6 +33,16 @@ class UsuarioService:
             password_hash=hash_password(datos.password),
             rol=datos.rol,
         )
+        try:
+            EmailService().enviar_cuenta_creada(
+                usuario=usuario,
+                password_temporal=datos.password,
+            )
+        except EmailDeliveryError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="La cuenta fue creada, pero no se pudo enviar el correo.",
+            ) from exc
         return UsuarioOut.model_validate(usuario)
 
     def listar(self, solo_activos: bool = False) -> list[UsuarioOut]:

@@ -111,7 +111,7 @@ jobs:
 
       - name: Construir APK (DoD ítem 5)
         working-directory: mobile
-        run: flutter build apk --release --no-tree-shake-icons
+        run: flutter build apk --release --no-tree-shake-icons --dart-define-from-file=dart-defines/release.json
 
       - name: Subir APK como artefacto
         uses: actions/upload-artifact@v4

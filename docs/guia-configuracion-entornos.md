@@ -33,12 +33,13 @@ VITE_PROXY_TARGET=http://10.138.57.250:8000
 La URL base de la API se inyecta en tiempo de compilación mediante `--dart-define-from-file`.
 Los archivos de configuración están versionados en `mobile/dart-defines/`.
 
-| Archivo                                      | `API_BASE_URL`                | Cuándo usar                                      |
-| -------------------------------------------- | ----------------------------- | ------------------------------------------------ |
-| `dart-defines/debug-emulador.json`           | `http://10.0.2.2/api`         | Debug en emulador Android (localhost del host)   |
-| `dart-defines/debug-dispositivo-fisico.json` | `http://127.0.0.1:8080/api`   | Debug en teléfono por cable con `adb reverse`    |
-| `dart-defines/debug-ip.json`                 | Configurado en el archivo     | Debug contra una IP específica de la red         |
-| `dart-defines/release.json`                  | Configurado en el archivo     | Build release / entorno desplegado configurado   |
+| Archivo                                      | `API_BASE_URL`                                                        | Cuándo usar                                      |
+| -------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------ |
+| `dart-defines/debug-emulador.json`           | `http://10.0.2.2/api`                                                 | Debug en emulador Android (localhost del host)   |
+| `dart-defines/debug-dispositivo-fisico.json` | `http://127.0.0.1:8080/api`                                           | Debug en teléfono por cable con `adb reverse`    |
+| `dart-defines/debug-ip.json`                 | Configurado en el archivo                                             | Debug contra una IP específica de la red         |
+| `dart-defines/debug-produccion.json`         | `https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/api`      | Debug contra producción                          |
+| `dart-defines/release.json`                  | `https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/api`      | Build release / producción                       |
 
 `dart-defines/default.json` se conserva como alias del perfil de emulador para
 compatibilidad con comandos antiguos.
@@ -56,21 +57,25 @@ flutter run --dart-define-from-file=dart-defines/debug-dispositivo-fisico.json
 # Debug apuntando a una IP específica
 flutter run --dart-define-from-file=dart-defines/debug-ip.json
 
+# Debug apuntando a producción
+flutter run --dart-define-from-file=dart-defines/debug-produccion.json
+
 # Release
 flutter build apk --release --dart-define-from-file=dart-defines/release.json
 ```
 
 ### Desde VS Code
 
-El archivo `.vscode/launch.json` en la raíz del proyecto define tres configuraciones
+El archivo `.vscode/launch.json` en la raíz del proyecto define configuraciones
 seleccionables desde el panel **Run & Debug**:
 
 - **Flutter — debug emulador** → `dart-defines/debug-emulador.json`
 - **Flutter — debug dispositivo físico** → `dart-defines/debug-dispositivo-fisico.json` + task `adb reverse tcp:8080 tcp:80`
 - **Flutter — debug IP específica** → `dart-defines/debug-ip.json`
+- **Flutter — debug producción** → `dart-defines/debug-produccion.json`
 - **Flutter — release** → `dart-defines/release.json` + `--release`
 
-Para cambiar la IP del entorno release, modificar solamente
+Para cambiar el dominio del entorno release, modificar solamente
 `mobile/dart-defines/release.json`. Para debug en dispositivo físico por cable no
 se modifica ninguna IP: el teléfono accede a `127.0.0.1:8080` y ADB redirige ese
 puerto hacia el Nginx local del host (`localhost:80`).

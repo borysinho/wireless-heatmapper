@@ -41,6 +41,7 @@
   gap: 0.375rem;
 }
 
+.generador input,
 .generador select {
   background: var(--bg);
   border: 1px solid var(--border);
@@ -49,6 +50,13 @@
   font: inherit;
   min-height: 2.375rem;
   padding: 0.5rem 0.75rem;
+}
+
+.generador input {
+  width: 15rem;
+}
+
+.generador select {
   width: 10rem;
 }
 

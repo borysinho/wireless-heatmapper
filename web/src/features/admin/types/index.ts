@@ -266,6 +266,12 @@ export interface EnlaceClienteOut {
   created_at: string;
 }
 
+export interface EnlaceClienteCrearIn {
+  expira_en_dias: number;
+  contenido: ContenidoEnlaceIn;
+  email_destino?: string | null;
+}
+
 export interface PortalProyectoOut {
   id: number;
   nombre: string;
