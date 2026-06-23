@@ -13,6 +13,9 @@ class PlanoRemoteDatasource {
   /// Tamaño máximo permitido — PB-02 CA-3.
   static const int kMaxBytes = 20 * 1024 * 1024;
 
+  /// Tiempo de espera para subir planos en redes móviles o producción.
+  static const Duration kUploadTimeout = Duration(minutes: 2);
+
   /// Extensiones aceptadas — PB-02 CA-2.
   static const Set<String> kFormatosPermitidos = {'png', 'jpg', 'jpeg', 'pdf'};
 
@@ -62,6 +65,11 @@ class PlanoRemoteDatasource {
       final response = await _dio.post<Map<String, dynamic>>(
         '/proyectos/$proyectoId/planos',
         data: formData,
+        options: Options(
+          contentType: Headers.multipartFormDataContentType,
+          sendTimeout: kUploadTimeout,
+          receiveTimeout: kUploadTimeout,
+        ),
       );
       return PlanoModel.fromJson(response.data!);
     } on DioException catch (e) {
