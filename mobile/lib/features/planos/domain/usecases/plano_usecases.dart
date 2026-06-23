@@ -19,12 +19,14 @@ class ImportarPlanoUseCase {
     String? rutaArchivo,
     List<int>? bytesArchivo,
     String? nombre,
+    String? descripcion,
   }) {
     return _repository.importar(
       proyectoId: proyectoId,
       rutaArchivo: rutaArchivo,
       bytesArchivo: bytesArchivo,
       nombre: nombre,
+      descripcion: descripcion,
     );
   }
 }

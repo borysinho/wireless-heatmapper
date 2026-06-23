@@ -22,6 +22,7 @@ class _CapturandoAdapter implements HttpClientAdapter {
   "id": 1,
   "proyecto_id": 10,
   "nombre": "plano.png",
+  "descripcion": "Área frontal",
   "formato": "png",
   "ancho_px": 100,
   "alto_px": 80,
@@ -102,11 +103,19 @@ void main() {
         proyectoId: 10,
         bytesArchivo: _pngMinimo,
         nombre: 'plano.png',
+        descripcion: 'Área frontal',
       );
 
       final request = adapter.ultimaRequest!;
       final formData = request.data as FormData;
       expect(request.path, '/proyectos/10/planos');
+      expect(
+        formData.fields.any(
+          (field) =>
+              field.key == 'descripcion' && field.value == 'Área frontal',
+        ),
+        isTrue,
+      );
       expect(formData.files.single.value.filename, 'plano.png');
     });
   });

@@ -66,11 +66,100 @@ class _PlanosListPageState extends State<PlanosListPage> {
       if (confirmar != true || !mounted) return;
     }
 
+    final metadata = await _pedirMetadataPlano(file.name);
+    if (metadata == null || !mounted) return;
+
     await context.read<PlanosCubit>().importarPlano(
           rutaArchivo: file.path,
           bytesArchivo: file.bytes,
-          nombre: file.name,
+          nombre: metadata.nombre,
+          descripcion: metadata.descripcion,
         );
+  }
+
+  Future<_PlanoMetadata?> _pedirMetadataPlano(String nombreArchivo) async {
+    final formKey = GlobalKey<FormState>();
+    final nombreCtrl = TextEditingController(
+      text: _nombreSugerido(nombreArchivo),
+    );
+    final descripcionCtrl = TextEditingController();
+
+    try {
+      return await showDialog<_PlanoMetadata>(
+        context: context,
+        builder: (ctx) {
+          return AlertDialog(
+            title: const Text('Identificar plano'),
+            content: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      nombreArchivo,
+                      style: Theme.of(ctx).textTheme.bodySmall,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: nombreCtrl,
+                      maxLength: 255,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'Nombre del área',
+                        hintText: 'Planta baja, Recepción, Piso 2',
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Ingresa un nombre para identificar el plano.';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: descripcionCtrl,
+                      maxLength: 500,
+                      minLines: 2,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'Descripción',
+                        hintText: 'Área cubierta, referencia o detalle útil',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  if (formKey.currentState?.validate() != true) return;
+                  Navigator.of(ctx).pop(
+                    _PlanoMetadata(
+                      nombre: nombreCtrl.text.trim(),
+                      descripcion: descripcionCtrl.text.trim().isEmpty
+                          ? null
+                          : descripcionCtrl.text.trim(),
+                    ),
+                  );
+                },
+                child: const Text('Importar'),
+              ),
+            ],
+          );
+        },
+      );
+    } finally {
+      nombreCtrl.dispose();
+      descripcionCtrl.dispose();
+    }
   }
 
   Future<void> _confirmarEliminar(Plano plano) async {
@@ -180,6 +269,22 @@ class _PlanosListPageState extends State<PlanosListPage> {
   }
 }
 
+class _PlanoMetadata {
+  final String nombre;
+  final String? descripcion;
+
+  const _PlanoMetadata({
+    required this.nombre,
+    this.descripcion,
+  });
+}
+
+String _nombreSugerido(String nombreArchivo) {
+  final punto = nombreArchivo.lastIndexOf('.');
+  if (punto <= 0) return nombreArchivo;
+  return nombreArchivo.substring(0, punto);
+}
+
 class _EmptyState extends StatelessWidget {
   final VoidCallback onImport;
   const _EmptyState({required this.onImport});
@@ -260,6 +365,15 @@ class _PlanoCard extends StatelessWidget {
           children: [
             const SizedBox(height: 4),
             Text('${plano.formato.etiqueta} · $tamanoMb MB · $dimensiones'),
+            if (plano.descripcion != null && plano.descripcion!.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                plano.descripcion!,
+                style: tema.textTheme.bodySmall,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
             const SizedBox(height: 4),
             Row(
               children: [

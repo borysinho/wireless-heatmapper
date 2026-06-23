@@ -37,6 +37,7 @@ class PlanoRemoteDatasource {
     String? rutaArchivo,
     List<int>? bytesArchivo,
     String? nombre,
+    String? descripcion,
   }) async {
     final nombreArchivo =
         _nombreArchivo(nombre: nombre, rutaArchivo: rutaArchivo);
@@ -52,6 +53,8 @@ class PlanoRemoteDatasource {
 
     final formData = FormData.fromMap({
       if (nombre != null && nombre.isNotEmpty) 'nombre': nombre,
+      if (descripcion != null && descripcion.trim().isNotEmpty)
+        'descripcion': descripcion.trim(),
       'archivo': bytesArchivo != null
           ? MultipartFile.fromBytes(bytesArchivo, filename: nombreArchivo)
           : await _multipartDesdeRuta(rutaArchivo, nombreArchivo),

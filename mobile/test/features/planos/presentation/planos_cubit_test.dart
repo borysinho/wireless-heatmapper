@@ -91,6 +91,7 @@ void main() {
               rutaArchivo: any(named: 'rutaArchivo'),
               bytesArchivo: any(named: 'bytesArchivo'),
               nombre: any(named: 'nombre'),
+              descripcion: any(named: 'descripcion'),
             )).thenThrow(
           const PlanoStorageException(
               'No se pudo leer el archivo seleccionado.'),

@@ -73,6 +73,24 @@ def test_importar_plano_png(client, tecnico_token):
     assert "/planos/archivo/" in body["url_firmada"]
 
 
+def test_importar_plano_con_nombre_y_descripcion(client, tecnico_token):
+    pid = _crear_proyecto(client, tecnico_token)
+    files = {"archivo": ("save_20260622_23044.jpg", _jpg_bytes(), "image/jpeg")}
+    r = client.post(
+        f"/proyectos/{pid}/planos",
+        data={
+            "nombre": "Planta baja - recepción",
+            "descripcion": "Plano provisto por Bulldog Tech. para el área frontal.",
+        },
+        files=files,
+        headers={"Authorization": f"Bearer {tecnico_token}"},
+    )
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["nombre"] == "Planta baja - recepción"
+    assert body["descripcion"] == "Plano provisto por Bulldog Tech. para el área frontal."
+
+
 def test_importar_plano_jpg(client, tecnico_token):
     pid = _crear_proyecto(client, tecnico_token)
     files = {"archivo": ("piso.jpg", _jpg_bytes(), "image/jpeg")}

@@ -45,6 +45,7 @@ class Plano(Base):
         index=True,
     )
     nombre = Column(String(255), nullable=False)
+    descripcion = Column(String(500), nullable=True)
     formato = Column(formato_plano_enum, nullable=False)
     ruta_storage = Column(String(500), nullable=False, unique=True)
     ancho_px = Column(Integer, nullable=False)

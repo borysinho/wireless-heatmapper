@@ -17,6 +17,7 @@ class PlanoOut(BaseModel):
     id: int
     proyecto_id: int
     nombre: str
+    descripcion: str | None = None
     formato: Literal["png", "jpg", "pdf"]
     ancho_px: int
     alto_px: int
@@ -49,6 +50,7 @@ class PlanoOut(BaseModel):
             id=p.id,
             proyecto_id=p.proyecto_id,
             nombre=p.nombre,
+            descripcion=p.descripcion,
             formato=p.formato,
             ancho_px=p.ancho_px,
             alto_px=p.alto_px,

@@ -8,6 +8,7 @@ void main() {
       'id': 1,
       'proyecto_id': 10,
       'nombre': 'Planta baja',
+      'descripcion': 'Área de recepción y oficinas.',
       'formato': 'png',
       'ancho_px': 1024,
       'alto_px': 768,
@@ -30,6 +31,7 @@ void main() {
       final m = PlanoModel.fromJson(jsonBase);
       expect(m.id, 1);
       expect(m.proyectoId, 10);
+      expect(m.descripcion, 'Área de recepción y oficinas.');
       expect(m.formato, FormatoPlano.png);
       expect(m.calibrado, isFalse);
       expect(m.cantidadPuntos, 0);

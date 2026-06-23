@@ -36,6 +36,7 @@ class PlanoRepository:
         *,
         proyecto_id: int,
         nombre: str,
+        descripcion: str | None = None,
         formato: str,
         ruta_storage: str,
         ancho_px: int,
@@ -45,6 +46,7 @@ class PlanoRepository:
         plano = Plano(
             proyecto_id=proyecto_id,
             nombre=nombre,
+            descripcion=descripcion,
             formato=formato,
             ruta_storage=ruta_storage,
             ancho_px=ancho_px,

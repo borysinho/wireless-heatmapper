@@ -39,6 +39,7 @@ class Plano extends Equatable {
   final int id;
   final int proyectoId;
   final String nombre;
+  final String? descripcion;
   final FormatoPlano formato;
   final int anchoPx;
   final int altoPx;
@@ -60,6 +61,7 @@ class Plano extends Equatable {
     required this.id,
     required this.proyectoId,
     required this.nombre,
+    this.descripcion,
     required this.formato,
     required this.anchoPx,
     required this.altoPx,
@@ -80,6 +82,7 @@ class Plano extends Equatable {
 
   Plano copyWith({
     String? urlFirmada,
+    String? descripcion,
     bool? calibrado,
     int? cantidadPuntos,
     double? escalaMPorPx,
@@ -95,6 +98,7 @@ class Plano extends Equatable {
       id: id,
       proyectoId: proyectoId,
       nombre: nombre,
+      descripcion: descripcion ?? this.descripcion,
       formato: formato,
       anchoPx: anchoPx,
       altoPx: altoPx,
@@ -119,6 +123,7 @@ class Plano extends Equatable {
         id,
         proyectoId,
         nombre,
+        descripcion,
         formato,
         anchoPx,
         altoPx,

@@ -20,12 +20,14 @@ class PlanoRepositoryImpl implements PlanoRepository {
     String? rutaArchivo,
     List<int>? bytesArchivo,
     String? nombre,
+    String? descripcion,
   }) {
     return _remote.importar(
       proyectoId: proyectoId,
       rutaArchivo: rutaArchivo,
       bytesArchivo: bytesArchivo,
       nombre: nombre,
+      descripcion: descripcion,
     );
   }
 

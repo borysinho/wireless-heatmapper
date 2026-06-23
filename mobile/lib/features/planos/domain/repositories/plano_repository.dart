@@ -16,6 +16,7 @@ abstract class PlanoRepository {
     String? rutaArchivo,
     List<int>? bytesArchivo,
     String? nombre,
+    String? descripcion,
   });
 
   /// Renueva la URL firmada de descarga.

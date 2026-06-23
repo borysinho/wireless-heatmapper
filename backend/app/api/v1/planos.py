@@ -12,6 +12,7 @@ from fastapi import (
     APIRouter,
     Depends,
     File,
+    Form,
     HTTPException,
     Query,
     Request,
@@ -39,6 +40,8 @@ router_planos = APIRouter(prefix="/planos", tags=["planos"])
 MAX_BYTES = 20 * 1024 * 1024  # 20 MB (CA-2 de PB-02)
 FORMATOS_IMAGEN = {"png": "png", "jpg": "jpg", "jpeg": "jpg"}
 FORMATOS_VALIDOS = {"png", "jpg", "jpeg", "pdf"}
+MAX_NOMBRE = 255
+MAX_DESCRIPCION = 500
 
 
 def _storage() -> LocalFilesystemStorage:
@@ -59,6 +62,15 @@ def _firmar(ruta: str, request: Request) -> str:
         base_url=_base_url(request),
         ttl_seconds=settings.storage_url_ttl_seconds,
     )
+
+
+def _normalizar_texto(valor: str | None, *, max_len: int) -> str | None:
+    if valor is None:
+        return None
+    normalizado = " ".join(valor.strip().split())
+    if not normalizado:
+        return None
+    return normalizado[:max_len]
 
 
 def _verificar_ownership(
@@ -119,6 +131,8 @@ async def importar_plano(
     proyecto_id: int,
     request: Request,
     archivo: UploadFile = File(...),
+    nombre: str | None = Form(None),
+    descripcion: str | None = Form(None),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
 ) -> PlanoOut:
@@ -136,6 +150,13 @@ async def importar_plano(
         )
 
     nombre_orig = archivo.filename or "plano"
+    nombre_plano = _normalizar_texto(nombre, max_len=MAX_NOMBRE) or Path(
+        nombre_orig
+    ).name
+    descripcion_plano = _normalizar_texto(
+        descripcion,
+        max_len=MAX_DESCRIPCION,
+    )
     ext = Path(nombre_orig).suffix.lower().lstrip(".")
     if ext not in FORMATOS_VALIDOS:
         raise HTTPException(
@@ -188,7 +209,8 @@ async def importar_plano(
     plano_repo = PlanoRepository(db)
     plano = plano_repo.crear(
         proyecto_id=proyecto_id,
-        nombre=Path(nombre_orig).name,
+        nombre=nombre_plano,
+        descripcion=descripcion_plano,
         formato=formato_final,
         ruta_storage=ruta,
         ancho_px=ancho_px,

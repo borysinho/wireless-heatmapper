@@ -95,6 +95,7 @@ export interface PlanoOut {
   id: number;
   proyecto_id: number;
   nombre: string;
+  descripcion: string | null;
   formato: "png" | "jpg" | "pdf";
   ancho_px: number;
   alto_px: number;

@@ -56,6 +56,7 @@ class PlanosCubit extends Cubit<PlanosState> {
     String? rutaArchivo,
     List<int>? bytesArchivo,
     String? nombre,
+    String? descripcion,
   }) async {
     final proyectoId = _proyectoId;
     if (proyectoId == null) {
@@ -71,6 +72,7 @@ class PlanosCubit extends Cubit<PlanosState> {
         rutaArchivo: rutaArchivo,
         bytesArchivo: bytesArchivo,
         nombre: nombre,
+        descripcion: descripcion,
       );
       final mensaje = plano.warning != null
           ? 'Plano "${plano.nombre}" importado. ${plano.warning}'
