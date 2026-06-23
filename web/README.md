@@ -17,6 +17,9 @@ npm install
 # Servidor de desarrollo (http://localhost:5173)
 npm run dev
 
+# Servidor de desarrollo con Docker exponiendo el puerto al host
+docker compose run --rm -p 5173:5173 web npm run dev -- --host 0.0.0.0 --port 5173
+
 # Verificar tipos TypeScript
 npx tsc --noEmit
 

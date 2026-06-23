@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent, type WheelEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { Layers3, MapPin, RadioTower, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
 import { resolverUrlApi } from "@/shared/api/urlApi";
 import type { MapaCalorOut, PlanoOut } from "../types";
@@ -117,10 +117,6 @@ export function MapaCalorInteractivo({ mapa, plano, titulo, compacto = false }: 
   };
 
   const cambiarZoom = (siguiente: number) => setZoom(Math.min(5, Math.max(0.5, siguiente)));
-  const manejarRueda = (event: WheelEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    cambiarZoom(zoom + (event.deltaY < 0 ? 0.15 : -0.15));
-  };
 
   return (
     <figure className={styles.contenedor}>
@@ -152,7 +148,6 @@ export function MapaCalorInteractivo({ mapa, plano, titulo, compacto = false }: 
         onPointerUp={(event) => { arrastreRef.current = null; setArrastrando(false); event.currentTarget.releasePointerCapture(event.pointerId); }}
         onPointerCancel={() => { arrastreRef.current = null; setArrastrando(false); }}
         onPointerLeave={() => setRssiCursor(null)}
-        onWheel={manejarRueda}
       >
         <div
           className={styles.lienzo}

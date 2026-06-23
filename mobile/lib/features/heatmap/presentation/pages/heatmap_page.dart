@@ -805,8 +805,8 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
   Widget build(BuildContext context) {
     return InteractiveViewer(
       transformationController: _transformController,
-      panEnabled: widget.onMoverAPInteres == null,
-      scaleEnabled: widget.onMoverAPInteres == null,
+      panEnabled: true,
+      scaleEnabled: true,
       minScale: 0.5,
       maxScale: 5,
       child: LayoutBuilder(
@@ -831,14 +831,19 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
                     ? (details) => _ultimoTapDown = details.localPosition
                     : null,
                 onTap: puedeTocar ? () => _onTap(w: w, h: h) : null,
-                onPanStart: widget.onMoverAPInteres == null
+                onLongPressStart: widget.onMoverAPInteres == null
                     ? null
-                    : (details) => _onPanStart(details, w: w, h: h),
-                onPanUpdate: widget.onMoverAPInteres == null
+                    : (details) => _onLongPressStart(details, w: w, h: h),
+                onLongPressMoveUpdate: widget.onMoverAPInteres == null
                     ? null
-                    : (details) => _onPanUpdate(details, w: w, h: h),
-                onPanEnd:
-                    widget.onMoverAPInteres == null ? null : (_) => _onPanEnd(),
+                    : (details) => _onLongPressMoveUpdate(
+                          details,
+                          w: w,
+                          h: h,
+                        ),
+                onLongPressEnd: widget.onMoverAPInteres == null
+                    ? null
+                    : (_) => _onLongPressEnd(),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -871,6 +876,8 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
                       ),
                     ),
                     ...widget.apsInteres.map((ap) {
+                      final escalaMarcador =
+                          _zoomEscala <= 0 ? 1.0 : 1.0 / _zoomEscala;
                       final posX = widget.apPosXPorBssid[ap.bssid] ?? ap.posX;
                       final posY = widget.apPosYPorBssid[ap.bssid] ?? ap.posY;
                       final activo = ap.bssid == widget.bssidActivo ||
@@ -886,7 +893,10 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
                       return Positioned(
                         left: left,
                         top: top,
-                        child: _APInteresMarker(ap: ap, activo: activo),
+                        child: Transform.scale(
+                          scale: escalaMarcador,
+                          child: _APInteresMarker(ap: ap, activo: activo),
+                        ),
                       );
                     }),
                     ...widget.aps.map((ap) {
@@ -933,8 +943,8 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
     widget.onTapPlano?.call(_tapAPlano(pos, w: w, h: h));
   }
 
-  void _onPanStart(
-    DragStartDetails details, {
+  void _onLongPressStart(
+    LongPressStartDetails details, {
     required double w,
     required double h,
   }) {
@@ -945,8 +955,8 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
     widget.onTapAPInteres?.call(ap);
   }
 
-  void _onPanUpdate(
-    DragUpdateDetails details, {
+  void _onLongPressMoveUpdate(
+    LongPressMoveUpdateDetails details, {
     required double w,
     required double h,
   }) {
@@ -959,7 +969,7 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
     widget.onMoverAPInteres?.call(ap, pos);
   }
 
-  void _onPanEnd() {
+  void _onLongPressEnd() {
     final bssid = _bssidArrastrado;
     final pos = _ultimaPosArrastradaPlano;
     final ap = bssid == null ? null : _apPorBssid(bssid);
@@ -1045,25 +1055,27 @@ class _APInteresMarker extends StatelessWidget {
             color: theme.colorScheme.outline.withValues(alpha: 0.55),
             width: 1,
           );
-    return Tooltip(
-      message: ap.ssid.isEmpty ? ap.bssid : ap.ssid,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-          border: borde,
-          boxShadow: const [
-            BoxShadow(
-              blurRadius: 6,
-              offset: Offset(0, 2),
-              color: Color(0x33000000),
-            ),
-          ],
-        ),
-        child: const SizedBox(
-          width: 32,
-          height: 32,
-          child: Icon(Icons.router, color: Colors.white, size: 15),
+    return Semantics(
+      label: ap.ssid.isEmpty ? ap.bssid : ap.ssid,
+      child: IgnorePointer(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            border: borde,
+            boxShadow: const [
+              BoxShadow(
+                blurRadius: 6,
+                offset: Offset(0, 2),
+                color: Color(0x33000000),
+              ),
+            ],
+          ),
+          child: const SizedBox(
+            width: 32,
+            height: 32,
+            child: Icon(Icons.router, color: Colors.white, size: 15),
+          ),
         ),
       ),
     );
