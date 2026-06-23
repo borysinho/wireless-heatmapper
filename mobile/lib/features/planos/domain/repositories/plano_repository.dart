@@ -10,11 +10,13 @@ abstract class PlanoRepository {
   /// [rutaArchivo] es la ruta absoluta en el filesystem del dispositivo, cuando
   /// Android la expone. [bytesArchivo] evita depender de rutas de caché
   /// inaccesibles en builds de producción.
+  /// [nombreArchivo] conserva el nombre real del archivo para el multipart.
   /// [nombre] es opcional; si es null se usa el nombre del archivo.
   Future<Plano> importar({
     required int proyectoId,
     String? rutaArchivo,
     List<int>? bytesArchivo,
+    String? nombreArchivo,
     String? nombre,
     String? descripcion,
   });

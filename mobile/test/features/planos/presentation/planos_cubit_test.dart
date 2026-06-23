@@ -90,6 +90,7 @@ void main() {
               proyectoId: any(named: 'proyectoId'),
               rutaArchivo: any(named: 'rutaArchivo'),
               bytesArchivo: any(named: 'bytesArchivo'),
+              nombreArchivo: any(named: 'nombreArchivo'),
               nombre: any(named: 'nombre'),
               descripcion: any(named: 'descripcion'),
             )).thenThrow(
@@ -102,7 +103,10 @@ void main() {
       act: (c) async {
         await c.cargarPlanos(10);
         await c.importarPlano(
-            rutaArchivo: '/tmp/plano.png', nombre: 'plano.png');
+          rutaArchivo: '/tmp/plano.png',
+          nombreArchivo: 'plano.png',
+          nombre: 'Planta baja',
+        );
       },
       skip: 2,
       expect: () => [

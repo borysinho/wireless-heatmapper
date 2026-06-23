@@ -55,6 +55,7 @@ class PlanosCubit extends Cubit<PlanosState> {
   Future<void> importarPlano({
     String? rutaArchivo,
     List<int>? bytesArchivo,
+    String? nombreArchivo,
     String? nombre,
     String? descripcion,
   }) async {
@@ -71,6 +72,7 @@ class PlanosCubit extends Cubit<PlanosState> {
         proyectoId: proyectoId,
         rutaArchivo: rutaArchivo,
         bytesArchivo: bytesArchivo,
+        nombreArchivo: nombreArchivo,
         nombre: nombre,
         descripcion: descripcion,
       );

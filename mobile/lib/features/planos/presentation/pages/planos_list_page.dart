@@ -72,94 +72,17 @@ class _PlanosListPageState extends State<PlanosListPage> {
     await context.read<PlanosCubit>().importarPlano(
           rutaArchivo: file.path,
           bytesArchivo: file.bytes,
+          nombreArchivo: file.name,
           nombre: metadata.nombre,
           descripcion: metadata.descripcion,
         );
   }
 
   Future<_PlanoMetadata?> _pedirMetadataPlano(String nombreArchivo) async {
-    final formKey = GlobalKey<FormState>();
-    final nombreCtrl = TextEditingController(
-      text: _nombreSugerido(nombreArchivo),
+    return showDialog<_PlanoMetadata>(
+      context: context,
+      builder: (_) => _PlanoMetadataDialog(nombreArchivo: nombreArchivo),
     );
-    final descripcionCtrl = TextEditingController();
-
-    try {
-      return await showDialog<_PlanoMetadata>(
-        context: context,
-        builder: (ctx) {
-          return AlertDialog(
-            title: const Text('Identificar plano'),
-            content: Form(
-              key: formKey,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      nombreArchivo,
-                      style: Theme.of(ctx).textTheme.bodySmall,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: nombreCtrl,
-                      maxLength: 255,
-                      textInputAction: TextInputAction.next,
-                      decoration: const InputDecoration(
-                        labelText: 'Nombre del área',
-                        hintText: 'Planta baja, Recepción, Piso 2',
-                      ),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Ingresa un nombre para identificar el plano.';
-                        }
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: descripcionCtrl,
-                      maxLength: 500,
-                      minLines: 2,
-                      maxLines: 4,
-                      decoration: const InputDecoration(
-                        labelText: 'Descripción',
-                        hintText: 'Área cubierta, referencia o detalle útil',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Cancelar'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  if (formKey.currentState?.validate() != true) return;
-                  Navigator.of(ctx).pop(
-                    _PlanoMetadata(
-                      nombre: nombreCtrl.text.trim(),
-                      descripcion: descripcionCtrl.text.trim().isEmpty
-                          ? null
-                          : descripcionCtrl.text.trim(),
-                    ),
-                  );
-                },
-                child: const Text('Importar'),
-              ),
-            ],
-          );
-        },
-      );
-    } finally {
-      nombreCtrl.dispose();
-      descripcionCtrl.dispose();
-    }
   }
 
   Future<void> _confirmarEliminar(Plano plano) async {
@@ -279,10 +202,98 @@ class _PlanoMetadata {
   });
 }
 
-String _nombreSugerido(String nombreArchivo) {
-  final punto = nombreArchivo.lastIndexOf('.');
-  if (punto <= 0) return nombreArchivo;
-  return nombreArchivo.substring(0, punto);
+class _PlanoMetadataDialog extends StatefulWidget {
+  final String nombreArchivo;
+
+  const _PlanoMetadataDialog({required this.nombreArchivo});
+
+  @override
+  State<_PlanoMetadataDialog> createState() => _PlanoMetadataDialogState();
+}
+
+class _PlanoMetadataDialogState extends State<_PlanoMetadataDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nombreCtrl = TextEditingController();
+  final _descripcionCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _nombreCtrl.dispose();
+    _descripcionCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Identificar plano'),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.nombreArchivo,
+                style: Theme.of(context).textTheme.bodySmall,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _nombreCtrl,
+                autofocus: true,
+                maxLength: 255,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre del área',
+                  hintText: 'Planta baja, Recepción, Piso 2',
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Ingresa un nombre para identificar el plano.';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _descripcionCtrl,
+                maxLength: 500,
+                minLines: 2,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Descripción opcional',
+                  hintText: 'Área cubierta, referencia o detalle útil',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _confirmar,
+          child: const Text('Importar'),
+        ),
+      ],
+    );
+  }
+
+  void _confirmar() {
+    if (_formKey.currentState?.validate() != true) return;
+    final descripcion = _descripcionCtrl.text.trim();
+    Navigator.of(context).pop(
+      _PlanoMetadata(
+        nombre: _nombreCtrl.text.trim(),
+        descripcion: descripcion.isEmpty ? null : descripcion,
+      ),
+    );
+  }
 }
 
 class _EmptyState extends StatelessWidget {

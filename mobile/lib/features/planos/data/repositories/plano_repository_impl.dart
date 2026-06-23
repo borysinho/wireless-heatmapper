@@ -19,6 +19,7 @@ class PlanoRepositoryImpl implements PlanoRepository {
     required int proyectoId,
     String? rutaArchivo,
     List<int>? bytesArchivo,
+    String? nombreArchivo,
     String? nombre,
     String? descripcion,
   }) {
@@ -26,6 +27,7 @@ class PlanoRepositoryImpl implements PlanoRepository {
       proyectoId: proyectoId,
       rutaArchivo: rutaArchivo,
       bytesArchivo: bytesArchivo,
+      nombreArchivo: nombreArchivo,
       nombre: nombre,
       descripcion: descripcion,
     );

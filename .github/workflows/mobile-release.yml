@@ -58,18 +58,82 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p mobile/android/app
+          destino="mobile/android/app/google-services.json"
+          tmp="${RUNNER_TEMP:-/tmp}/google-services.json"
 
           if [[ -n "${GOOGLE_SERVICES_JSON_BASE64}" ]]; then
-            printf '%s' "${GOOGLE_SERVICES_JSON_BASE64}" | base64 -d > mobile/android/app/google-services.json
+            if printf '%s' "${GOOGLE_SERVICES_JSON_BASE64}" | base64 -d > "${tmp}" 2>/dev/null \
+              && python -m json.tool "${tmp}" >/dev/null 2>&1; then
+              cp "${tmp}" "${destino}"
+            else
+              echo "::warning::MOBILE_GOOGLE_SERVICES_JSON_BASE64 no contiene JSON válido. Se generará google-services.json desde firebase_options.dart."
+            fi
           elif [[ -n "${GOOGLE_SERVICES_JSON}" ]]; then
-            printf '%s' "${GOOGLE_SERVICES_JSON}" > mobile/android/app/google-services.json
-          else
-            echo "::error::Configura el secret MOBILE_GOOGLE_SERVICES_JSON_BASE64 o MOBILE_GOOGLE_SERVICES_JSON para publicar el APK móvil."
-            exit 1
+            printf '%s' "${GOOGLE_SERVICES_JSON}" > "${tmp}"
+            if python -m json.tool "${tmp}" >/dev/null 2>&1; then
+              cp "${tmp}" "${destino}"
+            else
+              echo "::warning::MOBILE_GOOGLE_SERVICES_JSON no contiene JSON válido. Se generará google-services.json desde firebase_options.dart."
+            fi
           fi
 
-          python -m json.tool mobile/android/app/google-services.json >/dev/null
-          test -s mobile/android/app/google-services.json
+          if [[ ! -s "${destino}" ]]; then
+            python - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          firebase_options = Path("mobile/lib/firebase_options.dart").read_text(encoding="utf-8")
+          gradle = Path("mobile/android/app/build.gradle.kts").read_text(encoding="utf-8")
+
+          def extraer(campo: str) -> str:
+              patron = rf"{campo}:\s*'([^']+)'"
+              match = re.search(patron, firebase_options)
+              if not match:
+                  raise SystemExit(f"No se encontró {campo} en firebase_options.dart")
+              return match.group(1)
+
+          paquete = re.search(r'applicationId\s*=\s*"([^"]+)"', gradle)
+          if not paquete:
+              raise SystemExit("No se encontró applicationId en build.gradle.kts")
+
+          data = {
+              "project_info": {
+                  "project_number": extraer("messagingSenderId"),
+                  "project_id": extraer("projectId"),
+                  "storage_bucket": extraer("storageBucket"),
+              },
+              "client": [
+                  {
+                      "client_info": {
+                          "mobilesdk_app_id": extraer("appId"),
+                          "android_client_info": {
+                              "package_name": paquete.group(1),
+                          },
+                      },
+                      "oauth_client": [],
+                      "api_key": [
+                          {
+                              "current_key": extraer("apiKey"),
+                          }
+                      ],
+                      "services": {
+                          "appinvite_service": {
+                              "other_platform_oauth_client": [],
+                          }
+                      },
+                  }
+              ],
+              "configuration_version": "1",
+          }
+
+          destino = Path("mobile/android/app/google-services.json")
+          destino.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+          PY
+          fi
+
+          python -m json.tool "${destino}" >/dev/null
+          test -s "${destino}"
           echo "google-services.json restaurado correctamente para Android release."
 
       - name: Construir APK release

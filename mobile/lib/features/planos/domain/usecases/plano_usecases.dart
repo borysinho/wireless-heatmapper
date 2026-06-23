@@ -18,6 +18,7 @@ class ImportarPlanoUseCase {
     required int proyectoId,
     String? rutaArchivo,
     List<int>? bytesArchivo,
+    String? nombreArchivo,
     String? nombre,
     String? descripcion,
   }) {
@@ -25,6 +26,7 @@ class ImportarPlanoUseCase {
       proyectoId: proyectoId,
       rutaArchivo: rutaArchivo,
       bytesArchivo: bytesArchivo,
+      nombreArchivo: nombreArchivo,
       nombre: nombre,
       descripcion: descripcion,
     );

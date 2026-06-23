@@ -36,12 +36,18 @@ class PlanoRemoteDatasource {
     required int proyectoId,
     String? rutaArchivo,
     List<int>? bytesArchivo,
+    String? nombreArchivo,
     String? nombre,
     String? descripcion,
   }) async {
-    final nombreArchivo =
-        _nombreArchivo(nombre: nombre, rutaArchivo: rutaArchivo);
-    final ext = _extension(nombreArchivo);
+    final nombreArchivoFinal = _nombreArchivo(
+      nombreArchivo: nombreArchivo,
+      rutaArchivo: rutaArchivo,
+      nombrePlano: nombre,
+    );
+    final nombrePlano = nombre?.trim();
+    final descripcionPlano = descripcion?.trim();
+    final ext = _extension(nombreArchivoFinal);
     if (!kFormatosPermitidos.contains(ext)) {
       throw PlanoFormatoNoSoportadoException(ext);
     }
@@ -52,12 +58,12 @@ class PlanoRemoteDatasource {
     }
 
     final formData = FormData.fromMap({
-      if (nombre != null && nombre.isNotEmpty) 'nombre': nombre,
-      if (descripcion != null && descripcion.trim().isNotEmpty)
-        'descripcion': descripcion.trim(),
+      if (nombrePlano != null && nombrePlano.isNotEmpty) 'nombre': nombrePlano,
+      if (descripcionPlano != null && descripcionPlano.isNotEmpty)
+        'descripcion': descripcionPlano,
       'archivo': bytesArchivo != null
-          ? MultipartFile.fromBytes(bytesArchivo, filename: nombreArchivo)
-          : await _multipartDesdeRuta(rutaArchivo, nombreArchivo),
+          ? MultipartFile.fromBytes(bytesArchivo, filename: nombreArchivoFinal)
+          : await _multipartDesdeRuta(rutaArchivo, nombreArchivoFinal),
     });
 
     try {
@@ -192,12 +198,19 @@ class PlanoRemoteDatasource {
     return i < 0 ? ruta : ruta.substring(i + 1);
   }
 
-  static String _nombreArchivo({String? nombre, String? rutaArchivo}) {
-    if (nombre != null && nombre.trim().isNotEmpty) {
-      return nombre.trim();
+  static String _nombreArchivo({
+    String? nombreArchivo,
+    String? rutaArchivo,
+    String? nombrePlano,
+  }) {
+    if (nombreArchivo != null && nombreArchivo.trim().isNotEmpty) {
+      return _basename(nombreArchivo.trim());
     }
     if (rutaArchivo != null && rutaArchivo.trim().isNotEmpty) {
       return _basename(rutaArchivo);
+    }
+    if (nombrePlano != null && nombrePlano.trim().isNotEmpty) {
+      return _basename(nombrePlano.trim());
     }
     throw const PlanoStorageException('No se pudo identificar el archivo.');
   }

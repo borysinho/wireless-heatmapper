@@ -102,7 +102,8 @@ void main() {
       await datasource.importar(
         proyectoId: 10,
         bytesArchivo: _pngMinimo,
-        nombre: 'plano.png',
+        nombreArchivo: 'plano.png',
+        nombre: 'Planta baja',
         descripcion: 'Área frontal',
       );
 
@@ -116,7 +117,41 @@ void main() {
         ),
         isTrue,
       );
+      expect(
+        formData.fields.any(
+          (field) => field.key == 'nombre' && field.value == 'Planta baja',
+        ),
+        isTrue,
+      );
       expect(formData.files.single.value.filename, 'plano.png');
+    });
+
+    test('valida el formato con el archivo original y no con el nombre visible',
+        () async {
+      final adapter = _CapturandoAdapter();
+      final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api'))
+        ..httpClientAdapter = adapter;
+      final datasource = PlanoRemoteDatasource(dio);
+
+      await datasource.importar(
+        proyectoId: 10,
+        bytesArchivo: _pngMinimo,
+        nombreArchivo: 'plano.png',
+        nombre: 'Planta baja',
+      );
+
+      final formData = adapter.ultimaRequest!.data as FormData;
+      expect(formData.files.single.value.filename, 'plano.png');
+      expect(
+        formData.fields.any(
+          (field) => field.key == 'nombre' && field.value == 'Planta baja',
+        ),
+        isTrue,
+      );
+      expect(
+        formData.fields.any((field) => field.key == 'descripcion'),
+        isFalse,
+      );
     });
   });
 }
