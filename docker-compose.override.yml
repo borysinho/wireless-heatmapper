@@ -17,7 +17,20 @@ services:
   web:
     build:
       target: builder
+    ports:
+      - "80:80"
+      - "5173:80"
+    environment:
+      VITE_PROXY_TARGET: http://backend:8000
+      VITE_MANUAL_USUARIO_ROOT: /app/manual-usuario
     volumes:
       - ./web:/app
+      - ./manual-usuario:/app/manual-usuario:ro
       - /app/node_modules
     command: npm run dev -- --host 0.0.0.0 --port 80
+
+  # En desarrollo local se accede por Vite en http://localhost o http://localhost:5173.
+  # Nginx queda reservado para producción porque su config usa TLS real.
+  nginx:
+    profiles:
+      - produccion-local

@@ -1,6 +1,8 @@
 import { defineConfig } from "vitest/config";
 import { loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import type { ServerResponse } from "http";
+import type { ViteDevServer } from "vite";
 import { existsSync, readFileSync, statSync } from "fs";
 import { extname, join, resolve } from "path";
 
@@ -11,12 +13,38 @@ const tiposContenido: Record<string, string> = {
   ".svg": "image/svg+xml",
 };
 
-function servirManualUsuarioDev() {
-  const manualRoot = resolve(__dirname, "../manual-usuario");
+function resolverManualRoot(): string | null {
+  const candidatos = [
+    process.env.VITE_MANUAL_USUARIO_ROOT,
+    resolve(__dirname, "../manual-usuario"),
+    resolve(__dirname, "manual-usuario"),
+    "/app/manual-usuario",
+  ].filter((ruta): ruta is string => Boolean(ruta));
 
+  return candidatos.find((ruta) => existsSync(join(ruta, "index.html"))) ?? null;
+}
+
+function responderManualNoDisponible(res: ServerResponse) {
+  res.statusCode = 404;
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.end(`<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Manual no disponible</title>
+  </head>
+  <body style="font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.5;">
+    <h1>Manual de usuario no disponible</h1>
+    <p>El servidor de desarrollo no encontro <code>manual-usuario/index.html</code>.</p>
+    <p>Si estas usando Docker, verifica que <code>./manual-usuario</code> este montado en <code>/app/manual-usuario</code>.</p>
+  </body>
+</html>`);
+}
+
+function servirManualUsuarioDev() {
   return {
     name: "manual-usuario-dev",
-    configureServer(server) {
+    configureServer(server: ViteDevServer) {
       server.middlewares.use((req, res, next) => {
         const url = req.url ?? "";
         const pathname = decodeURIComponent(new URL(url, "http://localhost").pathname);
@@ -30,6 +58,13 @@ function servirManualUsuarioDev() {
 
         if (!pathname.startsWith("/manual/")) {
           next();
+          return;
+        }
+
+        const manualRoot = resolverManualRoot();
+
+        if (!manualRoot) {
+          responderManualNoDisponible(res);
           return;
         }
 
