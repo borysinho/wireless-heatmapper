@@ -14,15 +14,32 @@ import {
   LogOut,
   Menu,
   X,
+  LayoutDashboard,
 } from "lucide-react";
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { ToastContainer } from "@/shared/components";
 import styles from "./AdminLayout.module.css";
 
-const ITEMS_NAV = [
-  { to: "/admin/usuarios", etiqueta: "Usuarios", Icono: Users },
-  { to: "/admin/clientes", etiqueta: "Clientes", Icono: Building2 },
-  { to: "/admin/proyectos", etiqueta: "Proyectos", Icono: ClipboardList },
+const GRUPOS_NAV = [
+  {
+    titulo: "Centro RF",
+    items: [
+      { to: "/admin/inicio", etiqueta: "Inicio", Icono: LayoutDashboard },
+    ],
+  },
+  {
+    titulo: "Operación RF",
+    items: [
+      { to: "/admin/proyectos", etiqueta: "Pipeline de proyectos", Icono: ClipboardList },
+    ],
+  },
+  {
+    titulo: "Administración",
+    items: [
+      { to: "/admin/usuarios", etiqueta: "Usuarios", Icono: Users },
+      { to: "/admin/clientes", etiqueta: "Clientes", Icono: Building2 },
+    ],
+  },
 ];
 
 function iniciales(nombre: string): string {
@@ -71,17 +88,24 @@ export default function AdminLayout() {
       </div>
 
       <ul className={styles.menu} role="list">
-        {ITEMS_NAV.map(({ to, etiqueta, Icono }) => (
-          <li key={to}>
-            <NavLink
-              to={to}
-              className={({ isActive }) =>
-                isActive ? `${styles.enlace} ${styles.activo}` : styles.enlace
-              }
-            >
-              <Icono size={16} aria-hidden="true" />
-              {etiqueta}
-            </NavLink>
+        {GRUPOS_NAV.map((grupo) => (
+          <li key={grupo.titulo} className={styles.grupoNav}>
+            <span className={styles.tituloGrupo}>{grupo.titulo}</span>
+            <ul className={styles.submenu} role="list">
+              {grupo.items.map(({ to, etiqueta, Icono }) => (
+                <li key={to}>
+                  <NavLink
+                    to={to}
+                    className={({ isActive }) =>
+                      isActive ? `${styles.enlace} ${styles.activo}` : styles.enlace
+                    }
+                  >
+                    <Icono size={16} aria-hidden="true" />
+                    {etiqueta}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
           </li>
         ))}
       </ul>

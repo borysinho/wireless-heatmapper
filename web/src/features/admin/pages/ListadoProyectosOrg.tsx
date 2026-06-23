@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Archive,
+  BrainCircuit,
+  Link2,
   Pencil,
   Plus,
   RadioTower,
@@ -33,6 +35,13 @@ const ESTADOS = [
   { value: "en_progreso", label: "En progreso" },
   { value: "completado", label: "Completado" },
   { value: "archivado", label: "Archivado" },
+] as const;
+
+const COLUMNAS_PIPELINE = [
+  { value: "nuevo", label: "Nuevo", descripcion: "Pendiente de iniciar" },
+  { value: "en_progreso", label: "En progreso", descripcion: "Captura y revisión RF" },
+  { value: "completado", label: "Completado", descripcion: "Listo para entrega" },
+  { value: "archivado", label: "Archivado", descripcion: "Cerrado o fuera de operación" },
 ] as const;
 
 const formularioVacio: ProyectoAdminCreate = {
@@ -153,13 +162,24 @@ export default function ListadoProyectosOrg() {
   };
 
   const totalPaginas = data ? Math.max(1, Math.ceil(data.total / 20)) : 1;
+  const proyectosPorEstado = COLUMNAS_PIPELINE.map((columna) => ({
+    ...columna,
+    proyectos: (data?.items ?? []).filter((proyecto) => proyecto.estado === columna.value),
+  }));
+
+  const navegarRF = (proyecto: ProyectoListOut, seccion = "conjuntos-ap") => {
+    navigate(`/admin/proyectos/${proyecto.id}/rf/${seccion}`, {
+      state: { proyectoNombre: proyecto.nombre },
+    });
+  };
 
   return (
     <div>
       <div className={styles.encabezado}>
         <div>
-          <h1 className={styles.titulo}>Proyectos de la organización</h1>
-          <p className={styles.subtitulo}>Gestión de relevamientos WiFi de Bulldog Tech.</p>
+          <p className={styles.preTitulo}>Operación RF</p>
+          <h1 className={styles.titulo}>Pipeline de proyectos</h1>
+          <p className={styles.subtitulo}>Seguimiento de relevamientos WiFi, análisis IA y publicación para Bulldog Tech.</p>
         </div>
         <Button onClick={abrirNuevo} disabled={tecnicos.length === 0}>
           <Plus size={15} aria-hidden="true" /> Nuevo proyecto
@@ -202,31 +222,70 @@ export default function ListadoProyectosOrg() {
         <EmptyState mensaje="No hay proyectos registrados aún." />
       ) : (
         <>
-          <div className={styles.tablaWrapper}>
-            <table className={styles.tabla}>
-              <thead><tr><th>Proyecto</th><th>Cliente</th><th>Técnico</th><th>Estado</th><th>Última actividad</th><th>Puntos</th><th>Acciones</th></tr></thead>
-              <tbody>
-                {data.items.map((proyecto) => (
-                  <tr key={proyecto.id}>
-                    <td className={styles.nombreProyecto}>{proyecto.nombre}</td>
-                    <td>{proyecto.cliente?.nombre ?? "—"}</td>
-                    <td>{proyecto.tecnico.nombre}</td>
-                    <td><Badge variante={proyecto.estado as "en_progreso" | "completado" | "archivado"} etiqueta={_labelEstado(proyecto.estado)} /></td>
-                    <td>{new Date(proyecto.ultima_actividad).toLocaleDateString("es-BO")}</td>
-                    <td>{proyecto.cantidad_puntos}</td>
-                    <td>
-                      <div className={styles.acciones}>
-                        <Button variante="secondary" tamano="sm" onClick={() => abrirEditar(proyecto)}><Pencil size={14} /> Editar</Button>
-                        {proyecto.estado !== "archivado" && <Button variante="danger" tamano="sm" onClick={() => setProyectoArchivar(proyecto)}><Archive size={14} /> Archivar</Button>}
-                        <Button variante="secondary" tamano="sm" onClick={() => { setProyectoReasignar(proyecto); setNuevoTecnicoId(""); setErrorModal(null); }}><UserCog size={14} /> Reasignar</Button>
-                        <Button variante="secondary" tamano="sm" onClick={() => navigate(`/admin/proyectos/${proyecto.id}/rf`, { state: { proyectoNombre: proyecto.nombre } })}><RadioTower size={14} /> Espacio RF</Button>
-                        <Button variante="danger" tamano="sm" onClick={() => setProyectoEliminar(proyecto)}><Trash2 size={14} /> Eliminar</Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className={styles.pipeline} aria-label="Pipeline de proyectos RF">
+            {proyectosPorEstado.map((columna) => (
+              <section key={columna.value} className={styles.columna}>
+                <header className={styles.columnaHeader}>
+                  <div>
+                    <h2>{columna.label}</h2>
+                    <p>{columna.descripcion}</p>
+                  </div>
+                  <span>{columna.proyectos.length}</span>
+                </header>
+
+                <div className={styles.tarjetas}>
+                  {columna.proyectos.length === 0 ? (
+                    <div className={styles.columnaVacia}>Sin proyectos</div>
+                  ) : (
+                    columna.proyectos.map((proyecto) => (
+                      <article key={proyecto.id} className={styles.tarjetaProyecto}>
+                        <div className={styles.tarjetaHeader}>
+                          <div>
+                            <h3>{proyecto.nombre}</h3>
+                            <p>{proyecto.cliente?.nombre ?? "Sin cliente asignado"}</p>
+                          </div>
+                          <Badge variante={proyecto.estado} etiqueta={_labelEstado(proyecto.estado)} />
+                        </div>
+
+                        <dl className={styles.detalles}>
+                          <div>
+                            <dt>Técnico</dt>
+                            <dd>{proyecto.tecnico.nombre}</dd>
+                          </div>
+                          <div>
+                            <dt>Puntos</dt>
+                            <dd>{proyecto.cantidad_puntos}</dd>
+                          </div>
+                          <div>
+                            <dt>Actividad</dt>
+                            <dd>{new Date(proyecto.ultima_actividad).toLocaleDateString("es-BO")}</dd>
+                          </div>
+                        </dl>
+
+                        <div className={styles.atajosRF}>
+                          <Button variante="secondary" tamano="sm" onClick={() => navegarRF(proyecto, "conjuntos-ap")}>
+                            <RadioTower size={14} /> RF
+                          </Button>
+                          <Button variante="secondary" tamano="sm" onClick={() => navegarRF(proyecto, "escenarios-ia")}>
+                            <BrainCircuit size={14} /> IA
+                          </Button>
+                          <Button variante="secondary" tamano="sm" onClick={() => navegarRF(proyecto, "publicacion")}>
+                            <Link2 size={14} /> Publicar
+                          </Button>
+                        </div>
+
+                        <div className={styles.acciones}>
+                          <Button variante="ghost" tamano="sm" onClick={() => abrirEditar(proyecto)}><Pencil size={14} /> Editar</Button>
+                          <Button variante="ghost" tamano="sm" onClick={() => { setProyectoReasignar(proyecto); setNuevoTecnicoId(""); setErrorModal(null); }}><UserCog size={14} /> Reasignar</Button>
+                          {proyecto.estado !== "archivado" && <Button variante="ghost" tamano="sm" onClick={() => setProyectoArchivar(proyecto)}><Archive size={14} /> Archivar</Button>}
+                          <Button variante="danger" tamano="sm" onClick={() => setProyectoEliminar(proyecto)}><Trash2 size={14} /> Eliminar</Button>
+                        </div>
+                      </article>
+                    ))
+                  )}
+                </div>
+              </section>
+            ))}
           </div>
           {totalPaginas > 1 && <div className={styles.paginacion}>
             <Button variante="secondary" tamano="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>‹ Anterior</Button>

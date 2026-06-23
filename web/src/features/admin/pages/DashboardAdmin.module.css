@@ -1,0 +1,200 @@
+.encabezado {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.preTitulo {
+  color: var(--color-primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  margin: 0 0 0.25rem;
+  text-transform: uppercase;
+}
+
+.titulo {
+  color: var(--text-h);
+  font-size: 1.6rem;
+  font-weight: 750;
+  margin: 0 0 0.25rem;
+}
+
+.subtitulo {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  margin: 0;
+  max-width: 46rem;
+}
+
+.metricas {
+  display: grid;
+  gap: 0.875rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 1.25rem;
+}
+
+.metrica {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  display: grid;
+  gap: 0.35rem;
+  min-height: 7rem;
+  padding: 1rem;
+}
+
+.metrica svg {
+  color: var(--color-primary);
+}
+
+.metrica span {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.metrica strong {
+  color: var(--text-h);
+  font-size: 1.65rem;
+  line-height: 1;
+}
+
+.grilla {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.4fr) minmax(20rem, 0.8fr);
+}
+
+.panel {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem;
+}
+
+.panelHeader {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.panelHeader h2 {
+  color: var(--text-h);
+  font-size: 1rem;
+  margin: 0 0 0.15rem;
+}
+
+.panelHeader p {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  margin: 0;
+}
+
+.listaRecientes,
+.listaSkeleton,
+.acciones {
+  display: grid;
+  gap: 0.625rem;
+}
+
+.itemReciente,
+.acciones button {
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 0.75rem;
+  text-align: left;
+}
+
+.itemReciente {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 0.8rem 0.9rem;
+}
+
+.itemReciente:hover,
+.acciones button:hover {
+  border-color: var(--color-primary);
+}
+
+.itemReciente strong,
+.acciones strong {
+  color: var(--text-h);
+  display: block;
+  font-size: 0.9rem;
+}
+
+.itemReciente small,
+.acciones small {
+  color: var(--text-muted);
+  display: block;
+  font-size: 0.78rem;
+  margin-top: 0.1rem;
+}
+
+.puntos {
+  background: var(--color-primary-bg);
+  border-radius: var(--radius-pill);
+  color: var(--color-primary);
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 0.25rem 0.55rem;
+  white-space: nowrap;
+}
+
+.acciones button {
+  grid-template-columns: 1.5rem minmax(0, 1fr);
+  min-height: 4.4rem;
+  padding: 0.85rem;
+}
+
+.acciones svg {
+  color: var(--color-primary);
+}
+
+.skeleton {
+  animation: shimmer 1.4s infinite;
+  background: linear-gradient(90deg, var(--border) 25%, var(--bg-surface) 50%, var(--border) 75%);
+  background-size: 400% 100%;
+  border-radius: var(--radius-md);
+  height: 4rem;
+}
+
+@keyframes shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@media (max-width: 1100px) {
+  .metricas {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .grilla {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .encabezado,
+  .panelHeader {
+    flex-direction: column;
+  }
+
+  .metricas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .itemReciente {
+    grid-template-columns: 1fr;
+  }
+}
