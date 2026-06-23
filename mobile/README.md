@@ -62,6 +62,25 @@ flutter build apk --release --dart-define-from-file=dart-defines/release.json
 
 El archivo publicado queda con el nombre `WirelessHeatMapper-<tag>.apk`.
 
+### Secret requerido para Firebase
+
+El archivo `mobile/android/app/google-services.json` no se versiona porque está
+ignorado por Git. Para que GitHub Actions pueda construir el APK, crear este
+secret del repositorio:
+
+| Secret                                  | Valor recomendado                                      |
+| --------------------------------------- | ------------------------------------------------------ |
+| `MOBILE_GOOGLE_SERVICES_JSON_BASE64`    | Contenido base64 de `mobile/android/app/google-services.json` |
+
+Generar el valor con:
+
+```bash
+base64 -w 0 mobile/android/app/google-services.json
+```
+
+Como alternativa, se puede crear `MOBILE_GOOGLE_SERVICES_JSON` con el JSON
+crudo completo.
+
 ## Arquitectura
 
 ```

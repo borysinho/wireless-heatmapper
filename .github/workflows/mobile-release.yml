@@ -50,6 +50,28 @@ jobs:
         run: flutter test --reporter compact
         working-directory: mobile
 
+      - name: Restaurar configuración Firebase Android
+        shell: bash
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.MOBILE_GOOGLE_SERVICES_JSON_BASE64 }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.MOBILE_GOOGLE_SERVICES_JSON }}
+        run: |
+          set -euo pipefail
+          mkdir -p mobile/android/app
+
+          if [[ -n "${GOOGLE_SERVICES_JSON_BASE64}" ]]; then
+            printf '%s' "${GOOGLE_SERVICES_JSON_BASE64}" | base64 -d > mobile/android/app/google-services.json
+          elif [[ -n "${GOOGLE_SERVICES_JSON}" ]]; then
+            printf '%s' "${GOOGLE_SERVICES_JSON}" > mobile/android/app/google-services.json
+          else
+            echo "::error::Configura el secret MOBILE_GOOGLE_SERVICES_JSON_BASE64 o MOBILE_GOOGLE_SERVICES_JSON para publicar el APK móvil."
+            exit 1
+          fi
+
+          python -m json.tool mobile/android/app/google-services.json >/dev/null
+          test -s mobile/android/app/google-services.json
+          echo "google-services.json restaurado correctamente para Android release."
+
       - name: Construir APK release
         run: flutter build apk --release --dart-define-from-file=dart-defines/release.json
         working-directory: mobile
