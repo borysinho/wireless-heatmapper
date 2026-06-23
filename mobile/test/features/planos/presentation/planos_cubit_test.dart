@@ -82,6 +82,39 @@ void main() {
 
   group('calibrarPlano', () {
     blocTest<PlanosCubit, PlanosState>(
+      'muestra el mensaje de almacenamiento al fallar el acceso al archivo',
+      build: () {
+        when(() => repo.listar(10))
+            .thenAnswer((_) async => [_planoFake(id: 5)]);
+        when(() => repo.importar(
+              proyectoId: any(named: 'proyectoId'),
+              rutaArchivo: any(named: 'rutaArchivo'),
+              bytesArchivo: any(named: 'bytesArchivo'),
+              nombre: any(named: 'nombre'),
+            )).thenThrow(
+          const PlanoStorageException(
+              'No se pudo leer el archivo seleccionado.'),
+        );
+        return cubit;
+      },
+      seed: () => PlanosListaExitosa([_planoFake(id: 5)]),
+      act: (c) async {
+        await c.cargarPlanos(10);
+        await c.importarPlano(
+            rutaArchivo: '/tmp/plano.png', nombre: 'plano.png');
+      },
+      skip: 2,
+      expect: () => [
+        isA<PlanosLoading>(),
+        isA<PlanosError>().having(
+          (e) => e.mensaje,
+          'mensaje',
+          'No se pudo leer el archivo seleccionado.',
+        ),
+      ],
+    );
+
+    blocTest<PlanosCubit, PlanosState>(
       'mapea PlanoDistanciaInvalidaException a PlanosError',
       build: () {
         when(() => repo.calibrar(

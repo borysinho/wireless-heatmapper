@@ -9,6 +9,8 @@ COPY app ./app
 
 FROM base AS final
 RUN useradd --no-create-home --shell /bin/false appuser
+RUN mkdir -p /var/lib/heatmapper/planos \
+    && chown -R appuser:appuser /var/lib/heatmapper
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/uvicorn
 COPY --from=builder /app/app ./app

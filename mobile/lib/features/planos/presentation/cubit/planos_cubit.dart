@@ -53,7 +53,8 @@ class PlanosCubit extends Cubit<PlanosState> {
 
   /// Importa un plano. PB-02.
   Future<void> importarPlano({
-    required String rutaArchivo,
+    String? rutaArchivo,
+    List<int>? bytesArchivo,
     String? nombre,
   }) async {
     final proyectoId = _proyectoId;
@@ -68,6 +69,7 @@ class PlanosCubit extends Cubit<PlanosState> {
       final plano = await _importar(
         proyectoId: proyectoId,
         rutaArchivo: rutaArchivo,
+        bytesArchivo: bytesArchivo,
         nombre: nombre,
       );
       final mensaje = plano.warning != null
@@ -87,6 +89,11 @@ class PlanosCubit extends Cubit<PlanosState> {
     } on PlanoFormatoNoSoportadoException catch (e) {
       emit(PlanosError(
         e.toString(),
+        planos: actuales,
+      ));
+    } on PlanoStorageException catch (e) {
+      emit(PlanosError(
+        e.mensaje,
         planos: actuales,
       ));
     } on DioException catch (e) {

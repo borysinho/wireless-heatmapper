@@ -16,12 +16,14 @@ class ImportarPlanoUseCase {
 
   Future<Plano> call({
     required int proyectoId,
-    required String rutaArchivo,
+    String? rutaArchivo,
+    List<int>? bytesArchivo,
     String? nombre,
   }) {
     return _repository.importar(
       proyectoId: proyectoId,
       rutaArchivo: rutaArchivo,
+      bytesArchivo: bytesArchivo,
       nombre: nombre,
     );
   }

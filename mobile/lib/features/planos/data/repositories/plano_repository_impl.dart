@@ -17,12 +17,14 @@ class PlanoRepositoryImpl implements PlanoRepository {
   @override
   Future<Plano> importar({
     required int proyectoId,
-    required String rutaArchivo,
+    String? rutaArchivo,
+    List<int>? bytesArchivo,
     String? nombre,
   }) {
     return _remote.importar(
       proyectoId: proyectoId,
       rutaArchivo: rutaArchivo,
+      bytesArchivo: bytesArchivo,
       nombre: nombre,
     );
   }

@@ -36,12 +36,12 @@ class _PlanosListPageState extends State<PlanosListPage> {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['png', 'jpg', 'jpeg', 'pdf'],
-      withData: false,
+      withData: true,
     );
     if (result == null || result.files.isEmpty) return;
     final file = result.files.single;
     if (!mounted) return;
-    if (file.path == null) {
+    if (file.path == null && file.bytes == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -55,7 +55,7 @@ class _PlanosListPageState extends State<PlanosListPage> {
     }
 
     // Vista previa PDF antes de subir (Sp2-08 / PB-02).
-    if (file.path!.toLowerCase().endsWith('.pdf')) {
+    if (file.path != null && file.path!.toLowerCase().endsWith('.pdf')) {
       final confirmar = await showDialog<bool>(
         context: context,
         builder: (ctx) => _PdfPreviewDialog(
@@ -67,7 +67,8 @@ class _PlanosListPageState extends State<PlanosListPage> {
     }
 
     await context.read<PlanosCubit>().importarPlano(
-          rutaArchivo: file.path!,
+          rutaArchivo: file.path,
+          bytesArchivo: file.bytes,
           nombre: file.name,
         );
   }

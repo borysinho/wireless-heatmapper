@@ -16,6 +16,10 @@ mkdir -p certbot/conf certbot/www certbot/lib
 docker compose --env-file .env -f "$COMPOSE_FILE" pull
 docker compose --env-file .env -f "$COMPOSE_FILE" up -d db
 
+echo "Ajustando permisos del volumen de planos..."
+docker compose --env-file .env -f "$COMPOSE_FILE" run --rm --user root backend \
+  sh -c 'mkdir -p /var/lib/heatmapper/planos && chown -R appuser:appuser /var/lib/heatmapper/planos'
+
 echo "Aplicando migraciones Alembic..."
 docker compose --env-file .env -f "$COMPOSE_FILE" run --rm backend python -m alembic upgrade head
 

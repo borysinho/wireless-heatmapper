@@ -6,12 +6,15 @@ abstract class PlanoRepository {
   /// Lista los planos de un proyecto.
   Future<List<Plano>> listar(int proyectoId);
 
-  /// Importa un plano desde un archivo local.
-  /// [rutaArchivo] es la ruta absoluta en el filesystem del dispositivo.
+  /// Importa un plano desde un archivo local o desde bytes del selector.
+  /// [rutaArchivo] es la ruta absoluta en el filesystem del dispositivo, cuando
+  /// Android la expone. [bytesArchivo] evita depender de rutas de caché
+  /// inaccesibles en builds de producción.
   /// [nombre] es opcional; si es null se usa el nombre del archivo.
   Future<Plano> importar({
     required int proyectoId,
-    required String rutaArchivo,
+    String? rutaArchivo,
+    List<int>? bytesArchivo,
     String? nombre,
   });
 

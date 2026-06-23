@@ -90,6 +90,25 @@ void main() {
       expect(request.sendTimeout, PlanoRemoteDatasource.kUploadTimeout);
       expect(request.receiveTimeout, PlanoRemoteDatasource.kUploadTimeout);
     });
+
+    test('puede importar desde bytes sin depender de una ruta física',
+        () async {
+      final adapter = _CapturandoAdapter();
+      final dio = Dio(BaseOptions(baseUrl: 'https://example.test/api'))
+        ..httpClientAdapter = adapter;
+      final datasource = PlanoRemoteDatasource(dio);
+
+      await datasource.importar(
+        proyectoId: 10,
+        bytesArchivo: _pngMinimo,
+        nombre: 'plano.png',
+      );
+
+      final request = adapter.ultimaRequest!;
+      final formData = request.data as FormData;
+      expect(request.path, '/proyectos/10/planos');
+      expect(formData.files.single.value.filename, 'plano.png');
+    });
   });
 }
 

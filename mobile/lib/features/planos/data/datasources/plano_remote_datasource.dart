@@ -34,31 +34,27 @@ class PlanoRemoteDatasource {
   /// Importa un plano. Valida tamaño y formato antes de enviar.
   Future<PlanoModel> importar({
     required int proyectoId,
-    required String rutaArchivo,
+    String? rutaArchivo,
+    List<int>? bytesArchivo,
     String? nombre,
   }) async {
-    final file = File(rutaArchivo);
-    if (!await file.exists()) {
-      throw const PlanoStorageException('El archivo no existe.');
-    }
-
-    final tamano = await file.length();
-    if (tamano > kMaxBytes) {
-      throw PlanoArchivoMuyGrandeException(tamano);
-    }
-
-    final ext = _extension(rutaArchivo);
+    final nombreArchivo =
+        _nombreArchivo(nombre: nombre, rutaArchivo: rutaArchivo);
+    final ext = _extension(nombreArchivo);
     if (!kFormatosPermitidos.contains(ext)) {
       throw PlanoFormatoNoSoportadoException(ext);
     }
 
-    final filename = _basename(rutaArchivo);
+    final tamano = bytesArchivo?.length ?? await _tamanoDesdeRuta(rutaArchivo);
+    if (tamano > kMaxBytes) {
+      throw PlanoArchivoMuyGrandeException(tamano);
+    }
+
     final formData = FormData.fromMap({
       if (nombre != null && nombre.isNotEmpty) 'nombre': nombre,
-      'archivo': await MultipartFile.fromFile(
-        rutaArchivo,
-        filename: filename,
-      ),
+      'archivo': bytesArchivo != null
+          ? MultipartFile.fromBytes(bytesArchivo, filename: nombreArchivo)
+          : await _multipartDesdeRuta(rutaArchivo, nombreArchivo),
     });
 
     try {
@@ -130,6 +126,21 @@ class PlanoRemoteDatasource {
         ? (e.response!.data['detail']?.toString() ?? '')
         : '';
 
+    if (status == null) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        throw const PlanoStorageException(
+          'La conexión tardó demasiado al comunicarse con el servidor.',
+        );
+      }
+      if (e.type == DioExceptionType.connectionError) {
+        throw const PlanoStorageException(
+          'No se pudo conectar con el servidor de producción.',
+        );
+      }
+    }
+
     if (status == 404 && planoId != null) {
       throw PlanoNoEncontradoException(planoId);
     }
@@ -156,6 +167,12 @@ class PlanoRemoteDatasource {
         throw const PlanoPuntosInvalidosException();
       }
     }
+    if (detail.isNotEmpty) {
+      throw PlanoStorageException(detail);
+    }
+    if (status != null) {
+      throw PlanoStorageException('El servidor respondió HTTP $status.');
+    }
   }
 
   /// Devuelve la extensión sin punto y en minúsculas (vacío si no tiene).
@@ -170,5 +187,57 @@ class PlanoRemoteDatasource {
   static String _basename(String ruta) {
     final i = ruta.lastIndexOf(RegExp(r'[\\/]'));
     return i < 0 ? ruta : ruta.substring(i + 1);
+  }
+
+  static String _nombreArchivo({String? nombre, String? rutaArchivo}) {
+    if (nombre != null && nombre.trim().isNotEmpty) {
+      return nombre.trim();
+    }
+    if (rutaArchivo != null && rutaArchivo.trim().isNotEmpty) {
+      return _basename(rutaArchivo);
+    }
+    throw const PlanoStorageException('No se pudo identificar el archivo.');
+  }
+
+  static Future<int> _tamanoDesdeRuta(String? rutaArchivo) async {
+    if (rutaArchivo == null || rutaArchivo.isEmpty) {
+      throw const PlanoStorageException(
+          'No se pudo acceder al archivo seleccionado.');
+    }
+    try {
+      final file = File(rutaArchivo);
+      if (!await file.exists()) {
+        throw const PlanoStorageException(
+          'No se pudo acceder al archivo seleccionado.',
+        );
+      }
+      return file.length();
+    } on PlanoStorageException {
+      rethrow;
+    } catch (_) {
+      throw const PlanoStorageException(
+        'No se pudo leer el archivo seleccionado.',
+      );
+    }
+  }
+
+  static Future<MultipartFile> _multipartDesdeRuta(
+    String? rutaArchivo,
+    String nombreArchivo,
+  ) async {
+    if (rutaArchivo == null || rutaArchivo.isEmpty) {
+      throw const PlanoStorageException(
+          'No se pudo acceder al archivo seleccionado.');
+    }
+    try {
+      return await MultipartFile.fromFile(
+        rutaArchivo,
+        filename: nombreArchivo,
+      );
+    } catch (_) {
+      throw const PlanoStorageException(
+        'No se pudo preparar el archivo seleccionado para subirlo.',
+      );
+    }
   }
 }
