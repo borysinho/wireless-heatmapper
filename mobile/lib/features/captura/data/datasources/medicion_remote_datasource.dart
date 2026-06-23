@@ -186,13 +186,41 @@ class MedicionRemoteDatasource {
 
   static String _mensajeDesdeError(DioException e) {
     final status = e.response?.statusCode;
+    final path = e.requestOptions.path;
+    if ((status == 404 || status == 405) &&
+        path.contains('/poligono-interes')) {
+      return 'El servidor de producción no tiene habilitado el guardado de polígonos. Actualiza el backend.';
+    }
     if (status == 422) {
-      final detail = e.response?.data?['detail'];
-      if (detail is String) return detail;
-      return 'Datos inválidos en la solicitud.';
+      final mensaje = _detalleDesdeRespuesta(e.response?.data);
+      return mensaje ?? 'Datos inválidos en la solicitud.';
     }
     if (status == 404) return 'Recurso no encontrado.';
     if (status == 401) return 'Sesión expirada.';
+    if (status == 403) return 'No tienes permisos para modificar este recurso.';
+    if (status != null && status >= 500) {
+      return 'El servidor no pudo procesar la solicitud.';
+    }
     return 'Error de red. Reintenta.';
+  }
+
+  static String? _detalleDesdeRespuesta(dynamic data) {
+    if (data is! Map<String, dynamic>) return null;
+    final detail = data['detail'];
+    if (detail is String && detail.trim().isNotEmpty) return detail;
+    if (detail is List && detail.isNotEmpty) {
+      final mensajes = detail
+          .map((item) {
+            if (item is Map<String, dynamic>) {
+              return item['msg']?.toString();
+            }
+            return item.toString();
+          })
+          .whereType<String>()
+          .where((mensaje) => mensaje.trim().isNotEmpty)
+          .toList();
+      if (mensajes.isNotEmpty) return mensajes.join(' ');
+    }
+    return null;
   }
 }

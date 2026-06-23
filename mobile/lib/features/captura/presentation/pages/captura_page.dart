@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_tokens.dart';
 import '../../domain/entities/punto_medicion.dart';
+import '../../domain/repositories/captura_repository.dart';
 import '../../../planos/domain/entities/plano.dart';
 import '../cubit/captura_cubit.dart';
 import '../cubit/captura_state.dart';
@@ -264,14 +265,17 @@ class _CapturaPageState extends State<CapturaPage> {
         ..showSnackBar(
           const SnackBar(content: Text('Polígono de interés guardado.')),
         );
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() => _guardandoPoligono = false);
+      final mensaje = e is CapturaApiException
+          ? e.mensaje
+          : 'No se pudo guardar el polígono.';
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
         ..showSnackBar(
           SnackBar(
-            content: const Text('No se pudo guardar el polígono.'),
+            content: Text(mensaje),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );

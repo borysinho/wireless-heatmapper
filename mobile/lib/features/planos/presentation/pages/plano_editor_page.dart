@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../captura/domain/entities/punto_medicion.dart';
+import '../../../captura/domain/repositories/captura_repository.dart';
 import '../../../captura/presentation/cubit/captura_cubit.dart';
 import '../../../captura/presentation/cubit/captura_state.dart';
 import '../../../captura/presentation/widgets/plano_puntos_painter.dart';
@@ -351,14 +352,17 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
         ..showSnackBar(
           const SnackBar(content: Text('Polígono de interés guardado.')),
         );
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() => _guardandoPoligono = false);
+      final mensaje = e is CapturaApiException
+          ? e.mensaje
+          : 'No se pudo guardar el polígono.';
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
         ..showSnackBar(
           SnackBar(
-            content: const Text('No se pudo guardar el polígono.'),
+            content: Text(mensaje),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
