@@ -1,7 +1,64 @@
 import { defineConfig } from "vitest/config";
 import { loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
-import { resolve } from "path";
+import { existsSync, readFileSync, statSync } from "fs";
+import { extname, join, resolve } from "path";
+
+const tiposContenido: Record<string, string> = {
+  ".css": "text/css; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".svg": "image/svg+xml",
+};
+
+function servirManualUsuarioDev() {
+  const manualRoot = resolve(__dirname, "../manual-usuario");
+
+  return {
+    name: "manual-usuario-dev",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ?? "";
+        const pathname = decodeURIComponent(new URL(url, "http://localhost").pathname);
+
+        if (pathname === "/manual") {
+          res.statusCode = 302;
+          res.setHeader("Location", "/manual/");
+          res.end();
+          return;
+        }
+
+        if (!pathname.startsWith("/manual/")) {
+          next();
+          return;
+        }
+
+        const relativo = pathname.replace(/^\/manual\/?/, "") || "index.html";
+        let archivo = resolve(manualRoot, relativo);
+
+        if (!archivo.startsWith(manualRoot)) {
+          res.statusCode = 403;
+          res.end("Ruta no permitida.");
+          return;
+        }
+
+        if (existsSync(archivo) && statSync(archivo).isDirectory()) {
+          archivo = join(archivo, "index.html");
+        }
+
+        if (!existsSync(archivo)) {
+          archivo = join(manualRoot, "index.html");
+        }
+
+        res.setHeader(
+          "Content-Type",
+          tiposContenido[extname(archivo)] ?? "application/octet-stream",
+        );
+        res.end(readFileSync(archivo));
+      });
+    },
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -13,7 +70,7 @@ export default defineConfig(({ mode }) => {
   const proxyTarget = env.VITE_PROXY_TARGET ?? "http://localhost:8000";
 
   return {
-    plugins: [react()],
+    plugins: [react(), servirManualUsuarioDev()],
     resolve: {
       alias: {
         "@": resolve(__dirname, "src"),
