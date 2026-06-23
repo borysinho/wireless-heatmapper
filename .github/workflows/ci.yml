@@ -1,14 +1,27 @@
 # CI — Wireless HeatMapper
 # Sprint 1 — DoD ítem 5: pipeline de integración continua
-# Ejecuta en cada push a main/develop y en PRs hacia main.
+# Ejecuta backend y web en develop y en PRs hacia main.
+# La app móvil se valida localmente; no tiene despliegue contemplado en Actions.
 
 name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [develop]
+    paths:
+      - "backend/**"
+      - "web/**"
+      - ".github/workflows/ci.yml"
   pull_request:
     branches: [main]
+    paths:
+      - "backend/**"
+      - "web/**"
+      - ".github/workflows/ci.yml"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # ─────────────────────────────────────────────────────────────────
@@ -77,45 +90,3 @@ jobs:
 
       - name: Ejecutar tests Vitest
         run: npm test
-
-  # ─────────────────────────────────────────────────────────────────
-  mobile:
-    name: Mobile Flutter (flutter test + APK)
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configurar Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: "3.x"
-          channel: stable
-          cache: true
-
-      - name: Obtener dependencias
-        working-directory: mobile
-        run: flutter pub get
-
-      - name: Verificar formato
-        working-directory: mobile
-        run: dart format --set-exit-if-changed .
-
-      - name: Análisis estático
-        working-directory: mobile
-        run: flutter analyze
-
-      - name: Ejecutar tests unitarios y de widget
-        working-directory: mobile
-        run: flutter test --reporter compact
-
-      - name: Construir APK (DoD ítem 5)
-        working-directory: mobile
-        run: flutter build apk --release --no-tree-shake-icons --dart-define-from-file=dart-defines/release.json
-
-      - name: Subir APK como artefacto
-        uses: actions/upload-artifact@v4
-        with:
-          name: heatmapper-apk
-          path: mobile/build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 14
