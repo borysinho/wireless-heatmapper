@@ -29,6 +29,10 @@ if [[ -d certbot/conf/live ]]; then
 fi
 
 docker compose --env-file .env -f "$COMPOSE_FILE" up -d --remove-orphans
+
+echo "Reiniciando Nginx para refrescar upstreams de Docker..."
+docker compose --env-file .env -f "$COMPOSE_FILE" restart nginx
+
 docker image prune -f
 
 echo "Estado de servicios:"
