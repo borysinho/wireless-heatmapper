@@ -42,13 +42,13 @@ from app.schemas.escenario import (
     ResumenComparacionOut,
     ValorProyectadoPuntoOut,
 )
+from app.services.geometria_service import mascara_poligono
 from app.services.interpolacion_service import (
     ESCALA_CWNA,
     HeatmapImageService,
     InterpolacionService,
     PuntoRSSI,
 )
-from app.services.geometria_service import mascara_poligono
 from app.services.reporte_service import ReporteService
 from app.storage import LocalFilesystemStorage, generar_url_firmada, verificar_firma
 
@@ -442,7 +442,8 @@ def _requerir_poligono_interes(plano: Plano) -> list[dict]:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=(
-                "Debe definir un polígono de interés antes de generar recomendaciones IA."
+                "Debe definir un polígono de interés antes de generar "
+                "recomendaciones IA."
             ),
         )
     return poligono

@@ -278,6 +278,55 @@ def test_recalibrar_sin_puntos_permitido(client, tecnico_token):
     assert r2.json()["distancia_real_m"] == 10
 
 
+def test_guardar_poligono_interes(client, tecnico_token):
+    pid = _crear_proyecto(client, tecnico_token)
+    plano = _subir_plano(client, tecnico_token, pid)
+    puntos = [
+        {"x": 10, "y": 10},
+        {"x": 180, "y": 10},
+        {"x": 180, "y": 120},
+        {"x": 10, "y": 120},
+    ]
+    r = client.patch(
+        f"/planos/{plano['id']}/poligono-interes",
+        json={"puntos": puntos},
+        headers={"Authorization": f"Bearer {tecnico_token}"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["poligono_interes"] == [
+        {"x": float(punto["x"]), "y": float(punto["y"])}
+        for punto in puntos
+    ]
+
+    detalle = client.get(
+        f"/planos/{plano['id']}",
+        headers={"Authorization": f"Bearer {tecnico_token}"},
+    )
+    assert detalle.status_code == 200, detalle.text
+    assert detalle.json()["poligono_interes"] == body["poligono_interes"]
+
+
+def test_guardar_poligono_interes_fuera_del_plano_falla(client, tecnico_token):
+    pid = _crear_proyecto(client, tecnico_token)
+    plano = _subir_plano(client, tecnico_token, pid)
+    r = client.patch(
+        f"/planos/{plano['id']}/poligono-interes",
+        json={
+            "puntos": [
+                {"x": 10, "y": 10},
+                {"x": 1200, "y": 10},
+                {"x": 10, "y": 120},
+            ]
+        },
+        headers={"Authorization": f"Bearer {tecnico_token}"},
+    )
+    assert r.status_code == 422
+    assert r.json()["detail"] == (
+        "Todos los vértices deben estar dentro de los límites del plano."
+    )
+
+
 def test_eliminar_plano(client, tecnico_token):
     pid = _crear_proyecto(client, tecnico_token)
     plano = _subir_plano(client, tecnico_token, pid)
