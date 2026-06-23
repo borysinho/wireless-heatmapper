@@ -1,0 +1,125 @@
+name: Mobile Release
+
+on:
+  push:
+    tags:
+      - "mobile-v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag de release. Si se deja vacío, se genera desde pubspec + número de ejecución."
+        required: false
+        default: ""
+      prerelease:
+        description: "Marcar como pre-release"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mobile-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publicar-apk:
+    name: Construir APK y publicar en GitHub Releases
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.x"
+          channel: stable
+          cache: true
+
+      - name: Instalar dependencias
+        run: flutter pub get
+        working-directory: mobile
+
+      - name: Analizar código móvil
+        run: flutter analyze
+        working-directory: mobile
+
+      - name: Ejecutar pruebas móviles
+        run: flutter test --reporter compact
+        working-directory: mobile
+
+      - name: Construir APK release
+        run: flutter build apk --release --dart-define-from-file=dart-defines/release.json
+        working-directory: mobile
+
+      - name: Preparar metadatos de release
+        id: metadata
+        shell: bash
+        env:
+          RELEASE_TAG_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || '' }}
+        run: |
+          set -euo pipefail
+          VERSION="$(awk '/^version:/ {print $2}' mobile/pubspec.yaml | cut -d+ -f1)"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            TAG="${GITHUB_REF_NAME}"
+          elif [[ -n "${RELEASE_TAG_INPUT}" ]]; then
+            TAG="${RELEASE_TAG_INPUT}"
+          else
+            TAG="mobile-v${VERSION}-${GITHUB_RUN_NUMBER}"
+          fi
+          APK_NAME="WirelessHeatMapper-${TAG}.apk"
+          mkdir -p mobile/build/release
+          cp mobile/build/app/outputs/flutter-apk/app-release.apk "mobile/build/release/${APK_NAME}"
+          {
+            echo "tag=${TAG}"
+            echo "apk_name=${APK_NAME}"
+            echo "apk_path=mobile/build/release/${APK_NAME}"
+            echo "version=${VERSION}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Generar notas de release
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' \
+            "APK Android de Wireless HeatMapper compilado en modo producción." \
+            "" \
+            "Configuración incluida:" \
+            "- Backend: \`https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/api\`" \
+            "- Modalidad: 100 % en línea" \
+            "- Persistencia de dominio: backend PostgreSQL" \
+            > release-notes.md
+
+      - name: Publicar APK en GitHub Releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.metadata.outputs.tag }}
+          APK_PATH: ${{ steps.metadata.outputs.apk_path }}
+          VERSION: ${{ steps.metadata.outputs.version }}
+          PRERELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease || false }}
+        run: |
+          set -euo pipefail
+          PRERELEASE_FLAG=()
+          if [[ "${PRERELEASE}" == "true" ]]; then
+            PRERELEASE_FLAG=(--prerelease)
+          fi
+
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" "${APK_PATH}" --clobber
+          else
+            gh release create "${TAG}" "${APK_PATH}" \
+              --target "${GITHUB_SHA}" \
+              --title "Wireless HeatMapper Mobile ${VERSION}" \
+              --notes-file release-notes.md \
+              "${PRERELEASE_FLAG[@]}"
+          fi
+
+      - name: Subir APK como artefacto de Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.metadata.outputs.apk_name }}
+          path: ${{ steps.metadata.outputs.apk_path }}
+          retention-days: 14

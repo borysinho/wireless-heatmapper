@@ -1,7 +1,7 @@
 # CI — Wireless HeatMapper
 # Sprint 1 — DoD ítem 5: pipeline de integración continua
 # Ejecuta backend y web en develop y en PRs hacia main.
-# La app móvil se valida localmente; no tiene despliegue contemplado en Actions.
+# La app móvil no corre en CI regular; se publica sólo con Mobile Release.
 
 name: CI
 

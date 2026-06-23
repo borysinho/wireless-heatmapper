@@ -38,6 +38,30 @@ flutter run --dart-define-from-file=dart-defines/debug-produccion.json
 flutter build apk --release --dart-define-from-file=dart-defines/release.json
 ```
 
+## Publicación en GitHub Releases
+
+La app móvil no se despliega en servidor. El APK de producción se publica como
+asset en GitHub Releases mediante el workflow **Mobile Release**.
+
+Formas de publicar:
+
+```bash
+# Opción recomendada: crear un tag móvil y subirlo
+git tag mobile-v1.0.0
+git push origin mobile-v1.0.0
+```
+
+También se puede ejecutar manualmente desde GitHub Actions → **Mobile Release**,
+indicando un `release_tag` como `mobile-v1.0.0`.
+
+El workflow compila con:
+
+```bash
+flutter build apk --release --dart-define-from-file=dart-defines/release.json
+```
+
+El archivo publicado queda con el nombre `WirelessHeatMapper-<tag>.apk`.
+
 ## Arquitectura
 
 ```
