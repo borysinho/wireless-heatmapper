@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="620" viewBox="0 0 720 620" role="img" aria-label="App movil tecnica">
+  <rect width="720" height="620" rx="8" fill="#F2F6FA"/>
+  <g>
+    <rect x="70" y="48" width="242" height="524" rx="34" fill="#17202A"/>
+    <rect x="88" y="78" width="206" height="464" rx="18" fill="#FFFFFF"/>
+    <rect x="108" y="104" width="166" height="48" rx="8" fill="#2980B9"/>
+    <text x="128" y="134" font-family="Arial" font-size="18" font-weight="700" fill="#FFFFFF">Mis Proyectos</text>
+    <rect x="108" y="174" width="166" height="34" rx="8" fill="#F2F6FA"/>
+    <rect x="108" y="228" width="166" height="74" rx="8" fill="#EBF5FB" stroke="#D9E2EC"/>
+    <rect x="108" y="318" width="166" height="74" rx="8" fill="#EBF5FB" stroke="#D9E2EC"/>
+    <rect x="108" y="408" width="166" height="74" rx="8" fill="#EBF5FB" stroke="#D9E2EC"/>
+    <circle cx="250" cy="496" r="23" fill="#2980B9"/>
+    <path d="M250 484v24M238 496h24" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <g>
+    <rect x="396" y="48" width="242" height="524" rx="34" fill="#17202A"/>
+    <rect x="414" y="78" width="206" height="464" rx="18" fill="#FFFFFF"/>
+    <rect x="434" y="104" width="166" height="48" rx="8" fill="#2980B9"/>
+    <text x="454" y="134" font-family="Arial" font-size="18" font-weight="700" fill="#FFFFFF">Captura WiFi</text>
+    <rect x="434" y="174" width="166" height="228" rx="8" fill="#FFFDE7" stroke="#D9E2EC"/>
+    <path d="M458 350L492 214L570 256L548 368Z" fill="#EBF5FB" stroke="#2980B9" stroke-width="3"/>
+    <circle cx="484" cy="292" r="10" fill="#188F67"/>
+    <circle cx="528" cy="238" r="10" fill="#B7791F"/>
+    <circle cx="558" cy="330" r="10" fill="#C2413B"/>
+    <circle cx="496" cy="364" r="8" fill="#2980B9"/>
+    <rect x="434" y="424" width="74" height="34" rx="8" fill="#188F67"/>
+    <rect x="526" y="424" width="74" height="34" rx="8" fill="#2980B9"/>
+    <rect x="434" y="474" width="166" height="36" rx="8" fill="#F2F6FA"/>
+  </g>
+  <path d="M320 310H386" stroke="#2980B9" stroke-width="5" stroke-linecap="round"/>
+  <path d="M368 294L388 310L368 326" fill="none" stroke="#2980B9" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

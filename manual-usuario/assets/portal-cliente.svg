@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="560" viewBox="0 0 920 560" role="img" aria-label="Portal cliente">
+  <rect width="920" height="560" rx="8" fill="#FFFFFF"/>
+  <rect x="30" y="30" width="860" height="500" rx="8" fill="#F2F6FA" stroke="#D9E2EC"/>
+  <text x="62" y="78" font-family="Arial" font-size="16" font-weight="700" fill="#2980B9">Bulldog Tech.</text>
+  <text x="62" y="114" font-family="Arial" font-size="30" font-weight="700" fill="#17202A">Portal ejecutivo de cobertura WiFi</text>
+  <rect x="702" y="72" width="140" height="38" rx="8" fill="#2980B9"/>
+  <text x="732" y="96" font-family="Arial" font-size="14" font-weight="700" fill="#FFFFFF">Reporte PDF</text>
+  <g fill="#FFFFFF" stroke="#D9E2EC">
+    <rect x="62" y="146" width="184" height="76" rx="8"/>
+    <rect x="262" y="146" width="184" height="76" rx="8"/>
+    <rect x="462" y="146" width="184" height="76" rx="8"/>
+    <rect x="662" y="146" width="184" height="76" rx="8"/>
+  </g>
+  <g font-family="Arial" fill="#17202A" text-anchor="middle">
+    <text x="154" y="176" font-size="14">Planos</text><text x="154" y="202" font-size="26" font-weight="700">2</text>
+    <text x="354" y="176" font-size="14">Conjuntos reales</text><text x="354" y="202" font-size="26" font-weight="700">4</text>
+    <text x="554" y="176" font-size="14">Subconjuntos IA</text><text x="554" y="202" font-size="26" font-weight="700">3</text>
+    <text x="754" y="176" font-size="14">Escenarios IA</text><text x="754" y="202" font-size="26" font-weight="700">3</text>
+  </g>
+  <rect x="62" y="254" width="520" height="238" rx="8" fill="#FFFFFF" stroke="#D9E2EC"/>
+  <rect x="94" y="294" width="456" height="160" rx="8" fill="#FFFDE7"/>
+  <circle cx="206" cy="364" r="58" fill="#188F67" opacity="0.52"/>
+  <circle cx="316" cy="350" r="76" fill="#B7791F" opacity="0.36"/>
+  <circle cx="432" cy="386" r="62" fill="#C2413B" opacity="0.38"/>
+  <rect x="612" y="254" width="234" height="238" rx="8" fill="#FFFFFF" stroke="#D9E2EC"/>
+  <text x="638" y="292" font-family="Arial" font-size="20" font-weight="700" fill="#17202A">Generacion</text>
+  <rect x="638" y="320" width="182" height="34" rx="8" fill="#F2F6FA"/>
+  <rect x="638" y="374" width="78" height="34" rx="8" fill="#2980B9"/>
+  <rect x="728" y="374" width="92" height="34" rx="8" fill="#EBF5FB"/>
+  <rect x="638" y="428" width="182" height="38" rx="8" fill="#188F67"/>
+  <text x="682" y="452" font-family="Arial" font-size="14" font-weight="700" fill="#FFFFFF">Generar heatmap</text>
+</svg>

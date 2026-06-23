@@ -6,6 +6,7 @@ on:
     paths:
       - "backend/**"
       - "web/**"
+      - "manual-usuario/**"
       - "nginx/**"
       - "scripts/deploy/**"
       - "docker-compose.prod.yml"
@@ -31,10 +32,11 @@ env:
   OWNER: ${{ github.repository_owner }}
   BACKEND_IMAGE: ghcr.io/${{ github.repository_owner }}/wireless-heatmapper-backend
   WEB_IMAGE: ghcr.io/${{ github.repository_owner }}/wireless-heatmapper-web
+  MANUAL_IMAGE: ghcr.io/${{ github.repository_owner }}/wireless-heatmapper-manual
 
 jobs:
   construir-y-desplegar:
-    name: Validar backend/web, construir imagenes y actualizar VM
+    name: Validar backend/web/manual, construir imagenes y actualizar VM
     runs-on: ubuntu-latest
 
     steps:
@@ -120,6 +122,15 @@ jobs:
           tags: |
             ghcr.io/${{ env.OWNER_LC }}/wireless-heatmapper-web:latest
             ghcr.io/${{ env.OWNER_LC }}/wireless-heatmapper-web:${{ env.COMMIT_SHA }}
+
+      - name: Construir y publicar manual
+        uses: docker/build-push-action@v6
+        with:
+          context: manual-usuario
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER_LC }}/wireless-heatmapper-manual:latest
+            ghcr.io/${{ env.OWNER_LC }}/wireless-heatmapper-manual:${{ env.COMMIT_SHA }}
 
       - name: Copiar archivos de despliegue a la VM
         uses: appleboy/scp-action@v0.1.7

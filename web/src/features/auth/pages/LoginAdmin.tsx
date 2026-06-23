@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Radio } from "lucide-react";
+import { BookOpen, Eye, EyeOff, Radio } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import { Button } from "@/shared/components";
 import styles from "./LoginAdmin.module.css";
@@ -41,6 +41,7 @@ export default function LoginAdmin() {
   };
 
   const mensajeError = errLocal ?? error;
+  const urlManual = import.meta.env.VITE_MANUAL_USUARIO_URL ?? "/manual/";
 
   return (
     <div className={styles.container}>
@@ -113,6 +114,11 @@ export default function LoginAdmin() {
             {isLoading ? "Iniciando sesión…" : "Iniciar sesión"}
           </Button>
         </form>
+
+        <a className={styles.enlaceManual} href={urlManual} target="_blank" rel="noreferrer">
+          <BookOpen size={16} aria-hidden="true" />
+          Abrir manual de usuario
+        </a>
       </div>
     </div>
   );

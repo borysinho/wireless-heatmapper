@@ -118,6 +118,24 @@
   margin-top: 1rem;
 }
 
+.enlaceManual {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 1rem;
+  color: var(--color-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.enlaceManual:hover {
+  color: var(--color-primary-hover);
+  text-decoration: underline;
+}
+
 /* Responsive */
 @media (max-width: 480px) {
   .card {

@@ -72,6 +72,12 @@ services:
       - heatmapper-net
     restart: unless-stopped
 
+  manual:
+    image: ghcr.io/${GHCR_OWNER}/wireless-heatmapper-manual:${IMAGE_TAG:-latest}
+    networks:
+      - heatmapper-net
+    restart: unless-stopped
+
   nginx:
     image: nginx:1.27-alpine
     ports:
@@ -84,6 +90,7 @@ services:
     depends_on:
       - backend
       - web
+      - manual
     networks:
       - heatmapper-net
     restart: unless-stopped

@@ -11,12 +11,14 @@ on:
     paths:
       - "backend/**"
       - "web/**"
+      - "manual-usuario/**"
       - ".github/workflows/ci.yml"
   pull_request:
     branches: [main]
     paths:
       - "backend/**"
       - "web/**"
+      - "manual-usuario/**"
       - ".github/workflows/ci.yml"
 
 concurrency:
@@ -90,3 +92,14 @@ jobs:
 
       - name: Ejecutar tests Vitest
         run: npm test
+
+  # ─────────────────────────────────────────────────────────────────
+  manual:
+    name: Manual de usuario (Docker build)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Construir imagen estatica del manual
+        run: docker build -t wireless-heatmapper-manual:ci manual-usuario
