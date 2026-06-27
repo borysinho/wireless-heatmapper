@@ -13,7 +13,7 @@ La base de datos está organizada alrededor de `proyecto`. Un administrador crea
 Las mediciones reales quedan separadas de las proyecciones IA:
 
 - `punto_medicion` y `medicion_wifi` guardan observaciones capturadas desde Android.
-- `instantanea_configuracion_rf` contextualiza una medición cuando se conoce la configuración del radio.
+- `ap_fisico`, `radio_ap` y `bssid_radio` describen el inventario RF necesario para calibración y escenarios IA.
 - `escenario_optimizado`, `recomendacion_ap` y `valor_proyectado_punto` guardan propuestas y predicciones sin modificar la medición real.
 
 ---
@@ -150,7 +150,6 @@ package "Proyecto, planos y captura" {
     frecuencia_mhz : INTEGER
     nivel : nivel_senal <<NOT NULL>>
     numero_lectura : INTEGER <<DEFAULT 1>>
-    instantanea_rf_id : INTEGER <<FK, NULL>>
     created_at : TIMESTAMPTZ
   }
 }
@@ -251,8 +250,6 @@ package "Inventario RF físico" {
     coord_y : FLOAT <<NOT NULL>>
     altura_m : FLOAT <<DEFAULT 2.5>>
     tipo_montaje : VARCHAR(30) <<DEFAULT 'TECHO'>>
-    costo_referencial : FLOAT
-    procedencia : VARCHAR(30) <<DEFAULT 'INGRESADA_TECNICO'>>
     verificado : BOOLEAN <<DEFAULT false>>
     created_at : TIMESTAMPTZ
     updated_at : TIMESTAMPTZ
@@ -266,23 +263,12 @@ package "Inventario RF físico" {
     habilitada : BOOLEAN <<DEFAULT true>>
     canal : INTEGER <<NOT NULL>>
     ancho_canal_mhz : INTEGER <<DEFAULT 20>>
-    potencia_original : FLOAT <<NOT NULL>>
-    unidad_potencia_original : VARCHAR(10) <<DEFAULT 'DBM'>>
     referencia_potencia : VARCHAR(15) <<DEFAULT 'IR'>>
     potencia_dbm : FLOAT <<NOT NULL>>
     potencia_max_dbm : FLOAT <<NOT NULL>>
-    modo_gestion_rf : VARCHAR(15) <<DEFAULT 'ESTATICO'>>
-    dfs_permitido : BOOLEAN <<DEFAULT false>>
-    dominio_regulatorio : VARCHAR(10) <<DEFAULT 'BO'>>
     tipo_antena : VARCHAR(30) <<DEFAULT 'OMNIDIRECCIONAL'>>
-    modelo_antena : VARCHAR(120)
     ganancia_dbi : FLOAT <<DEFAULT 2.14>>
-    beamwidth_horizontal : FLOAT <<DEFAULT 360.0>>
-    beamwidth_vertical : FLOAT <<DEFAULT 60.0>>
-    azimut_grados : FLOAT <<DEFAULT 0.0>>
-    inclinacion_grados : FLOAT <<DEFAULT 0.0>>
     perdida_cable_db : FLOAT <<DEFAULT 0.0>>
-    procedencia : VARCHAR(30)
     created_at : TIMESTAMPTZ
   }
 
@@ -292,18 +278,6 @@ package "Inventario RF físico" {
     radio_id : INTEGER <<FK, NOT NULL>>
     bssid : VARCHAR(17) <<UNIQUE, NOT NULL>>
     ssid : VARCHAR(255) <<NOT NULL>>
-    observado : BOOLEAN <<DEFAULT true>>
-    procedencia : VARCHAR(30) <<DEFAULT 'DETECTADA_ANDROID'>>
-  }
-
-  entity "instantanea_configuracion_rf" as INSTANTANEA_RF {
-    * id : INTEGER <<PK>>
-    --
-    radio_id : INTEGER <<FK, NULL>>
-    datos : JSON <<NOT NULL>>
-    procedencia : VARCHAR(30) <<NOT NULL>>
-    completitud : FLOAT <<NOT NULL>>
-    capturada_en : TIMESTAMPTZ
   }
 }
 
@@ -410,7 +384,6 @@ PROYECTO ||--o{ TOKEN_CLIENTE : "proyecto_id"
 
 PLANO ||--o{ PUNTO : "plano_id"
 PUNTO ||--o{ MEDICION : "punto_id"
-INSTANTANEA_RF "0..1" -- "0..*" MEDICION : "instantanea_rf_id"
 
 PLANO ||--o{ CONJUNTO : "plano_id"
 CONJUNTO ||--o{ CONJUNTO_ITEM : "conjunto_ap_id"
@@ -422,7 +395,6 @@ ANALISIS ||--o{ AP_DETECTADO : "analisis_id"
 PLANO ||--o{ AP_FISICO : "plano_id"
 AP_FISICO ||--o{ RADIO : "ap_fisico_id"
 RADIO ||--o{ BSSID_RADIO : "radio_id"
-RADIO "0..1" -- "0..*" INSTANTANEA_RF : "radio_id"
 
 PLANO ||--o{ ESCENARIO : "plano_id"
 MAPA "0..1" -- "0..*" ESCENARIO : "mapa_actual/proyectado"
@@ -564,7 +536,6 @@ entity "plano" as PLANO
 entity "ap_fisico" as APF
 entity "radio_ap" as RADIO
 entity "bssid_radio" as BSSID
-entity "instantanea_configuracion_rf" as SNAP
 entity "medicion_wifi" as MEDICION
 entity "escenario_optimizado" as ESC
 entity "recomendacion_ap" as REC
@@ -575,9 +546,8 @@ entity "reporte" as REPORTE
 
 PLANO ||--o{ APF : "inventario físico"
 APF ||--o{ RADIO : "radios por banda"
-RADIO ||--o{ BSSID : "BSSID declarados/observados"
-RADIO "0..1" -- "0..*" SNAP : "configuración inmutable"
-SNAP "0..1" -- "0..*" MEDICION : "contexto de captura"
+RADIO ||--o{ BSSID : "BSSID declarados"
+BSSID "0..1" -- "0..*" MEDICION : "lecturas observadas"
 
 PLANO ||--o{ ESC : "escenario IA"
 MAPA "0..1" -- "0..*" ESC : "actual/proyectado"
@@ -587,10 +557,10 @@ ESC ||--o{ VALOR : "predice por punto"
 PUNTO ||--o{ VALOR : "punto real"
 ESC "0..1" -- "0..*" REPORTE : "PDF técnico"
 
-note bottom of SNAP
-  Es una fotografía de configuración RF.
-  Evita que cambios posteriores en radio_ap
-  alteren el contexto histórico de mediciones.
+note bottom of RADIO
+  La calibración IA usa banda, potencia,
+  ganancia y pérdida de cable. Los parámetros
+  no leídos durante survey fueron podados.
 end note
 
 note bottom of ESC
@@ -613,7 +583,7 @@ end note
 | `proyecto`                | `INDEX(tecnico_id)`, `INDEX(cliente_id)`                           | Listados por técnico y cliente                 |
 | `plano`                   | `UNIQUE(ruta_storage)`, `INDEX(proyecto_id)`                       | Archivos de plano por proyecto                 |
 | `punto_medicion`          | `INDEX(plano_id)`                                                  | Consulta de puntos para captura y heatmap      |
-| `medicion_wifi`           | `INDEX(punto_id)`, `INDEX(instantanea_rf_id)`                      | Lecturas por punto y contexto RF               |
+| `medicion_wifi`           | `INDEX(punto_id)`                                                  | Lecturas por punto                             |
 | `conjunto_ap`             | `UNIQUE(plano_id, nombre)`                                         | Conjuntos nombrados por plano                  |
 | `conjunto_ap_item`        | `UNIQUE(conjunto_ap_id, bssid)`, `INDEX(bssid)`                    | Evitar AP duplicado dentro del conjunto        |
 | `mapa_calor`              | `UNIQUE(plano_id, algoritmo, resolucion, firma_mediciones)`        | Cache de heatmaps reproducibles                |
@@ -643,8 +613,6 @@ end note
 | `plano` → `ap_fisico`                         | `ON DELETE CASCADE`             | Borrar plano elimina inventario RF del plano          |
 | `ap_fisico` → `radio_ap`                      | `ON DELETE CASCADE`             | Borrar AP elimina radios                              |
 | `radio_ap` → `bssid_radio`                    | `ON DELETE CASCADE`             | Borrar radio elimina sus BSSID declarados             |
-| `radio_ap` → `instantanea_configuracion_rf`   | `ON DELETE SET NULL`            | La instantánea histórica queda sin radio actual       |
-| `instantanea_configuracion_rf` → `medicion_wifi` | `ON DELETE SET NULL`         | La medición real se conserva                          |
 | `proyecto` → `escenario_optimizado`           | `ON DELETE CASCADE`             | Borrar proyecto elimina escenarios IA                 |
 | `escenario_optimizado` → `recomendacion_ap`   | `ON DELETE CASCADE`             | Borrar escenario elimina recomendaciones              |
 | `escenario_optimizado` → `valor_proyectado_punto` | `ON DELETE CASCADE`          | Borrar escenario elimina predicciones                 |
@@ -722,6 +690,6 @@ end note
 | Captura WiFi                   | `punto_medicion`, `medicion_wifi`                                                  | Observaciones reales sobre posiciones del plano                     |
 | Heatmap y análisis             | `mapa_calor`, `analisis_cobertura`, `ap_detectado`                                 | Interpolación, diagnóstico y APs inferidos                          |
 | Conjuntos de AP                | `conjunto_ap`, `conjunto_ap_item`                                                  | Selección persistente de APs por propósito                          |
-| Inventario RF                  | `ap_fisico`, `radio_ap`, `bssid_radio`, `instantanea_configuracion_rf`             | Modelo físico AP → radio → BSSID y contexto histórico de captura    |
+| Inventario RF                  | `ap_fisico`, `radio_ap`, `bssid_radio`                                             | Modelo físico AP → radio → BSSID para calibración IA                |
 | IA y escenarios                | `escenario_optimizado`, `recomendacion_ap`, `valor_proyectado_punto`               | Recomendaciones y predicciones sin alterar mediciones reales        |
 | Reportes y portal cliente      | `reporte`, `token_enlace_cliente`                                                  | PDF técnico y publicación controlada al cliente                     |

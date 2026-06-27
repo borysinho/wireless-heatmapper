@@ -16,7 +16,6 @@ from app.models.heatmap import (  # noqa: F401
 from app.models.inventario_rf import (  # noqa: F401
     APFisico,
     BSSIDRadio,
-    InstantaneaConfiguracionRF,
     RadioAP,
 )
 from app.models.medicion import MedicionWifi, PuntoMedicion  # noqa: F401
