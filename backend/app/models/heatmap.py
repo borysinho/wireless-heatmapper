@@ -93,6 +93,12 @@ class ConjuntoAP(Base):
         nullable=False,
         index=True,
     )
+    conjunto_origen_id = Column(
+        Integer,
+        ForeignKey("conjunto_ap.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     nombre = Column(String(100), nullable=False)
     proposito = Column(String(255), nullable=False)
     descripcion = Column(Text, nullable=True)
@@ -115,6 +121,15 @@ class ConjuntoAP(Base):
     )
 
     plano = relationship("Plano", back_populates="conjuntos_ap")
+    conjunto_origen = relationship(
+        "ConjuntoAP",
+        remote_side=[id],
+        back_populates="conjuntos_derivados",
+    )
+    conjuntos_derivados = relationship(
+        "ConjuntoAP",
+        back_populates="conjunto_origen",
+    )
     creado_por = relationship("Usuario")
     items = relationship(
         "ConjuntoAPItem",

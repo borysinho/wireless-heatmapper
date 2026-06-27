@@ -14,7 +14,8 @@ Las mediciones reales quedan separadas de las proyecciones IA:
 
 - `punto_medicion` y `medicion_wifi` guardan observaciones capturadas desde Android.
 - `ap_fisico`, `radio_ap` y `bssid_radio` describen el inventario RF necesario para calibración y escenarios IA.
-- `escenario_optimizado`, `recomendacion_ap` y `valor_proyectado_punto` guardan propuestas y predicciones sin modificar la medición real.
+- `conjunto_ap` se reutiliza para conjuntos definidos por técnico y conjuntos propuestos por IA; cuando `origen = 'ia'`, `conjunto_origen_id` identifica el conjunto técnico usado como fuente. La generación IA no debe encadenarse desde otro conjunto IA.
+- `escenario_optimizado`, `recomendacion_ap` y `valor_proyectado_punto` guardan métricas, acciones sugeridas y predicciones sin modificar la medición real.
 
 ---
 
@@ -159,6 +160,7 @@ package "Heatmap, análisis y conjuntos de AP" {
     * id : INTEGER <<PK>>
     --
     plano_id : INTEGER <<FK, NOT NULL>>
+    conjunto_origen_id : INTEGER <<FK, NULL>>
     nombre : VARCHAR(100) <<NOT NULL>>
     proposito : VARCHAR(255) <<NOT NULL>>
     descripcion : TEXT
@@ -386,6 +388,7 @@ PLANO ||--o{ PUNTO : "plano_id"
 PUNTO ||--o{ MEDICION : "punto_id"
 
 PLANO ||--o{ CONJUNTO : "plano_id"
+CONJUNTO "0..1" -- "0..*" CONJUNTO : "conjunto_origen_id"
 CONJUNTO ||--o{ CONJUNTO_ITEM : "conjunto_ap_id"
 CONJUNTO ||--o{ MAPA : "conjunto_ap_id"
 PLANO ||--o{ MAPA : "plano_id"
@@ -500,6 +503,7 @@ PROYECTO ||--o{ PLANO : "contiene"
 PLANO ||--o{ PUNTO : "puntos marcados"
 PUNTO ||--o{ MEDICION : "lecturas BSSID"
 PLANO ||--o{ CONJUNTO : "agrupa APs"
+CONJUNTO "0..1" -- "0..*" CONJUNTO : "deriva propuestas IA"
 CONJUNTO ||--o{ ITEM : "BSSID seleccionados"
 PLANO ||--o{ MAPA : "interpolación"
 CONJUNTO "0..1" -- "0..*" MAPA : "subconjunto usado"
@@ -584,7 +588,7 @@ end note
 | `plano`                   | `UNIQUE(ruta_storage)`, `INDEX(proyecto_id)`                       | Archivos de plano por proyecto                 |
 | `punto_medicion`          | `INDEX(plano_id)`                                                  | Consulta de puntos para captura y heatmap      |
 | `medicion_wifi`           | `INDEX(punto_id)`                                                  | Lecturas por punto                             |
-| `conjunto_ap`             | `UNIQUE(plano_id, nombre)`                                         | Conjuntos nombrados por plano                  |
+| `conjunto_ap`             | `UNIQUE(plano_id, nombre)`, `INDEX(conjunto_origen_id)`            | Conjuntos nombrados por plano y derivados IA   |
 | `conjunto_ap_item`        | `UNIQUE(conjunto_ap_id, bssid)`, `INDEX(bssid)`                    | Evitar AP duplicado dentro del conjunto        |
 | `mapa_calor`              | `UNIQUE(plano_id, algoritmo, resolucion, firma_mediciones)`        | Cache de heatmaps reproducibles                |
 | `analisis_cobertura`      | `UNIQUE(mapa_calor_id)`                                            | Un diagnóstico vigente por mapa                |
@@ -609,6 +613,7 @@ end note
 | `mapa_calor` → `analisis_cobertura`           | `ON DELETE CASCADE`             | Borrar mapa elimina su diagnóstico                    |
 | `analisis_cobertura` → `ap_detectado`         | `ON DELETE CASCADE`             | Borrar análisis elimina APs inferidos                 |
 | `plano` → `conjunto_ap`                       | `ON DELETE CASCADE`             | Borrar plano elimina conjuntos                        |
+| `conjunto_ap` → `conjunto_ap`                 | `ON DELETE SET NULL`            | Si se borra el conjunto fuente, la propuesta IA conserva sus datos |
 | `conjunto_ap` → `conjunto_ap_item`            | `ON DELETE CASCADE`             | Borrar conjunto elimina sus APs seleccionados         |
 | `plano` → `ap_fisico`                         | `ON DELETE CASCADE`             | Borrar plano elimina inventario RF del plano          |
 | `ap_fisico` → `radio_ap`                      | `ON DELETE CASCADE`             | Borrar AP elimina radios                              |
@@ -659,8 +664,8 @@ enum nivel_senal {
 
 class "Valores controlados en VARCHAR" as CONTROLADOS {
   usuario.rol = tecnico | admin
-  conjunto_ap.origen = manual_movil | ia | backend
-  conjunto_ap.estado_gobernanza = borrador_tecnico | aprobado | publicado
+  conjunto_ap.origen = manual_movil | manual_web | ia | backend
+  conjunto_ap.estado_gobernanza = borrador_tecnico | pendiente_revision | aprobado_interno | publicado_cliente
   escenario_optimizado.origen = ia | tecnico
   escenario_optimizado.estado_gobernanza = pendiente_revision | aprobado | publicado
   ap_fisico.rol = EXISTENTE | CANDIDATO | TEMPORAL
@@ -689,7 +694,7 @@ end note
 | Proyecto y planos              | `proyecto`, `plano`                                                                | Estructura de trabajo y metadatos de archivos de plano              |
 | Captura WiFi                   | `punto_medicion`, `medicion_wifi`                                                  | Observaciones reales sobre posiciones del plano                     |
 | Heatmap y análisis             | `mapa_calor`, `analisis_cobertura`, `ap_detectado`                                 | Interpolación, diagnóstico y APs inferidos                          |
-| Conjuntos de AP                | `conjunto_ap`, `conjunto_ap_item`                                                  | Selección persistente de APs por propósito                          |
+| Conjuntos de AP                | `conjunto_ap`, `conjunto_ap_item`                                                  | Selección técnica y propuestas IA derivadas por propósito            |
 | Inventario RF                  | `ap_fisico`, `radio_ap`, `bssid_radio`                                             | Modelo físico AP → radio → BSSID para calibración IA                |
-| IA y escenarios                | `escenario_optimizado`, `recomendacion_ap`, `valor_proyectado_punto`               | Recomendaciones y predicciones sin alterar mediciones reales        |
+| IA y escenarios                | `escenario_optimizado`, `recomendacion_ap`, `valor_proyectado_punto`               | Métricas, acciones sugeridas y predicciones sin alterar mediciones reales |
 | Reportes y portal cliente      | `reporte`, `token_enlace_cliente`                                                  | PDF técnico y publicación controlada al cliente                     |

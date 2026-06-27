@@ -158,9 +158,11 @@ class ConjuntoAPRepository:
         origen: str = "manual_movil",
         estado_gobernanza: str = "borrador_tecnico",
         creado_por_id: int | None = None,
+        conjunto_origen_id: int | None = None,
     ) -> ConjuntoAP:
         conjunto = ConjuntoAP(
             plano_id=plano_id,
+            conjunto_origen_id=conjunto_origen_id,
             nombre=nombre,
             proposito=proposito,
             descripcion=descripcion,

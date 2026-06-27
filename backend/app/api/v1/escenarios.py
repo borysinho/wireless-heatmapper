@@ -27,7 +27,10 @@ from app.models.plano import Plano
 from app.models.proyecto import Proyecto
 from app.models.usuario import Usuario
 from app.repositories.escenario_repository import EscenarioRepository, ReporteRepository
-from app.repositories.heatmap_repository import MapaCalorRepository
+from app.repositories.heatmap_repository import (
+    ConjuntoAPRepository,
+    MapaCalorRepository,
+)
 from app.repositories.medicion_repository import MedicionRepository
 from app.repositories.proyecto_repository import ProyectoRepository
 from app.schemas.escenario import (
@@ -330,6 +333,11 @@ def _conjunto_fuente_entrada(
             status_code=422,
             detail="El conjunto seleccionado no contiene APs.",
         )
+    if conjunto.origen == "ia":
+        raise HTTPException(
+            status_code=422,
+            detail="La IA debe partir de un conjunto técnico, no de una propuesta IA.",
+        )
     return conjunto
 
 
@@ -348,6 +356,36 @@ def _limite_aps_derivado(
     else:
         cantidad_base = 5
     return max(1, min(3, cantidad_base))
+
+
+def _nombre_conjunto_ia(
+    *,
+    repo: ConjuntoAPRepository,
+    plano_id: int,
+    nombre_base: str,
+    indice: int,
+) -> str:
+    nombre = f"{nombre_base} · IA Propuesta {indice}"
+    candidato = nombre
+    correlativo = 2
+    while repo.existe_nombre(plano_id=plano_id, nombre=candidato):
+        candidato = f"{nombre} ({correlativo})"
+        correlativo += 1
+    return candidato
+
+
+def _items_conjunto_ia(*, indice: int, recomendaciones: list[dict]) -> list[dict]:
+    return [
+        {
+            "bssid": f"sp5:{indice:02d}:{rec_idx:02d}:00:00",
+            "ssid_snapshot": rec["modelo_ap"],
+            "canal_snapshot": None,
+            "rssi_promedio_snapshot": rec["rssi_proyectado"],
+            "pos_x": rec["coord_x"],
+            "pos_y": rec["coord_y"],
+        }
+        for rec_idx, rec in enumerate(recomendaciones, start=1)
+    ]
 
 
 def _mapa_actual(
@@ -559,6 +597,7 @@ def generar_escenarios(
     )
     observados_por_banda = _observados_por_punto_y_banda(db=db, plano_id=plano.id)
     mapa_repo = MapaCalorRepository(db)
+    conjunto_repo = ConjuntoAPRepository(db)
     escenario_repo = EscenarioRepository(db)
     escenarios: list[EscenarioOptimizado] = []
     restricciones = body.model_dump(exclude_none=True)
@@ -575,6 +614,33 @@ def generar_escenarios(
             f"{conjunto_fuente.nombre} · Propuesta {idx}"
             if conjunto_fuente
             else alternativa.nombre
+        )
+        items_conjunto_ia = _items_conjunto_ia(
+            indice=idx,
+            recomendaciones=alternativa.recomendaciones,
+        )
+        nombre_base_ia = (
+            conjunto_fuente.nombre if conjunto_fuente else alternativa.nombre
+        )
+        proposito_ia = (
+            conjunto_fuente.proposito if conjunto_fuente else nombre_escenario
+        )
+        conjunto_ia = conjunto_repo.crear(
+            plano_id=plano.id,
+            conjunto_origen_id=conjunto_fuente.id if conjunto_fuente else None,
+            nombre=_nombre_conjunto_ia(
+                repo=conjunto_repo,
+                plano_id=plano.id,
+                nombre_base=nombre_base_ia,
+                indice=idx,
+            ),
+            proposito=proposito_ia,
+            descripcion=conjunto_fuente.descripcion if conjunto_fuente else None,
+            es_principal=False,
+            items=items_conjunto_ia,
+            origen="ia",
+            estado_gobernanza="pendiente_revision",
+            creado_por_id=current_user.id,
         )
         for valor in alternativa.valores_proyectados:
             observado = observados_por_banda.get(
@@ -605,7 +671,7 @@ def generar_escenarios(
         ).hexdigest()
         mapa_proyectado = mapa_repo.crear(
             plano_id=plano.id,
-            conjunto_ap_id=conjunto_fuente.id if conjunto_fuente else None,
+            conjunto_ap_id=conjunto_ia.id,
             modo_generacion="PROYECTADO",
             algoritmo="FSPL",
             resolucion=body.resolucion,
@@ -626,10 +692,7 @@ def generar_escenarios(
                 }
                 for rec_idx, rec in enumerate(alternativa.recomendaciones, start=1)
             ],
-            bssids_generacion=[
-                f"sp5:{idx:02d}:{rec_idx:02d}:00:00"
-                for rec_idx, _ in enumerate(alternativa.recomendaciones, start=1)
-            ],
+            bssids_generacion=[item["bssid"] for item in items_conjunto_ia],
             matriz=alternativa.matriz,
             escala=ESCALA_CWNA,
             ruta_imagen=ruta,

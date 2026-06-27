@@ -147,6 +147,7 @@ export interface ConjuntoAPItemOut {
 export interface ConjuntoAPOut {
   id: number;
   plano_id: number;
+  conjunto_origen_id: number | null;
   nombre: string;
   proposito: string;
   descripcion: string | null;

@@ -5,6 +5,7 @@ import 'ap_disponible.dart';
 class ConjuntoAP extends Equatable {
   final int id;
   final int planoId;
+  final int? conjuntoOrigenId;
   final String nombre;
   final String proposito;
   final String? descripcion;
@@ -20,6 +21,7 @@ class ConjuntoAP extends Equatable {
   const ConjuntoAP({
     required this.id,
     required this.planoId,
+    this.conjuntoOrigenId,
     required this.nombre,
     required this.proposito,
     required this.descripcion,
@@ -37,6 +39,7 @@ class ConjuntoAP extends Equatable {
   List<Object?> get props => [
         id,
         planoId,
+        conjuntoOrigenId,
         nombre,
         proposito,
         descripcion,

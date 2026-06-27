@@ -5,6 +5,7 @@ class ConjuntoAPModel extends ConjuntoAP {
   const ConjuntoAPModel({
     required super.id,
     required super.planoId,
+    super.conjuntoOrigenId,
     required super.nombre,
     required super.proposito,
     required super.descripcion,
@@ -39,6 +40,7 @@ class ConjuntoAPModel extends ConjuntoAP {
     return ConjuntoAPModel(
       id: json['id'] as int,
       planoId: json['plano_id'] as int,
+      conjuntoOrigenId: json['conjunto_origen_id'] as int?,
       nombre: json['nombre'] as String,
       proposito: json['proposito'] as String,
       descripcion: json['descripcion'] as String?,

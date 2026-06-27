@@ -133,6 +133,7 @@ class ConjuntoAPActualizarIn(BaseModel):
 class ConjuntoAPOut(BaseModel):
     id: int
     plano_id: int
+    conjunto_origen_id: int | None = None
     nombre: str
     proposito: str
     descripcion: str | None

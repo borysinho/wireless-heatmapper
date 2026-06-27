@@ -325,6 +325,7 @@ def _conjunto_out(conjunto) -> ConjuntoAPOut:
     return ConjuntoAPOut(
         id=conjunto.id,
         plano_id=conjunto.plano_id,
+        conjunto_origen_id=conjunto.conjunto_origen_id,
         nombre=conjunto.nombre,
         proposito=conjunto.proposito,
         descripcion=conjunto.descripcion,

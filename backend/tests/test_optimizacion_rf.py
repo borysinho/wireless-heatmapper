@@ -443,8 +443,68 @@ def test_generacion_desde_conjunto_existente_conserva_fuente_y_bssids(
         db_session.query(MapaCalor).filter_by(id=escenario.mapa_proyectado_id).one()
     )
     assert mapa_actual.conjunto_ap_id == conjunto.id
-    assert mapa_proyectado.conjunto_ap_id == conjunto.id
+    assert mapa_proyectado.conjunto_ap_id != conjunto.id
+    conjunto_ia = (
+        db_session.query(ConjuntoAP)
+        .filter_by(id=mapa_proyectado.conjunto_ap_id)
+        .one()
+    )
+    assert conjunto_ia.conjunto_origen_id == conjunto.id
+    assert conjunto_ia.origen == "ia"
+    assert conjunto_ia.estado_gobernanza == "pendiente_revision"
+    assert len(conjunto_ia.items) == escenario.cantidad_aps
     assert mapa_actual.bssids_generacion == ["aa:bb:cc:dd:ee:50"]
+
+
+def test_ia_no_usa_conjunto_propuesto_por_ia_como_fuente(
+    db_session,
+    tecnico_usuario,
+    admin_usuario,
+):
+    plano = _plano_con_mediciones(db_session, tecnico_usuario)
+    conjunto_base = _crear_conjunto_ap(
+        db_session,
+        plano=plano,
+        admin=admin_usuario,
+        nombre="Conjunto técnico base",
+        bssids=("aa:bb:cc:dd:ee:50",),
+    )
+    conjunto_ia = ConjuntoAP(
+        plano_id=plano.id,
+        conjunto_origen_id=conjunto_base.id,
+        nombre="Conjunto IA derivado",
+        proposito=conjunto_base.proposito,
+        origen="ia",
+        estado_gobernanza="pendiente_revision",
+        creado_por_id=admin_usuario.id,
+    )
+    conjunto_ia.items.append(
+        ConjuntoAPItem(
+            bssid="sp5:01:01:00:00",
+            ssid_snapshot="AP recomendado",
+            rssi_promedio_snapshot=-62,
+        )
+    )
+    db_session.add(conjunto_ia)
+    db_session.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        generar_escenarios(
+            proyecto_id=plano.proyecto_id,
+            body=RestriccionesEscenarioIn(
+                bandas=["5"],
+                resolucion=32,
+                fuente_entrada={
+                    "tipo": "CONJUNTO_EXISTENTE",
+                    "conjunto_id": conjunto_ia.id,
+                },
+            ),
+            db=db_session,
+            current_user=admin_usuario,
+        )
+
+    assert exc.value.status_code == 422
+    assert "conjunto técnico" in exc.value.detail
 
 
 def test_admin_puede_borrar_permanentemente_escenarios_ia(
