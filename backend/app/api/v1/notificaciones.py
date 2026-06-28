@@ -73,9 +73,9 @@ def diagnosticar_notificaciones(
             detail="Usuario no encontrado.",
         )
 
-    tokens_activos, tokens_inactivos, ultimo_registro = (
-        DispositivoPushRepository(db).resumir_usuario(usuario_id=usuario_id)
-    )
+    tokens_activos, tokens_inactivos, ultimo_registro = DispositivoPushRepository(
+        db
+    ).resumir_usuario(usuario_id=usuario_id)
     ruta_credenciales = (
         Path(settings.firebase_credentials_path)
         if settings.firebase_credentials_path

@@ -40,7 +40,7 @@ class UsuarioOut(BaseModel):
 
 
 class UsuarioUpdate(BaseModel):
-    """DTO para editar un usuario: datos personales, estado o contraseña. PB-13 (Sp1-06)."""
+    """DTO para editar datos personales, estado o contraseña."""
 
     nombre: str | None = None
     email: EmailStr | None = None

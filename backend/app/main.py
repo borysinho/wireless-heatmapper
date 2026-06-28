@@ -9,7 +9,10 @@ from app.core.database import SessionLocal
 
 app = FastAPI(
     title="Wireless HeatMapper API",
-    description="Backend REST + IA para el sistema de análisis de cobertura WiFi. Bulldog Tech.",
+    description=(
+        "Backend REST + IA para el sistema de análisis de cobertura WiFi. "
+        "Bulldog Tech."
+    ),
     version="0.1.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -40,4 +43,3 @@ def health_check():
         pass
 
     return {"status": "ok", "version": "0.1.0", "db": db_status}
-

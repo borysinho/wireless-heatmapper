@@ -3,17 +3,12 @@
 import { apiClient } from "@/shared/api/client";
 import type {
   APDisponibleOut,
-  AnalisisCoberturaOut,
-  ComparacionEscenarioOut,
+  ConjuntosIAGeneradosOut,
   ConjuntoAPOut,
   EnlaceClienteCrearIn,
   EnlaceClienteEnviarCorreoIn,
   EnlaceClienteEnviarCorreoOut,
   EnlaceClienteOut,
-  EscenarioOptimizadoOut,
-  EscenariosGeneradosOut,
-  EstadoGobernanzaConjunto,
-  EstadoGobernanzaEscenario,
   MapaCalorOut,
   PlanoOut,
   ProyectoListOut,
@@ -22,8 +17,7 @@ import type {
   ProyectoReasignarIn,
   ProyectosFilter,
   ProyectosPageOut,
-  RestriccionesEscenarioIn,
-  ReporteOut,
+  RestriccionesIAIn,
 } from "../types";
 
 export async function listarProyectosOrg(
@@ -168,82 +162,13 @@ export async function generarHeatmapConjunto(
   return data;
 }
 
-export async function analizarMapa(mapaId: number): Promise<AnalisisCoberturaOut> {
-  const { data } = await apiClient.post<AnalisisCoberturaOut>(
-    `/mapas/${mapaId}/analisis`,
-  );
-  return data;
-}
-
-export async function cambiarEstadoConjuntoAP(
-  conjuntoId: number,
-  estadoGobernanza: EstadoGobernanzaConjunto,
-): Promise<ConjuntoAPOut> {
-  const { data } = await apiClient.patch<ConjuntoAPOut>(
-    `/conjuntos-ap/${conjuntoId}`,
-    { estado_gobernanza: estadoGobernanza },
-  );
-  return data;
-}
-
-export async function listarEscenariosProyecto(
+export async function generarConjuntosIAProyecto(
   proyectoId: number,
-): Promise<EscenarioOptimizadoOut[]> {
-  const { data } = await apiClient.get<EscenarioOptimizadoOut[]>(
-    `/proyectos/${proyectoId}/escenarios`,
-  );
-  return data;
-}
-
-export async function generarEscenariosProyecto(
-  proyectoId: number,
-  body: RestriccionesEscenarioIn,
-): Promise<EscenariosGeneradosOut> {
-  const { data } = await apiClient.post<EscenariosGeneradosOut>(
-    `/proyectos/${proyectoId}/escenarios`,
+  body: RestriccionesIAIn,
+): Promise<ConjuntosIAGeneradosOut> {
+  const { data } = await apiClient.post<ConjuntosIAGeneradosOut>(
+    `/proyectos/${proyectoId}/conjuntos-ap/recomendaciones-ia`,
     body,
-  );
-  return data;
-}
-
-export async function cambiarEstadoEscenario(
-  escenarioId: number,
-  estadoGobernanza: EstadoGobernanzaEscenario,
-): Promise<EscenarioOptimizadoOut> {
-  const { data } = await apiClient.patch<EscenarioOptimizadoOut>(
-    `/escenarios/${escenarioId}/estado`,
-    { estado_gobernanza: estadoGobernanza },
-  );
-  return data;
-}
-
-export async function compararEscenario(
-  escenarioId: number,
-): Promise<ComparacionEscenarioOut> {
-  const { data } = await apiClient.get<ComparacionEscenarioOut>(
-    `/escenarios/${escenarioId}/comparacion`,
-  );
-  return data;
-}
-
-export async function listarReportesProyecto(
-  proyectoId: number,
-): Promise<ReporteOut[]> {
-  const { data } = await apiClient.get<ReporteOut[]>(
-    `/proyectos/${proyectoId}/reportes`,
-  );
-  return data;
-}
-
-export async function eliminarEscenario(escenarioId: number): Promise<void> {
-  await apiClient.delete(`/escenarios/${escenarioId}`);
-}
-
-export async function eliminarEscenariosProyecto(
-  proyectoId: number,
-): Promise<{ eliminados: number }> {
-  const { data } = await apiClient.delete<{ eliminados: number }>(
-    `/proyectos/${proyectoId}/escenarios`,
   );
   return data;
 }

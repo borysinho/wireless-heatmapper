@@ -3,7 +3,6 @@
 Sprint 1 — PB-19 (Sp1-31): CRUD básico de clientes para el admin.
 """
 
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.cliente import Cliente

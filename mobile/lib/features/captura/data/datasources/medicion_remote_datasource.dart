@@ -106,6 +106,36 @@ class MedicionRemoteDatasource {
     }
   }
 
+  /// Elimina el polígono operativo del plano.
+  Future<List<PuntoPlano>> eliminarPoligonoInteres(int planoId) async {
+    try {
+      final response = await _dio.delete<Map<String, dynamic>>(
+        '/planos/$planoId/poligono-interes',
+      );
+      return PlanoModel.fromJson(response.data!).poligonoInteres;
+    } on DioException catch (e) {
+      throw CapturaApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
+  /// Genera y guarda el polígono operativo con IA en el backend.
+  Future<List<PuntoPlano>> generarPoligonoInteresIA(int planoId) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/planos/$planoId/poligono-interes/generar-ia',
+      );
+      return PlanoModel.fromJson(response.data!).poligonoInteres;
+    } on DioException catch (e) {
+      throw CapturaApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
   /// Detalle de un punto. GET /api/puntos/{id}.
   Future<PuntoMedicion> obtenerPunto(int puntoId) async {
     try {
@@ -189,7 +219,10 @@ class MedicionRemoteDatasource {
     final path = e.requestOptions.path;
     if ((status == 404 || status == 405) &&
         path.contains('/poligono-interes')) {
-      return 'El servidor de producción no tiene habilitado el guardado de polígonos. Actualiza el backend.';
+      return 'El servidor de producción no tiene habilitada la gestión de polígonos. Actualiza el backend.';
+    }
+    if (status == 503 && path.contains('/generar-ia')) {
+      return 'La generación automática no está configurada en el backend.';
     }
     if (status == 422) {
       final mensaje = _detalleDesdeRespuesta(e.response?.data);

@@ -1,6 +1,6 @@
-"""Endpoints de heatmap y análisis de cobertura.
+"""Endpoints de heatmap y conjuntos de AP.
 
-Sprint 4 — PB-05 (Generar mapa de calor), PB-06 (Analizar cobertura).
+Sprint 4 — PB-05 (Generar mapa de calor).
 """
 
 import hashlib
@@ -18,7 +18,6 @@ from app.core.security import get_current_user
 from app.models.heatmap import MapaCalor
 from app.models.usuario import Usuario
 from app.repositories.heatmap_repository import (
-    AnalisisCoberturaRepository,
     ConjuntoAPRepository,
     MapaCalorRepository,
 )
@@ -27,10 +26,7 @@ from app.repositories.plano_repository import PlanoRepository
 from app.repositories.proyecto_repository import ProyectoRepository
 from app.schemas.heatmap import (
     ActualizarUbicacionAPConjuntoIn,
-    AnalisisCoberturaOut,
-    APDetectadoOut,
     APDisponibleOut,
-    ConfirmarAPIn,
     ConjuntoAPActualizarIn,
     ConjuntoAPCrearIn,
     ConjuntoAPItemOut,
@@ -39,19 +35,17 @@ from app.schemas.heatmap import (
     MapaCalorOut,
     PuntoLecturaHeatmapOut,
 )
-from app.services.analisis_cobertura_service import AnalisisCoberturaService
+from app.services.geometria_service import mascara_poligono
 from app.services.interpolacion_service import (
     ESCALA_CWNA,
     HeatmapImageService,
     InterpolacionService,
     PuntoRSSI,
 )
-from app.services.geometria_service import mascara_poligono
 from app.storage import LocalFilesystemStorage, generar_url_firmada, verificar_firma
 
 router_planos_heatmap = APIRouter(prefix="/planos", tags=["heatmaps"])
 router_mapas = APIRouter(prefix="/mapas", tags=["heatmaps"])
-router_aps = APIRouter(prefix="/aps", tags=["heatmaps"])
 router_conjuntos_ap = APIRouter(prefix="/conjuntos-ap", tags=["heatmaps"])
 
 
@@ -146,7 +140,6 @@ def _mapa_out(
         id=mapa.id,
         plano_id=mapa.plano_id,
         conjunto_ap_id=mapa.conjunto_ap_id,
-        analisis_id=mapa.analisis.id if mapa.analisis is not None else None,
         modo_generacion=mapa.modo_generacion,
         algoritmo=mapa.algoritmo,
         resolucion=mapa.resolucion,
@@ -319,6 +312,14 @@ def _conjunto_out(conjunto) -> ConjuntoAPOut:
             rssi_promedio=item.rssi_promedio_snapshot,
             pos_x=item.pos_x,
             pos_y=item.pos_y,
+            accion_recomendada=item.accion_recomendada,
+            justificacion=item.justificacion,
+            altura_m=item.altura_m,
+            tipo_montaje=item.tipo_montaje,
+            banda=item.banda,
+            modelo_ap=item.modelo_ap,
+            costo_estimado=item.costo_estimado,
+            radios=item.radios,
         )
         for item in conjunto.items
     ]
@@ -331,8 +332,11 @@ def _conjunto_out(conjunto) -> ConjuntoAPOut:
         descripcion=conjunto.descripcion,
         es_principal=conjunto.es_principal,
         origen=conjunto.origen,
-        estado_gobernanza=conjunto.estado_gobernanza,
         creado_por_id=conjunto.creado_por_id,
+        resumen_ia=conjunto.resumen_ia,
+        metricas_ia=conjunto.metricas_ia,
+        restricciones_ia=conjunto.restricciones_ia,
+        version_motor_ia=conjunto.version_motor_ia,
         cantidad_aps=len(items),
         items=items,
         created_at=conjunto.created_at,
@@ -392,9 +396,7 @@ def _requerir_poligono_interes(plano) -> list[dict]:
     if len(poligono) < 3:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=(
-                "Debe definir un polígono de interés antes de generar heatmaps."
-            ),
+            detail=("Debe definir un polígono de interés antes de generar heatmaps."),
         )
     return poligono
 
@@ -671,9 +673,6 @@ def crear_conjunto_ap(
         es_principal=body.es_principal,
         items=items,
         origen="manual_web" if current_user.rol == "admin" else "manual_movil",
-        estado_gobernanza=(
-            "pendiente_revision" if current_user.rol == "admin" else "borrador_tecnico"
-        ),
         creado_por_id=current_user.id,
     )
     return _conjunto_out(conjunto)
@@ -728,11 +727,6 @@ def actualizar_conjunto_ap(
     if body.bssids is not None:
         aps = MedicionRepository(db).listar_aps_por_plano(plano_id=conjunto.plano_id)
         items = _resolver_items_conjunto(aps=aps, bssids=body.bssids)
-    if body.estado_gobernanza is not None and current_user.rol != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Solo el panel web admin puede cambiar el estado del conjunto.",
-        )
     descripcion = (
         body.descripcion
         if "descripcion" in body.model_fields_set
@@ -745,7 +739,6 @@ def actualizar_conjunto_ap(
         descripcion=descripcion,
         es_principal=body.es_principal,
         items=items,
-        estado_gobernanza=body.estado_gobernanza,
     )
     return _conjunto_out(actualizado)
 
@@ -893,97 +886,6 @@ def generar_heatmap_conjunto(
         conjunto_ap_id=conjunto.id,
         modo_generacion=body.modo,
     )
-
-
-@router_mapas.post(
-    "/{mapa_id}/analisis",
-    response_model=AnalisisCoberturaOut,
-    summary="Analizar cobertura del mapa",
-    description="Regenera de forma idempotente el análisis automático. PB-06.",
-)
-def analizar_mapa(
-    mapa_id: int,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
-) -> AnalisisCoberturaOut:
-    mapa = _verificar_ownership_mapa(
-        mapa_id=mapa_id,
-        current_user=current_user,
-        db=db,
-    )
-    plano = mapa.plano
-    aps_referencia = mapa.aps_interes or [
-        {
-            "bssid": mapa.bssid,
-            "pos_x": mapa.ap_pos_x,
-            "pos_y": mapa.ap_pos_y,
-        }
-    ]
-    bssids_interes = {ap["bssid"] for ap in aps_referencia}
-    mediciones = [
-        medicion
-        for medicion in MedicionRepository(db).listar_mediciones_por_plano(
-            plano_id=mapa.plano_id,
-        )
-        if medicion.bssid in bssids_interes
-    ]
-    datos = AnalisisCoberturaService().analizar(
-        matriz=mapa.matriz,
-        mediciones=mediciones,
-        ancho_px=plano.ancho_px,
-        alto_px=plano.alto_px,
-        aps_referencia=aps_referencia,
-        mascara=mascara_poligono(
-            poligono=plano.poligono_interes,
-            ancho_px=plano.ancho_px,
-            alto_px=plano.alto_px,
-            resolucion=mapa.resolucion,
-        ),
-    )
-    analisis = AnalisisCoberturaRepository(db).reemplazar(
-        mapa=mapa,
-        pct_cobertura=datos["pct_cobertura"],
-        pct_zonas_muertas=datos["pct_zonas_muertas"],
-        celdas_zonas_muertas=datos["celdas_zonas_muertas"],
-        cantidad_solapamientos=datos["cantidad_solapamientos"],
-        cantidad_interferencias=datos["cantidad_interferencias"],
-        hallazgos=datos["hallazgos"],
-        resumen=datos["resumen"],
-        aps_detectados=datos["aps_detectados"],
-    )
-    return AnalisisCoberturaOut.model_validate(analisis)
-
-
-@router_aps.patch(
-    "/{ap_id}",
-    response_model=APDetectadoOut,
-    summary="Confirmar ubicación estimada de AP",
-)
-def confirmar_ap(
-    ap_id: int,
-    body: ConfirmarAPIn,
-    db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
-) -> APDetectadoOut:
-    repo = AnalisisCoberturaRepository(db)
-    ap = repo.obtener_ap_por_id(ap_id=ap_id)
-    if ap is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="AP detectado no encontrado.",
-        )
-    _verificar_ownership_mapa(
-        mapa_id=ap.analisis.mapa_calor_id,
-        current_user=current_user,
-        db=db,
-    )
-    actualizado = repo.confirmar_ap(
-        ap=ap,
-        pos_x=body.pos_x,
-        pos_y=body.pos_y,
-        confirmado=body.confirmado,
-    )
-    return APDetectadoOut.model_validate(actualizado)
 
 
 @router_mapas.get(

@@ -7,10 +7,6 @@ import pytest
 from PIL import Image
 
 from app.core.config import settings
-from app.models.cliente import Cliente
-from app.models.plano import Plano
-from app.models.proyecto import Proyecto
-
 
 # ---------------------------------------------------------------------------
 # Fixtures de apoyo
@@ -21,7 +17,9 @@ from app.models.proyecto import Proyecto
 def storage_temporal(monkeypatch):
     with tempfile.TemporaryDirectory() as tmp:
         monkeypatch.setattr(settings, "storage_root", tmp)
-        monkeypatch.setattr(settings, "storage_url_secret", "test_secret_32chars_minimo_xxxxxx")
+        monkeypatch.setattr(
+            settings, "storage_url_secret", "test_secret_32chars_minimo_xxxxxx"
+        )
         monkeypatch.setattr(settings, "storage_url_ttl_seconds", 60)
         monkeypatch.setattr(settings, "public_api_url", "")
         yield tmp
@@ -212,8 +210,7 @@ def test_lote_sin_mediciones_retorna_422(client, tecnico_token):
 
 def test_ownership_plano_ajeno_retorna_404(client, tecnico_token, admin_token):
     """CA-5 (ownership): técnico no puede insertar en plano ajeno."""
-    # El admin crea un proyecto (no tiene proyectos técnicos, pero puede ser otro técnico)
-    # Simulamos creando un proyecto con el técnico y luego intentando con admin token
+    # Simula un plano de un técnico y un intento con token de otro usuario.
     pid = _crear_proyecto(client, tecnico_token)
     plano_id = _subir_plano_calibrado(client, tecnico_token, pid)
 

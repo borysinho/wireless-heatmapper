@@ -11,8 +11,11 @@ class ConjuntoAPModel extends ConjuntoAP {
     required super.descripcion,
     required super.esPrincipal,
     super.origen,
-    super.estadoGobernanza,
     super.creadoPorId,
+    super.resumenIa,
+    super.metricasIa,
+    super.restriccionesIa,
+    super.versionMotorIa,
     required super.cantidadAps,
     required super.items,
     required super.createdAt,
@@ -46,13 +49,21 @@ class ConjuntoAPModel extends ConjuntoAP {
       descripcion: json['descripcion'] as String?,
       esPrincipal: json['es_principal'] as bool? ?? false,
       origen: json['origen'] as String? ?? 'manual_movil',
-      estadoGobernanza:
-          json['estado_gobernanza'] as String? ?? 'borrador_tecnico',
       creadoPorId: json['creado_por_id'] as int?,
+      resumenIa: json['resumen_ia'] as String?,
+      metricasIa: _mapaOpcional(json['metricas_ia']),
+      restriccionesIa: _mapaOpcional(json['restricciones_ia']),
+      versionMotorIa: json['version_motor_ia'] as String?,
       cantidadAps: json['cantidad_aps'] as int? ?? items.length,
       items: items,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
+  }
+
+  static Map<String, dynamic>? _mapaOpcional(Object? value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return Map<String, dynamic>.from(value);
+    return null;
   }
 }

@@ -26,7 +26,10 @@ router = APIRouter(tags=["clientes"])
     "/clientes",
     response_model=list[ClienteOut],
     summary="Listar clientes activos",
-    description="Devuelve el catálogo de clientes activos. Disponible para ADMIN y TECNICO. PB-19 — CA-3.",
+    description=(
+        "Devuelve el catálogo de clientes activos. Disponible para ADMIN y "
+        "TECNICO. PB-19 — CA-3."
+    ),
 )
 def listar_clientes_activos(
     db: Session = Depends(get_db),
@@ -40,7 +43,10 @@ def listar_clientes_activos(
     "/admin/clientes",
     response_model=list[ClienteOut],
     summary="Listar todos los clientes (admin)",
-    description="Devuelve todos los clientes, incluidos los inactivos. Solo ADMIN. PB-19.",
+    description=(
+        "Devuelve todos los clientes, incluidos los inactivos. "
+        "Solo ADMIN. PB-19."
+    ),
 )
 def listar_todos_los_clientes(
     db: Session = Depends(get_db),
@@ -94,7 +100,9 @@ def actualizar_cliente(
     repo = ClienteRepository(db)
     cliente = repo.obtener_por_id(cliente_id)
     if not cliente:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado"
+        )
     try:
         actualizar_email = "email_referencia" in payload.model_fields_set
         email_referencia = (
@@ -122,7 +130,10 @@ def actualizar_cliente(
     "/admin/clientes/{cliente_id}/desactivar",
     response_model=ClienteOut,
     summary="Desactivar cliente",
-    description="Marca un cliente como inactivo. No aparecerá en el selector de proyectos. Solo ADMIN. PB-19 — CA-4.",
+    description=(
+        "Marca un cliente como inactivo. No aparecerá en el selector de "
+        "proyectos. Solo ADMIN. PB-19 — CA-4."
+    ),
 )
 def desactivar_cliente(
     cliente_id: int,
@@ -132,7 +143,9 @@ def desactivar_cliente(
     repo = ClienteRepository(db)
     cliente = repo.obtener_por_id(cliente_id)
     if not cliente:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cliente no encontrado"
+        )
     cliente = repo.actualizar(cliente, activo=False)
     db.commit()
     db.refresh(cliente)

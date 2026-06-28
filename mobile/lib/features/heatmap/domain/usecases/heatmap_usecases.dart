@@ -1,6 +1,4 @@
-import '../entities/analisis_cobertura.dart';
 import '../entities/ap_disponible.dart';
-import '../entities/ap_detectado.dart';
 import '../entities/conjunto_ap.dart';
 import '../entities/mapa_calor.dart';
 import '../repositories/heatmap_repository.dart';
@@ -136,25 +134,5 @@ class GenerarHeatmapDesdeConjuntoUseCase {
       apPosX: apPosX,
       apPosY: apPosY,
     );
-  }
-}
-
-class AnalizarMapaUseCase {
-  final HeatmapRepository _repo;
-  const AnalizarMapaUseCase(this._repo);
-
-  Future<AnalisisCobertura> call(int mapaId) => _repo.analizarMapa(mapaId);
-}
-
-class ConfirmarAPUseCase {
-  final HeatmapRepository _repo;
-  const ConfirmarAPUseCase(this._repo);
-
-  Future<APDetectado> call({
-    required int apId,
-    required double posX,
-    required double posY,
-  }) {
-    return _repo.confirmarAP(apId: apId, posX: posX, posY: posY);
   }
 }

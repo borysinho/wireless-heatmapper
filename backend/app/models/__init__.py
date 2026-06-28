@@ -1,14 +1,6 @@
 from app.models.cliente import Cliente  # noqa: F401
 from app.models.dispositivo_push import DispositivoPush  # noqa: F401
-from app.models.escenario import (  # noqa: F401
-    EscenarioOptimizado,
-    RecomendacionAP,
-    Reporte,
-    ValorProyectadoPunto,
-)
 from app.models.heatmap import (  # noqa: F401
-    AnalisisCobertura,
-    APDetectado,
     ConjuntoAP,
     ConjuntoAPItem,
     MapaCalor,

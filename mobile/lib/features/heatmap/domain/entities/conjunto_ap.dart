@@ -11,8 +11,11 @@ class ConjuntoAP extends Equatable {
   final String? descripcion;
   final bool esPrincipal;
   final String origen;
-  final String estadoGobernanza;
   final int? creadoPorId;
+  final String? resumenIa;
+  final Map<String, dynamic>? metricasIa;
+  final Map<String, dynamic>? restriccionesIa;
+  final String? versionMotorIa;
   final int cantidadAps;
   final List<APDisponible> items;
   final DateTime createdAt;
@@ -27,8 +30,11 @@ class ConjuntoAP extends Equatable {
     required this.descripcion,
     required this.esPrincipal,
     this.origen = 'manual_movil',
-    this.estadoGobernanza = 'borrador_tecnico',
     this.creadoPorId,
+    this.resumenIa,
+    this.metricasIa,
+    this.restriccionesIa,
+    this.versionMotorIa,
     required this.cantidadAps,
     required this.items,
     required this.createdAt,
@@ -45,8 +51,11 @@ class ConjuntoAP extends Equatable {
         descripcion,
         esPrincipal,
         origen,
-        estadoGobernanza,
         creadoPorId,
+        resumenIa,
+        metricasIa,
+        restriccionesIa,
+        versionMotorIa,
         cantidadAps,
         items,
         createdAt,

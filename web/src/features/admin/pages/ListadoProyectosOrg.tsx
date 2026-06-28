@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Archive,
   BrainCircuit,
+  CalendarClock,
   Link2,
   Pencil,
   Plus,
@@ -16,7 +16,6 @@ import { useClientes } from "../hooks/useClientes";
 import { useUsuarios } from "../hooks/useUsuarios";
 import {
   useActualizarProyectoAdmin,
-  useArchivarProyectoAdmin,
   useCrearProyectoAdmin,
   useEliminarProyectoAdmin,
   useProyectosOrg,
@@ -27,22 +26,8 @@ import type {
   ProyectoListOut,
   ProyectosFilter,
 } from "../types";
-import { Badge, Button, ConfirmDialog, EmptyState, useToast } from "@/shared/components";
+import { Button, ConfirmDialog, EmptyState, useToast } from "@/shared/components";
 import styles from "./ListadoProyectosOrg.module.css";
-
-const ESTADOS = [
-  { value: "nuevo", label: "Nuevo" },
-  { value: "en_progreso", label: "En progreso" },
-  { value: "completado", label: "Completado" },
-  { value: "archivado", label: "Archivado" },
-] as const;
-
-const COLUMNAS_PIPELINE = [
-  { value: "nuevo", label: "Nuevo", descripcion: "Pendiente de iniciar" },
-  { value: "en_progreso", label: "En progreso", descripcion: "Captura y revisión RF" },
-  { value: "completado", label: "Completado", descripcion: "Listo para entrega" },
-  { value: "archivado", label: "Archivado", descripcion: "Cerrado o fuera de operación" },
-] as const;
 
 const formularioVacio: ProyectoAdminCreate = {
   nombre: "",
@@ -57,7 +42,6 @@ export default function ListadoProyectosOrg() {
   const toast = useToast();
   const [page, setPage] = useState(1);
   const [filtros, setFiltros] = useState<ProyectosFilter>({});
-  const [proyectoArchivar, setProyectoArchivar] = useState<ProyectoListOut | null>(null);
   const [proyectoEliminar, setProyectoEliminar] = useState<ProyectoListOut | null>(null);
   const [proyectoReasignar, setProyectoReasignar] = useState<ProyectoListOut | null>(null);
   const [nuevoTecnicoId, setNuevoTecnicoId] = useState<number | "">("");
@@ -71,7 +55,6 @@ export default function ListadoProyectosOrg() {
   const { mutateAsync: crear, isPending: creando } = useCrearProyectoAdmin();
   const { mutateAsync: actualizar, isPending: actualizando } = useActualizarProyectoAdmin();
   const { mutateAsync: eliminar, isPending: eliminando } = useEliminarProyectoAdmin();
-  const { mutateAsync: archivar, isPending: archivando } = useArchivarProyectoAdmin();
   const { mutateAsync: reasignar, isPending: reasignando } = useReasignarTecnico();
 
   const tecnicos = (usuarios ?? []).filter((u) => u.activo && u.rol === "tecnico");
@@ -122,18 +105,6 @@ export default function ListadoProyectosOrg() {
     }
   };
 
-  const confirmarArchivar = async () => {
-    if (!proyectoArchivar) return;
-    try {
-      await archivar(proyectoArchivar.id);
-      toast.exito(`Proyecto "${proyectoArchivar.nombre}" archivado.`);
-    } catch {
-      toast.error("No se pudo archivar el proyecto.");
-    } finally {
-      setProyectoArchivar(null);
-    }
-  };
-
   const confirmarEliminar = async () => {
     if (!proyectoEliminar) return;
     try {
@@ -162,10 +133,9 @@ export default function ListadoProyectosOrg() {
   };
 
   const totalPaginas = data ? Math.max(1, Math.ceil(data.total / 20)) : 1;
-  const proyectosPorEstado = COLUMNAS_PIPELINE.map((columna) => ({
-    ...columna,
-    proyectos: (data?.items ?? []).filter((proyecto) => proyecto.estado === columna.value),
-  }));
+  const proyectos = data?.items ?? [];
+  const totalPuntos = proyectos.reduce((total, proyecto) => total + proyecto.cantidad_puntos, 0);
+  const proyectosConDatos = proyectos.filter((proyecto) => proyecto.cantidad_puntos > 0).length;
 
   const navegarRF = (proyecto: ProyectoListOut, seccion = "conjuntos-ap") => {
     navigate(`/admin/proyectos/${proyecto.id}/rf/${seccion}`, {
@@ -178,8 +148,10 @@ export default function ListadoProyectosOrg() {
       <div className={styles.encabezado}>
         <div>
           <p className={styles.preTitulo}>Operación RF</p>
-          <h1 className={styles.titulo}>Pipeline de proyectos</h1>
-          <p className={styles.subtitulo}>Seguimiento de relevamientos WiFi, análisis IA y publicación para Bulldog Tech.</p>
+          <h1 className={styles.titulo}>Proyectos RF para publicación</h1>
+          <p className={styles.subtitulo}>
+            Selección de datos relevados, generación IA y publicación controlada para clientes de Bulldog Tech.
+          </p>
         </div>
         <Button onClick={abrirNuevo} disabled={tecnicos.length === 0}>
           <Plus size={15} aria-hidden="true" /> Nuevo proyecto
@@ -187,18 +159,6 @@ export default function ListadoProyectosOrg() {
       </div>
 
       <div className={styles.filtros}>
-        <select
-          value={filtros.estado ?? ""}
-          onChange={(e) => {
-            setFiltros((prev) => ({ ...prev, estado: e.target.value || undefined }));
-            setPage(1);
-          }}
-          className={styles.select}
-          aria-label="Filtrar por estado"
-        >
-          <option value="">Todos los estados</option>
-          {ESTADOS.map((estado) => <option key={estado.value} value={estado.value}>{estado.label}</option>)}
-        </select>
         <select
           value={filtros.tecnico_id ?? ""}
           onChange={(e) => {
@@ -222,71 +182,73 @@ export default function ListadoProyectosOrg() {
         <EmptyState mensaje="No hay proyectos registrados aún." />
       ) : (
         <>
-          <div className={styles.pipeline} aria-label="Pipeline de proyectos RF">
-            {proyectosPorEstado.map((columna) => (
-              <section key={columna.value} className={styles.columna}>
-                <header className={styles.columnaHeader}>
+          <section className={styles.resumenFlujo} aria-label="Resumen del flujo RF">
+            <article>
+              <RadioTower size={18} aria-hidden="true" />
+              <span>Datos relevados</span>
+              <strong>{totalPuntos} punto(s)</strong>
+            </article>
+            <article>
+              <BrainCircuit size={18} aria-hidden="true" />
+              <span>Base para IA</span>
+              <strong>{proyectosConDatos} proyecto(s)</strong>
+            </article>
+            <article>
+              <Link2 size={18} aria-hidden="true" />
+              <span>Entrega</span>
+              <strong>Publicación explícita</strong>
+            </article>
+          </section>
+
+          <section className={styles.listaProyectos} aria-label="Proyectos RF disponibles">
+            {proyectos.map((proyecto) => (
+              <article key={proyecto.id} className={styles.tarjetaProyecto}>
+                <div className={styles.tarjetaHeader}>
                   <div>
-                    <h2>{columna.label}</h2>
-                    <p>{columna.descripcion}</p>
+                    <h2>{proyecto.nombre}</h2>
+                    <p>{proyecto.cliente?.nombre ?? "Sin cliente asignado"}</p>
                   </div>
-                  <span>{columna.proyectos.length}</span>
-                </header>
-
-                <div className={styles.tarjetas}>
-                  {columna.proyectos.length === 0 ? (
-                    <div className={styles.columnaVacia}>Sin proyectos</div>
-                  ) : (
-                    columna.proyectos.map((proyecto) => (
-                      <article key={proyecto.id} className={styles.tarjetaProyecto}>
-                        <div className={styles.tarjetaHeader}>
-                          <div>
-                            <h3>{proyecto.nombre}</h3>
-                            <p>{proyecto.cliente?.nombre ?? "Sin cliente asignado"}</p>
-                          </div>
-                          <Badge variante={proyecto.estado} etiqueta={_labelEstado(proyecto.estado)} />
-                        </div>
-
-                        <dl className={styles.detalles}>
-                          <div>
-                            <dt>Técnico</dt>
-                            <dd>{proyecto.tecnico.nombre}</dd>
-                          </div>
-                          <div>
-                            <dt>Puntos</dt>
-                            <dd>{proyecto.cantidad_puntos}</dd>
-                          </div>
-                          <div>
-                            <dt>Actividad</dt>
-                            <dd>{new Date(proyecto.ultima_actividad).toLocaleDateString("es-BO")}</dd>
-                          </div>
-                        </dl>
-
-                        <div className={styles.atajosRF}>
-                          <Button variante="secondary" tamano="sm" onClick={() => navegarRF(proyecto, "conjuntos-ap")}>
-                            <RadioTower size={14} /> RF
-                          </Button>
-                          <Button variante="secondary" tamano="sm" onClick={() => navegarRF(proyecto, "escenarios-ia")}>
-                            <BrainCircuit size={14} /> IA
-                          </Button>
-                          <Button variante="secondary" tamano="sm" onClick={() => navegarRF(proyecto, "publicacion")}>
-                            <Link2 size={14} /> Publicar
-                          </Button>
-                        </div>
-
-                        <div className={styles.acciones}>
-                          <Button variante="ghost" tamano="sm" onClick={() => abrirEditar(proyecto)}><Pencil size={14} /> Editar</Button>
-                          <Button variante="ghost" tamano="sm" onClick={() => { setProyectoReasignar(proyecto); setNuevoTecnicoId(""); setErrorModal(null); }}><UserCog size={14} /> Reasignar</Button>
-                          {proyecto.estado !== "archivado" && <Button variante="ghost" tamano="sm" onClick={() => setProyectoArchivar(proyecto)}><Archive size={14} /> Archivar</Button>}
-                          <Button variante="danger" tamano="sm" onClick={() => setProyectoEliminar(proyecto)}><Trash2 size={14} /> Eliminar</Button>
-                        </div>
-                      </article>
-                    ))
-                  )}
+                  <span className={styles.actividad}>
+                    <CalendarClock size={14} aria-hidden="true" />
+                    {new Date(proyecto.ultima_actividad).toLocaleDateString("es-BO")}
+                  </span>
                 </div>
-              </section>
+
+                <dl className={styles.detalles}>
+                  <div>
+                    <dt>Técnico</dt>
+                    <dd>{proyecto.tecnico.nombre}</dd>
+                  </div>
+                  <div>
+                    <dt>Datos relevados</dt>
+                    <dd>{proyecto.cantidad_puntos} punto(s)</dd>
+                  </div>
+                  <div>
+                    <dt>Cliente</dt>
+                    <dd>{proyecto.cliente?.nombre ?? "Pendiente"}</dd>
+                  </div>
+                </dl>
+
+                <div className={styles.flujoRF} aria-label={`Flujo RF de ${proyecto.nombre}`}>
+                  <Button variante="secondary" tamano="sm" onClick={() => navegarRF(proyecto, "conjuntos-ap")}>
+                    <RadioTower size={14} /> Seleccionar datos
+                  </Button>
+                  <Button variante="secondary" tamano="sm" onClick={() => navegarRF(proyecto, "escenarios-ia")}>
+                    <BrainCircuit size={14} /> Generar IA
+                  </Button>
+                  <Button variante="secondary" tamano="sm" onClick={() => navegarRF(proyecto, "publicacion")}>
+                    <Link2 size={14} /> Publicar al cliente
+                  </Button>
+                </div>
+
+                <div className={styles.acciones}>
+                  <Button variante="ghost" tamano="sm" onClick={() => abrirEditar(proyecto)}><Pencil size={14} /> Editar</Button>
+                  <Button variante="ghost" tamano="sm" onClick={() => { setProyectoReasignar(proyecto); setNuevoTecnicoId(""); setErrorModal(null); }}><UserCog size={14} /> Reasignar</Button>
+                  <Button variante="danger" tamano="sm" onClick={() => setProyectoEliminar(proyecto)}><Trash2 size={14} /> Eliminar</Button>
+                </div>
+              </article>
             ))}
-          </div>
+          </section>
           {totalPaginas > 1 && <div className={styles.paginacion}>
             <Button variante="secondary" tamano="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>‹ Anterior</Button>
             <span className={styles.infoPag}>Página {page} de {totalPaginas} — {data.total} proyectos</span>
@@ -295,8 +257,7 @@ export default function ListadoProyectosOrg() {
         </>
       )}
 
-      {proyectoArchivar && <ConfirmDialog titulo={`¿Archivar "${proyectoArchivar.nombre}"?`} descripcion="Dejará de aparecer entre los proyectos activos del técnico." textoConfirmar="Archivar" cargando={archivando} onCancelar={() => setProyectoArchivar(null)} onConfirmar={confirmarArchivar} />}
-      {proyectoEliminar && <ConfirmDialog titulo={`¿Eliminar "${proyectoEliminar.nombre}"?`} descripcion="Se eliminarán también sus datos dependientes. Los proyectos con reportes exportados están protegidos." textoConfirmar="Eliminar" cargando={eliminando} onCancelar={() => setProyectoEliminar(null)} onConfirmar={confirmarEliminar} />}
+      {proyectoEliminar && <ConfirmDialog titulo={`¿Eliminar "${proyectoEliminar.nombre}"?`} descripcion="Se eliminarán también sus datos dependientes." textoConfirmar="Eliminar" cargando={eliminando} onCancelar={() => setProyectoEliminar(null)} onConfirmar={confirmarEliminar} />}
 
       {proyectoEditar && (
         <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby="modal-proyecto">
@@ -308,7 +269,6 @@ export default function ListadoProyectosOrg() {
                 <label className={styles.campo}><span>Nombre *</span><input autoFocus required maxLength={200} value={formulario.nombre} onChange={(e) => setFormulario((f) => ({ ...f, nombre: e.target.value }))} /></label>
                 <label className={styles.campo}><span>Técnico *</span><select required value={formulario.tecnico_id || ""} onChange={(e) => setFormulario((f) => ({ ...f, tecnico_id: Number(e.target.value) }))}><option value="">Seleccione…</option>{tecnicos.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}</select></label>
                 <label className={styles.campo}><span>Cliente</span><select value={formulario.cliente_id ?? ""} onChange={(e) => setFormulario((f) => ({ ...f, cliente_id: e.target.value ? Number(e.target.value) : null }))}><option value="">Sin cliente</option>{clientesDisponibles.map((c) => <option key={c.id} value={c.id}>{c.nombre}{c.activo ? "" : " (inactivo)"}</option>)}</select></label>
-                <label className={styles.campo}><span>Estado</span><select value={formulario.estado} onChange={(e) => setFormulario((f) => ({ ...f, estado: e.target.value as ProyectoAdminCreate["estado"] }))}>{ESTADOS.map((estado) => <option key={estado.value} value={estado.value}>{estado.label}</option>)}</select></label>
                 <label className={`${styles.campo} ${styles.campoCompleto}`}><span>Descripción</span><textarea rows={3} maxLength={500} value={formulario.descripcion ?? ""} onChange={(e) => setFormulario((f) => ({ ...f, descripcion: e.target.value }))} /></label>
               </div>
               {errorModal && <p className={styles.modalError} role="alert">{errorModal}</p>}
@@ -334,10 +294,6 @@ export default function ListadoProyectosOrg() {
       )}
     </div>
   );
-}
-
-function _labelEstado(estado: string): string {
-  return ESTADOS.find((item) => item.value === estado)?.label ?? estado;
 }
 
 function _detalleError(error: unknown, alternativo: string): string {

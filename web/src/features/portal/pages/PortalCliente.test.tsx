@@ -20,13 +20,17 @@ const portal: PortalClienteOut = {
     {
       id: 10,
       plano_id: 2,
+      conjunto_origen_id: null,
       nombre: "APs planta alta",
       proposito: "Validar cobertura del área administrativa",
-      descripcion: "Selección aprobada por Bulldog Tech.",
+      descripcion: "Selección compartida por Bulldog Tech.",
       es_principal: true,
       origen: "manual_web",
-      estado_gobernanza: "publicado_cliente",
       creado_por_id: 3,
+      resumen_ia: null,
+      metricas_ia: null,
+      restricciones_ia: null,
+      version_motor_ia: null,
       cantidad_aps: 1,
       items: [
         {
@@ -38,6 +42,14 @@ const portal: PortalClienteOut = {
           pos_x: 120,
           pos_y: 80,
           cantidad_puntos: 8,
+          accion_recomendada: null,
+          justificacion: null,
+          altura_m: null,
+          tipo_montaje: null,
+          banda: null,
+          modelo_ap: null,
+          costo_estimado: null,
+          radios: null,
         },
       ],
       created_at: "2026-06-20T10:00:00Z",
@@ -45,9 +57,6 @@ const portal: PortalClienteOut = {
     },
   ],
   heatmaps: [],
-  analisis: [],
-  escenarios: [],
-  reporte_disponible: false,
 };
 
 describe("PortalCliente", () => {
@@ -67,7 +76,7 @@ describe("PortalCliente", () => {
     render(<PortalCliente />);
 
     expect(screen.getByRole("heading", { name: "Datos reales relevados en sitio" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Subconjuntos y escenarios del modelo IA" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Conjuntos propuestos por IA" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "APs planta alta" })).toBeVisible();
     expect(screen.getByText("Validar cobertura del área administrativa")).toBeVisible();
     expect(screen.getAllByText(/aa:bb:cc:dd:ee:01/).length).toBeGreaterThan(0);

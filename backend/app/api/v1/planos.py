@@ -33,10 +33,16 @@ from app.schemas.plano import (
     PlanoCalibracionIn,
     PlanoOut,
     PlanoPoligonoInteresIn,
+    PuntoPlano,
     UrlFirmadaOut,
 )
 from app.services.geometria_service import area_poligono, normalizar_poligono
 from app.services.pdf_service import PdfService
+from app.services.poligono_ia_service import (
+    PoligonoIAConfigError,
+    PoligonoIAGenerationError,
+    PoligonoIAService,
+)
 from app.storage import LocalFilesystemStorage, generar_url_firmada, verificar_firma
 
 # Routers separados según prefijo lógico
@@ -136,9 +142,7 @@ def _validar_poligono_interes(
             detail="El polígono de interés requiere al menos 3 vértices.",
         )
     fuera = [
-        punto
-        for punto in poligono
-        if punto["x"] > ancho_px or punto["y"] > alto_px
+        punto for punto in poligono if punto["x"] > ancho_px or punto["y"] > alto_px
     ]
     if fuera:
         raise HTTPException(
@@ -186,9 +190,9 @@ async def importar_plano(
         )
 
     nombre_orig = archivo.filename or "plano"
-    nombre_plano = _normalizar_texto(nombre, max_len=MAX_NOMBRE) or Path(
-        nombre_orig
-    ).name
+    nombre_plano = (
+        _normalizar_texto(nombre, max_len=MAX_NOMBRE) or Path(nombre_orig).name
+    )
     descripcion_plano = _normalizar_texto(
         descripcion,
         max_len=MAX_DESCRIPCION,
@@ -237,9 +241,8 @@ async def importar_plano(
                 detail="La imagen está corrupta o no es válida.",
             ) from exc
         tamano_bytes = len(contenido)
-        ruta = (
-            f"{proyecto_id}/{secrets.token_hex(8)}_{Path(nombre_orig).stem}.{formato_final}"
-        )
+        nombre_seguro = f"{secrets.token_hex(8)}_{Path(nombre_orig).stem}"
+        ruta = f"{proyecto_id}/{nombre_seguro}.{formato_final}"
         storage.save(contenido, ruta)
 
     plano_repo = PlanoRepository(db)
@@ -418,6 +421,97 @@ def actualizar_poligono_interes(
     )
     poligono = _validar_poligono_interes(
         body=body,
+        ancho_px=plano.ancho_px,
+        alto_px=plano.alto_px,
+    )
+    plano_repo = PlanoRepository(db)
+    plano = plano_repo.actualizar_poligono_interes(
+        plano=plano,
+        poligono=poligono,
+    )
+    return PlanoOut.from_plano(
+        plano,
+        url_firmada=_firmar(plano.ruta_storage, request),
+        cantidad_puntos=plano_repo.contar_puntos(plano_id=plano.id),
+    )
+
+
+@router_planos.delete(
+    "/{plano_id}/poligono-interes",
+    response_model=PlanoOut,
+    summary="Eliminar polígono de interés del plano",
+    description="Quita el área operativa guardada sin eliminar puntos ni mediciones.",
+)
+def eliminar_poligono_interes(
+    plano_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> PlanoOut:
+    plano = _verificar_ownership_plano(
+        plano_id=plano_id,
+        current_user=current_user,
+        db=db,
+    )
+    plano_repo = PlanoRepository(db)
+    plano = plano_repo.actualizar_poligono_interes(
+        plano=plano,
+        poligono=None,
+    )
+    return PlanoOut.from_plano(
+        plano,
+        url_firmada=_firmar(plano.ruta_storage, request),
+        cantidad_puntos=plano_repo.contar_puntos(plano_id=plano.id),
+    )
+
+
+@router_planos.post(
+    "/{plano_id}/poligono-interes/generar-ia",
+    response_model=PlanoOut,
+    summary="Generar polígono de interés con IA",
+    description=(
+        "Usa Azure OpenAI para proponer el área operativa del plano y la persiste "
+        "si supera las validaciones geométricas del backend."
+    ),
+)
+def generar_poligono_interes_ia(
+    plano_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> PlanoOut:
+    plano = _verificar_ownership_plano(
+        plano_id=plano_id,
+        current_user=current_user,
+        db=db,
+    )
+    storage = _storage()
+    if not storage.exists(plano.ruta_storage):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Archivo de plano no encontrado en storage.",
+        )
+    try:
+        poligono_ia = PoligonoIAService().generar_desde_imagen(
+            imagen_bytes=storage.read(plano.ruta_storage),
+            ancho_original=plano.ancho_px,
+            alto_original=plano.alto_px,
+        )
+    except PoligonoIAConfigError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except PoligonoIAGenerationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+    poligono = _validar_poligono_interes(
+        body=PlanoPoligonoInteresIn(
+            puntos=[PuntoPlano(x=punto["x"], y=punto["y"]) for punto in poligono_ia]
+        ),
         ancho_px=plano.ancho_px,
         alto_px=plano.alto_px,
     )

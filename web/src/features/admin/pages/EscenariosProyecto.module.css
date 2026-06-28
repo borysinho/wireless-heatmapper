@@ -263,6 +263,28 @@
   font: inherit;
 }
 
+.selectorBandas {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.selectorBandas button {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  flex: 1;
+  font: inherit;
+  padding: 0.5rem 0.75rem;
+}
+
+.selectorBandas button:hover,
+.selectorBandas .bandaActiva {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
 .selectorHeader {
   display: flex;
   align-items: center;
@@ -497,6 +519,12 @@
   color: var(--text);
   font-size: 0.82rem;
   padding: 0.35rem 0.55rem;
+}
+
+.resultadosLista {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
 }
 
 .recomendaciones {

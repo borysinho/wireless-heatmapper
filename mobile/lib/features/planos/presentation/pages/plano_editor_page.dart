@@ -8,6 +8,7 @@ import '../../../captura/presentation/cubit/captura_cubit.dart';
 import '../../../captura/presentation/cubit/captura_state.dart';
 import '../../../captura/presentation/widgets/plano_puntos_painter.dart';
 import '../../../captura/presentation/widgets/punto_detalle_sheet.dart';
+import '../../../../core/theme/app_tokens.dart';
 import '../../domain/entities/plano.dart';
 import '../cubit/planos_cubit.dart';
 import '../cubit/planos_state.dart';
@@ -66,6 +67,7 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
   bool _modoPoligono = false;
   bool _guardandoPoligono = false;
   List<Offset> _poligonoInteres = [];
+  List<Offset>? _poligonoAntesRedibujar;
   Offset? _ultimoTapPoligono;
   DateTime? _ultimoTapPoligonoAt;
 
@@ -276,9 +278,14 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
     if (_guardandoPoligono || !_plano.calibrado) return;
     setState(() {
       if (_modoPoligono) {
-        _poligonoInteres =
+        final anterior = _poligonoAntesRedibujar;
+        _poligonoInteres = anterior ??
             _plano.poligonoInteres.map((p) => Offset(p.x, p.y)).toList();
+        _poligonoAntesRedibujar = null;
       } else {
+        _poligonoAntesRedibujar =
+            _plano.poligonoInteres.map((p) => Offset(p.x, p.y)).toList();
+        _poligonoInteres = [];
         _modoCalibracion = false;
         _modoRegla = false;
         _reglaA = null;
@@ -307,10 +314,6 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
     }
 
     setState(() {
-      if (_plano.poligonoInteres.length >= 3 &&
-          _poligonoInteres.length == _plano.poligonoInteres.length) {
-        _poligonoInteres = [];
-      }
       _poligonoInteres = [..._poligonoInteres, puntoImagen];
       _ultimoTapPoligono = puntoImagen;
       _ultimoTapPoligonoAt = ahora;
@@ -344,6 +347,7 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
         _poligonoInteres = guardado.map((p) => Offset(p.x, p.y)).toList();
         _modoPoligono = false;
         _guardandoPoligono = false;
+        _poligonoAntesRedibujar = null;
         _ultimoTapPoligono = null;
         _ultimoTapPoligonoAt = null;
       });
@@ -358,6 +362,127 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
       final mensaje = e is CapturaApiException
           ? e.mensaje
           : 'No se pudo guardar el polígono.';
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(mensaje),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+    }
+  }
+
+  Future<void> _confirmarEliminarPoligono() async {
+    if (_guardandoPoligono || _plano.poligonoInteres.isEmpty) return;
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Eliminar polígono'),
+        content: const Text(
+          '¿Eliminar el polígono de interés? Los puntos y mediciones del plano se conservan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmado != true || !mounted) return;
+
+    setState(() => _guardandoPoligono = true);
+    try {
+      final puntos =
+          await context.read<CapturaCubit>().eliminarPoligonoInteres(_plano.id);
+      if (!mounted) return;
+      setState(() {
+        _plano = _plano.copyWith(poligonoInteres: puntos);
+        _poligonoInteres = puntos.map((p) => Offset(p.x, p.y)).toList();
+        _modoPoligono = false;
+        _guardandoPoligono = false;
+        _poligonoAntesRedibujar = null;
+        _ultimoTapPoligono = null;
+        _ultimoTapPoligonoAt = null;
+      });
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Polígono de interés eliminado.')),
+        );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _guardandoPoligono = false);
+      final mensaje = e is CapturaApiException
+          ? e.mensaje
+          : 'No se pudo eliminar el polígono.';
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(mensaje),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+    }
+  }
+
+  Future<void> _generarPoligonoIA() async {
+    if (_guardandoPoligono) return;
+    if (_plano.poligonoInteres.length >= 3) {
+      final confirmado = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Generar con IA'),
+          content: const Text(
+            'La IA reemplazará el polígono actual. Los puntos y mediciones se conservan.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Generar'),
+            ),
+          ],
+        ),
+      );
+      if (confirmado != true || !mounted) return;
+    }
+
+    setState(() => _guardandoPoligono = true);
+    try {
+      final puntos = await context
+          .read<CapturaCubit>()
+          .generarPoligonoInteresIA(_plano.id);
+      if (!mounted) return;
+      setState(() {
+        _plano = _plano.copyWith(poligonoInteres: puntos);
+        _poligonoInteres = puntos.map((p) => Offset(p.x, p.y)).toList();
+        _modoPoligono = false;
+        _guardandoPoligono = false;
+        _poligonoAntesRedibujar = null;
+        _ultimoTapPoligono = null;
+        _ultimoTapPoligonoAt = null;
+      });
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Polígono generado con IA.')),
+        );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _guardandoPoligono = false);
+      final mensaje = e is CapturaApiException
+          ? e.mensaje
+          : 'No se pudo generar el polígono con IA.';
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
         ..showSnackBar(
@@ -750,57 +875,168 @@ class _PlanoEditorPageState extends State<PlanoEditorPage> {
                   icon: const Icon(Icons.check),
                   label: const Text('Confirmar'),
                 )
-              : (_plano.calibrado
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        FloatingActionButton.extended(
-                          heroTag: 'area-interes',
-                          onPressed:
-                              _guardandoPoligono ? null : _alternarModoPoligono,
-                          icon: Icon(
-                            _modoPoligono
-                                ? Icons.close
-                                : (_plano.poligonoInteres.length >= 3
-                                    ? Icons.polyline
-                                    : Icons.polyline_outlined),
-                          ),
-                          label: Text(
-                            _modoPoligono ? 'Cancelar' : 'Área',
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        FloatingActionButton.extended(
-                          heroTag: 'iniciar-captura',
-                          onPressed: _modoPoligono
-                              ? null
-                              : () async {
-                                  await context.pushNamed(
-                                    'captura',
-                                    pathParameters: {
-                                      'id': _plano.proyectoId.toString(),
-                                      'planoId': _plano.id.toString(),
-                                    },
-                                    extra: {
-                                      'planoId': _plano.id,
-                                      'imagenUrl':
-                                          resolverUrlFirmada(_plano.urlFirmada),
-                                      'anchoPlanoPx': _plano.anchoPx.toDouble(),
-                                      'altoPlanoPx': _plano.altoPx.toDouble(),
-                                    },
-                                  );
-                                  _cargarPuntosSiCalibrado();
-                                  _recargarPoligonoInteres();
-                                },
-                          icon: const Icon(Icons.wifi_find),
-                          label: const Text('Iniciar captura'),
-                        ),
-                      ],
-                    )
-                  : null),
+              : null,
+          bottomNavigationBar: !_modoCalibracion && _plano.calibrado
+              ? _PlanoEditorActions(
+                  modoPoligono: _modoPoligono,
+                  tienePoligono: _plano.poligonoInteres.length >= 3,
+                  guardandoPoligono: _guardandoPoligono,
+                  onGenerarIA: _generarPoligonoIA,
+                  onEliminar: _confirmarEliminarPoligono,
+                  onArea: _alternarModoPoligono,
+                  onCaptura: () async {
+                    await context.pushNamed(
+                      'captura',
+                      pathParameters: {
+                        'id': _plano.proyectoId.toString(),
+                        'planoId': _plano.id.toString(),
+                      },
+                      extra: {
+                        'planoId': _plano.id,
+                        'imagenUrl': resolverUrlFirmada(_plano.urlFirmada),
+                        'anchoPlanoPx': _plano.anchoPx.toDouble(),
+                        'altoPlanoPx': _plano.altoPx.toDouble(),
+                      },
+                    );
+                    _cargarPuntosSiCalibrado();
+                    _recargarPoligonoInteres();
+                  },
+                )
+              : null,
         ),
       ),
     );
+  }
+}
+
+class _PlanoEditorActions extends StatelessWidget {
+  final bool modoPoligono;
+  final bool tienePoligono;
+  final bool guardandoPoligono;
+  final VoidCallback onGenerarIA;
+  final VoidCallback onEliminar;
+  final VoidCallback onArea;
+  final VoidCallback onCaptura;
+
+  const _PlanoEditorActions({
+    required this.modoPoligono,
+    required this.tienePoligono,
+    required this.guardandoPoligono,
+    required this.onGenerarIA,
+    required this.onEliminar,
+    required this.onArea,
+    required this.onCaptura,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      top: false,
+      child: Material(
+        elevation: 10,
+        color: theme.colorScheme.surface,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.sm,
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compacto = constraints.maxWidth < 390;
+              return Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (!modoPoligono) ...[
+                    _IconAction(
+                      tooltip: 'Generar área con IA',
+                      icon: Icons.auto_awesome,
+                      onPressed: guardandoPoligono ? null : onGenerarIA,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                  ],
+                  if (!modoPoligono && tienePoligono) ...[
+                    _IconAction(
+                      tooltip: 'Eliminar área',
+                      icon: Icons.delete_outline,
+                      onPressed: guardandoPoligono ? null : onEliminar,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                  ],
+                  if (compacto)
+                    _IconAction(
+                      tooltip: modoPoligono ? 'Cancelar área' : 'Área',
+                      icon: modoPoligono
+                          ? Icons.close
+                          : (tienePoligono
+                              ? Icons.polyline
+                              : Icons.polyline_outlined),
+                      onPressed: guardandoPoligono ? null : onArea,
+                    )
+                  else
+                    FilledButton.tonalIcon(
+                      onPressed: guardandoPoligono ? null : onArea,
+                      icon: Icon(
+                        modoPoligono
+                            ? Icons.close
+                            : (tienePoligono
+                                ? Icons.polyline
+                                : Icons.polyline_outlined),
+                      ),
+                      label: Text(modoPoligono ? 'Cancelar' : 'Área'),
+                    ),
+                  const SizedBox(width: AppSpacing.sm),
+                  if (compacto)
+                    _IconAction(
+                      tooltip: 'Iniciar captura',
+                      icon: Icons.wifi_find,
+                      onPressed: modoPoligono ? null : onCaptura,
+                      filled: true,
+                    )
+                  else
+                    Flexible(
+                      child: FilledButton.icon(
+                        onPressed: modoPoligono ? null : onCaptura,
+                        icon: const Icon(Icons.wifi_find),
+                        label: const Text('Captura'),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _IconAction extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final bool filled;
+
+  const _IconAction({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.filled = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return filled
+        ? IconButton.filled(
+            tooltip: tooltip,
+            onPressed: onPressed,
+            icon: Icon(icon),
+          )
+        : IconButton.filledTonal(
+            tooltip: tooltip,
+            onPressed: onPressed,
+            icon: Icon(icon),
+          );
   }
 }
 

@@ -30,7 +30,7 @@ const GRUPOS_NAV = [
   {
     titulo: "Operación RF",
     items: [
-      { to: "/admin/proyectos", etiqueta: "Pipeline de proyectos", Icono: ClipboardList },
+      { to: "/admin/proyectos", etiqueta: "Proyectos RF", Icono: ClipboardList },
     ],
   },
   {

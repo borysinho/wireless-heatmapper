@@ -3,11 +3,11 @@
 Sprint 1 — Usa SQLite en memoria para independencia de PostgreSQL.
 """
 
-import pytest
 import anyio
 import anyio.to_thread
 import fastapi.routing
 import httpx
+import pytest
 import starlette.concurrency
 import starlette.routing
 from sqlalchemy import create_engine
@@ -36,7 +36,7 @@ starlette.routing.run_in_threadpool = _run_in_threadpool_directo
 starlette.concurrency.run_in_threadpool = _run_in_threadpool_directo
 anyio.to_thread.run_sync = _anyio_run_sync_directo
 
-from app.main import app
+from app.main import app  # noqa: E402
 
 TEST_DATABASE_URL = "sqlite://"
 

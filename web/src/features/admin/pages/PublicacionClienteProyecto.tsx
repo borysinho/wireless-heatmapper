@@ -8,11 +8,10 @@ import {
   useCrearEnlaceCliente,
   useEnlacesCliente,
   useEnviarCorreoEnlaceCliente,
-  useEscenariosProyecto,
   usePlanosProyecto,
 } from "../hooks/useProyectosOrg";
 import { useClientes } from "../hooks/useClientes";
-import type { ConjuntoAPOut, EscenarioOptimizadoOut } from "../types";
+import type { ConjuntoAPOut } from "../types";
 import styles from "./PublicacionClienteProyecto.module.css";
 
 export default function PublicacionClienteProyecto() {
@@ -30,16 +29,11 @@ export default function PublicacionClienteProyecto() {
   const [conjuntosSeleccionados, setConjuntosSeleccionados] = useState<Set<number>>(
     () => new Set(),
   );
-  const [escenariosSeleccionados, setEscenariosSeleccionados] = useState<Set<number>>(
-    () => new Set(),
-  );
 
   const { data: planos, isLoading: cargandoPlanos, isError: errorPlanos } =
     usePlanosProyecto(proyectoId);
   const planoIds = useMemo(() => (planos ?? []).map((plano) => plano.id), [planos]);
   const consultasConjuntos = useConjuntosPorPlanos(planoIds);
-  const { data: escenarios, isLoading: cargandoEscenarios, isError: errorEscenarios } =
-    useEscenariosProyecto(proyectoId);
   const { data: clientes, isLoading: cargandoClientes, isError: errorClientes } =
     useClientes();
   const { data: enlacesCliente, isLoading: cargandoEnlaces } =
@@ -58,31 +52,21 @@ export default function PublicacionClienteProyecto() {
         .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1)),
     [consultasConjuntos],
   );
-  const conjuntosPublicados = useMemo(
+  const conjuntosPublicables = useMemo(
     () =>
       conjuntos
-        .filter((conjunto) => conjunto.estado_gobernanza === "publicado_cliente")
         .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1)),
     [conjuntos],
-  );
-  const escenariosPublicados = useMemo(
-    () =>
-      (escenarios ?? [])
-        .filter((escenario) => escenario.estado_gobernanza === "publicado_cliente")
-        .sort((a, b) => (a.created_at < b.created_at ? 1 : -1)),
-    [escenarios],
   );
   const cargandoConjuntos = consultasConjuntos.some((consulta) => consulta.isLoading);
   const errorConjuntos = consultasConjuntos.some((consulta) => consulta.isError);
   const cargando =
     cargandoPlanos ||
     cargandoConjuntos ||
-    cargandoEscenarios ||
     cargandoClientes;
   const error =
     errorPlanos ||
     errorConjuntos ||
-    errorEscenarios ||
     errorClientes;
   const clientesActivos = useMemo(
     () => (clientes ?? []).filter((cliente) => cliente.activo),
@@ -93,24 +77,16 @@ export default function PublicacionClienteProyecto() {
 
   const conjuntosSeleccionadosPublicados = useMemo(
     () =>
-      conjuntosPublicados.filter((conjunto) =>
+      conjuntosPublicables.filter((conjunto) =>
         conjuntosSeleccionados.has(conjunto.id),
       ),
-    [conjuntosPublicados, conjuntosSeleccionados],
+    [conjuntosPublicables, conjuntosSeleccionados],
   );
-  const escenariosSeleccionadosPublicados = useMemo(
-    () =>
-      escenariosPublicados.filter((escenario) =>
-        escenariosSeleccionados.has(escenario.id),
-      ),
-    [escenariosPublicados, escenariosSeleccionados],
-  );
-  const totalSeleccionado =
-    conjuntosSeleccionadosPublicados.length + escenariosSeleccionadosPublicados.length;
+  const totalSeleccionado = conjuntosSeleccionadosPublicados.length;
 
   const handleCrearEnlace = async () => {
     if (totalSeleccionado === 0) {
-      toast.error("Seleccione al menos un conjunto o escenario IA publicado para el cliente.");
+      toast.error("Seleccione al menos un conjunto para el cliente.");
       return;
     }
     if (clienteDestinoId !== null && !clienteDestino?.email_referencia) {
@@ -123,7 +99,6 @@ export default function PublicacionClienteProyecto() {
         cliente_id: clienteDestinoId,
         contenido: {
           conjunto_ids: conjuntosSeleccionadosPublicados.map((item) => item.id),
-          escenario_ids: escenariosSeleccionadosPublicados.map((item) => item.id),
         },
       });
       const url = `${window.location.origin}${enlace.url_publica}`;
@@ -184,7 +159,7 @@ export default function PublicacionClienteProyecto() {
       <div className={styles.encabezadoSeccion}>
         <div>
           <h2>Publicación al cliente</h2>
-          <p>El enlace incluye únicamente conjuntos y escenarios IA publicados seleccionados.</p>
+          <p>El enlace incluye los conjuntos seleccionados, sean relevados en campo o propuestos por IA.</p>
         </div>
         <div className={styles.generador}>
           <label>
@@ -240,10 +215,10 @@ export default function PublicacionClienteProyecto() {
 
       <div className={styles.selectorGrid}>
         <PanelSeleccion
-          titulo="Conjuntos publicados"
-          vacio="No hay conjuntos publicados para cliente."
+          titulo="Conjuntos disponibles"
+          vacio="No hay conjuntos disponibles para este proyecto."
         >
-          {conjuntosPublicados.map((conjunto) => (
+          {conjuntosPublicables.map((conjunto) => (
             <SeleccionConjunto
               key={conjunto.id}
               conjunto={conjunto}
@@ -258,22 +233,9 @@ export default function PublicacionClienteProyecto() {
         </PanelSeleccion>
 
         <PanelSeleccion
-          titulo="Escenarios IA publicados"
-          vacio="No hay propuestas IA publicadas para cliente."
-        >
-          {escenariosPublicados.map((escenario) => (
-            <SeleccionEscenario
-              key={escenario.id}
-              escenario={escenario}
-              seleccionado={escenariosSeleccionados.has(escenario.id)}
-              onToggle={() =>
-                setEscenariosSeleccionados((prev) =>
-                  _toggleSet(prev, escenario.id),
-                )
-              }
-            />
-          ))}
-        </PanelSeleccion>
+          titulo="Criterio de publicación"
+          vacio="Seleccione conjuntos específicos para crear el enlace."
+        />
       </div>
 
       {ultimoEnlace && <p className={styles.enlaceReciente}>{ultimoEnlace}</p>}
@@ -297,8 +259,7 @@ export default function PublicacionClienteProyecto() {
                     </strong>
                     <small>
                       {enlace.accesos} acceso(s) ·{" "}
-                      {enlace.contenido.conjunto_ids.length} conjunto(s) ·{" "}
-                      {enlace.contenido.escenario_ids.length} escenario(s) IA
+                      {enlace.contenido.conjunto_ids.length} conjunto(s)
                     </small>
                   </div>
                   <div className={styles.enlaceAcciones}>
@@ -397,7 +358,7 @@ function PanelSeleccion({
 }: {
   titulo: string;
   vacio: string;
-  children: ReactNode;
+  children?: ReactNode;
 }) {
   const items = Array.isArray(children) ? children.filter(Boolean) : children;
   const estaVacio = Array.isArray(items) ? items.length === 0 : !items;
@@ -426,32 +387,6 @@ function SeleccionConjunto({
         <small>
           {_labelOrigen(conjunto.origen)} · {conjunto.cantidad_aps} APs
         </small>
-      </span>
-    </label>
-  );
-}
-
-function SeleccionEscenario({
-  escenario,
-  seleccionado,
-  onToggle,
-}: {
-  escenario: EscenarioOptimizadoOut;
-  seleccionado: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <label className={styles.itemSeleccion}>
-      <input type="checkbox" checked={seleccionado} onChange={onToggle} />
-      <span>
-        <strong>{escenario.nombre}</strong>
-        <small>{escenario.resumen}</small>
-        <span className={styles.itemMeta}>
-          <span>Actual {_porcentaje(escenario.pct_cobertura_actual)}</span>
-          <span>Proyectada {_porcentaje(escenario.pct_cobertura)}</span>
-          <span>{escenario.cantidad_aps} AP(s)</span>
-          <span>{escenario.confianza}</span>
-        </span>
       </span>
     </label>
   );
@@ -491,8 +426,4 @@ function _labelOrigen(origen: string): string {
     ia: "IA",
   };
   return mapa[origen] ?? origen;
-}
-
-function _porcentaje(valor: number): string {
-  return `${valor.toFixed(1)}%`;
 }

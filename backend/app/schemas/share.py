@@ -9,17 +9,13 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.schemas.escenario import EscenarioOptimizadoOut
-from app.schemas.heatmap import AnalisisCoberturaOut, ConjuntoAPOut, MapaCalorOut
+from app.schemas.heatmap import ConjuntoAPOut, MapaCalorOut
 from app.schemas.plano import PlanoOut
 
 
 class ContenidoEnlaceIn(BaseModel):
     conjunto_ids: list[int] = Field(default_factory=list)
     mapa_ids: list[int] = Field(default_factory=list)
-    analisis_ids: list[int] = Field(default_factory=list)
-    escenario_ids: list[int] = Field(default_factory=list)
-    reporte_id: int | None = None
 
 
 class EnlaceClienteCrearIn(BaseModel):
@@ -67,6 +63,3 @@ class PortalClienteOut(BaseModel):
     planos: list[PlanoOut]
     conjuntos: list[ConjuntoAPOut]
     heatmaps: list[MapaCalorOut]
-    analisis: list[AnalisisCoberturaOut]
-    escenarios: list[EscenarioOptimizadoOut]
-    reporte_disponible: bool

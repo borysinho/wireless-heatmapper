@@ -40,7 +40,10 @@ def crear_usuario(
     "",
     response_model=list[UsuarioOut],
     summary="Listar usuarios",
-    description="Lista todos los usuarios del sistema. Solo accesible por rol ADMIN. PB-13.",
+    description=(
+        "Lista todos los usuarios del sistema. Solo accesible por rol ADMIN. "
+        "PB-13."
+    ),
 )
 def listar_usuarios(
     solo_activos: bool = False,

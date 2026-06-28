@@ -6,7 +6,7 @@ const PESTANAS = [
   {
     path: "conjuntos-ap",
     etiqueta: "Conjuntos AP",
-    descripcion: "Revisión y estados de conjuntos móviles, web e IA",
+    descripcion: "Selección de datos relevados para revisión y publicación",
     Icono: Network,
   },
   {

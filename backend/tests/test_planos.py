@@ -16,7 +16,9 @@ from app.storage.signing import generar_url_firmada, verificar_firma
 def storage_temporal(monkeypatch):
     with tempfile.TemporaryDirectory() as tmp:
         monkeypatch.setattr(settings, "storage_root", tmp)
-        monkeypatch.setattr(settings, "storage_url_secret", "test_secret_32chars_minimo_xxxxxx")
+        monkeypatch.setattr(
+            settings, "storage_url_secret", "test_secret_32chars_minimo_xxxxxx"
+        )
         monkeypatch.setattr(settings, "storage_url_ttl_seconds", 60)
         monkeypatch.setattr(settings, "public_api_url", "")
         yield tmp
@@ -88,7 +90,9 @@ def test_importar_plano_con_nombre_y_descripcion(client, tecnico_token):
     assert r.status_code == 201, r.text
     body = r.json()
     assert body["nombre"] == "Planta baja - recepción"
-    assert body["descripcion"] == "Plano provisto por Bulldog Tech. para el área frontal."
+    assert (
+        body["descripcion"] == "Plano provisto por Bulldog Tech. para el área frontal."
+    )
 
 
 def test_importar_plano_jpg(client, tecnico_token):
@@ -295,8 +299,7 @@ def test_guardar_poligono_interes(client, tecnico_token):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["poligono_interes"] == [
-        {"x": float(punto["x"]), "y": float(punto["y"])}
-        for punto in puntos
+        {"x": float(punto["x"]), "y": float(punto["y"])} for punto in puntos
     ]
 
     detalle = client.get(
@@ -305,6 +308,73 @@ def test_guardar_poligono_interes(client, tecnico_token):
     )
     assert detalle.status_code == 200, detalle.text
     assert detalle.json()["poligono_interes"] == body["poligono_interes"]
+
+
+def test_eliminar_poligono_interes(client, tecnico_token):
+    pid = _crear_proyecto(client, tecnico_token)
+    plano = _subir_plano(client, tecnico_token, pid)
+    puntos = [
+        {"x": 10, "y": 10},
+        {"x": 180, "y": 10},
+        {"x": 180, "y": 120},
+        {"x": 10, "y": 120},
+    ]
+    r_guardar = client.patch(
+        f"/planos/{plano['id']}/poligono-interes",
+        json={"puntos": puntos},
+        headers={"Authorization": f"Bearer {tecnico_token}"},
+    )
+    assert r_guardar.status_code == 200, r_guardar.text
+
+    r = client.delete(
+        f"/planos/{plano['id']}/poligono-interes",
+        headers={"Authorization": f"Bearer {tecnico_token}"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["poligono_interes"] == []
+
+    detalle = client.get(
+        f"/planos/{plano['id']}",
+        headers={"Authorization": f"Bearer {tecnico_token}"},
+    )
+    assert detalle.status_code == 200, detalle.text
+    assert detalle.json()["poligono_interes"] == []
+
+
+def test_generar_poligono_interes_ia_persiste_resultado(
+    client,
+    tecnico_token,
+    monkeypatch,
+):
+    from app.api.v1 import planos as planos_mod
+
+    class FakePoligonoIAService:
+        def generar_desde_imagen(self, *, imagen_bytes, ancho_original, alto_original):
+            assert imagen_bytes
+            assert ancho_original == 1000
+            assert alto_original == 500
+            return [
+                {"x": 20, "y": 20},
+                {"x": 900, "y": 20},
+                {"x": 900, "y": 450},
+                {"x": 20, "y": 450},
+            ]
+
+    monkeypatch.setattr(planos_mod, "PoligonoIAService", FakePoligonoIAService)
+
+    pid = _crear_proyecto(client, tecnico_token)
+    plano = _subir_plano(client, tecnico_token, pid)
+    r = client.post(
+        f"/planos/{plano['id']}/poligono-interes/generar-ia",
+        headers={"Authorization": f"Bearer {tecnico_token}"},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["poligono_interes"] == [
+        {"x": 20.0, "y": 20.0},
+        {"x": 900.0, "y": 20.0},
+        {"x": 900.0, "y": 450.0},
+        {"x": 20.0, "y": 450.0},
+    ]
 
 
 def test_guardar_poligono_interes_fuera_del_plano_falla(client, tecnico_token):
@@ -423,9 +493,12 @@ def test_url_firmada_manipulada(client, tecnico_token):
 
 
 def test_verificar_firma_unit():
-    assert verificar_firma(
-        ruta_relativa="x.png",
-        secret="s",
-        exp=int(time.time()) + 60,
-        sig="bad",
-    ) is False
+    assert (
+        verificar_firma(
+            ruta_relativa="x.png",
+            secret="s",
+            exp=int(time.time()) + 60,
+            sig="bad",
+        )
+        is False
+    )

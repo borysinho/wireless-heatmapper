@@ -64,7 +64,9 @@ class TestCrearUsuario:
         assert resp.status_code == 201
         assert envios == [("correo@test.bo", "Pass1234!")]
 
-    def test_email_duplicado_retorna_409(self, client: TestClient, admin_token: str, admin_usuario: Usuario):
+    def test_email_duplicado_retorna_409(
+        self, client: TestClient, admin_token: str, admin_usuario: Usuario
+    ):
         """CA-3: Email ya registrado → 409 Conflict."""
         resp = client.post(
             "/admin/usuarios",
@@ -78,7 +80,9 @@ class TestCrearUsuario:
         )
         assert resp.status_code == 409
 
-    def test_tecnico_no_puede_crear_usuario(self, client: TestClient, tecnico_token: str):
+    def test_tecnico_no_puede_crear_usuario(
+        self, client: TestClient, tecnico_token: str
+    ):
         """CA-4: Rol TECNICO intenta acceder a /admin/usuarios → 403."""
         resp = client.post(
             "/admin/usuarios",
@@ -121,7 +125,9 @@ class TestCrearUsuario:
 class TestActivarDesactivar:
     """PB-13 — Sp1-07: activar y desactivar cuentas."""
 
-    def test_desactivar_usuario(self, client: TestClient, admin_token: str, tecnico_usuario: Usuario):
+    def test_desactivar_usuario(
+        self, client: TestClient, admin_token: str, tecnico_usuario: Usuario
+    ):
         """Desactivar técnico → activo=False + tokens revocados."""
         resp = client.patch(
             f"/admin/usuarios/{tecnico_usuario.id}",
@@ -131,7 +137,9 @@ class TestActivarDesactivar:
         assert resp.status_code == 200
         assert resp.json()["activo"] is False
 
-    def test_activar_usuario(self, client: TestClient, admin_token: str, tecnico_usuario: Usuario):
+    def test_activar_usuario(
+        self, client: TestClient, admin_token: str, tecnico_usuario: Usuario
+    ):
         """Reactivar técnico → activo=True."""
         # Primero desactivar
         client.patch(
@@ -168,7 +176,11 @@ class TestListarUsuarios:
     """PB-13: listado de usuarios."""
 
     def test_admin_lista_todos_los_usuarios(
-        self, client: TestClient, admin_token: str, admin_usuario: Usuario, tecnico_usuario: Usuario
+        self,
+        client: TestClient,
+        admin_token: str,
+        admin_usuario: Usuario,
+        tecnico_usuario: Usuario,
     ):
         """Admin puede listar todos los usuarios del sistema."""
         resp = client.get(
@@ -196,7 +208,7 @@ class TestValidacionesSchema:
     """Cobertura de schemas/usuario.py: ramas de validación no ejercidas."""
 
     def test_rol_invalido_retorna_422(self, client: TestClient, admin_token: str):
-        """rol_valido: valor fuera de ('tecnico','admin') → 422 (línea 25 schemas/usuario.py)."""
+        """rol_valido rechaza valores fuera del catálogo."""
         resp = client.post(
             "/admin/usuarios",
             json={
@@ -212,7 +224,7 @@ class TestValidacionesSchema:
     def test_reset_password_corta_en_patch_retorna_422(
         self, client: TestClient, admin_token: str, tecnico_usuario
     ):
-        """UsuarioUpdate.password_min_length: password < 8 en PATCH → 422 (líneas 51-53 schemas/usuario.py)."""
+        """UsuarioUpdate rechaza password menor a 8 caracteres."""
         resp = client.patch(
             f"/admin/usuarios/{tecnico_usuario.id}",
             json={"password": "123"},

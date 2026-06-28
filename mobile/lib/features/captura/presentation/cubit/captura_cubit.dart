@@ -100,6 +100,14 @@ class CapturaCubit extends Cubit<CapturaState> {
     return _repo.guardarPoligonoInteres(planoId: planoId, puntos: puntos);
   }
 
+  Future<List<PuntoPlano>> eliminarPoligonoInteres(int planoId) {
+    return _repo.eliminarPoligonoInteres(planoId);
+  }
+
+  Future<List<PuntoPlano>> generarPoligonoInteresIA(int planoId) {
+    return _repo.generarPoligonoInteresIA(planoId);
+  }
+
   /// Detiene la sesión. El estado vuelve a [CapturaInactiva].
   void detenerSesion() => emit(const CapturaInactiva());
 

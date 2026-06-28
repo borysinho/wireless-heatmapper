@@ -28,8 +28,10 @@ def _get_service(db: Session = Depends(get_db)) -> AuthService:
     "/login",
     response_model=TokenResponse,
     summary="Iniciar sesión",
-    description="Valida email y contraseña. Retorna access_token (15 min) + refresh_token (7 días). "
-    "PB-09 — CA-1, CA-2, CA-3.",
+    description=(
+        "Valida email y contraseña. Retorna access_token (15 min) + "
+        "refresh_token (7 días). PB-09 — CA-1, CA-2, CA-3."
+    ),
 )
 def login(
     body: LoginRequest,

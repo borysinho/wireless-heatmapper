@@ -1,14 +1,10 @@
-"""Tests Sprint 5 — PB-07, PB-12 y PB-08."""
+"""Tests Sprint 5 — PB-07."""
 
-import fitz
 import pytest
 
 from app.ai.modelo_propagacion import ModeloPropagacion
 from app.ai.optimizador_ap_service import OptimizadorAPService
-from app.models.escenario import EscenarioOptimizado, RecomendacionAP
-from app.models.proyecto import Proyecto
 from app.services.interpolacion_service import PuntoRSSI
-from app.services.reporte_service import ReporteService
 
 
 def test_fspl_pierde_seis_db_por_duplicar_distancia():
@@ -85,98 +81,3 @@ def test_optimizador_respeta_poligono_de_interes():
     for recomendacion in escenarios[0].recomendaciones:
         assert recomendacion["coord_x"] >= 200
         assert 0 <= recomendacion["coord_y"] <= 300
-
-
-def test_reporte_pdf_contiene_hash_y_bytes_pdf():
-    proyecto = Proyecto(
-        id=1, nombre="Survey Bulldog", estado="en_progreso", tecnico_id=1
-    )
-    escenario = EscenarioOptimizado(
-        id=1,
-        proyecto_id=1,
-        plano_id=1,
-        nombre="Alternativa 1",
-        banda="5",
-        modelo_ap="AP empresarial de potencia ajustable",
-        pct_cobertura_actual=42.0,
-        pct_cobertura=88.0,
-        costo_estimado=240.0,
-        cantidad_aps=2,
-        resumen="Cobertura proyectada con dos APs.",
-        restricciones={"max_aps": 2},
-        metricas={"mejora_pct": 46.0},
-    )
-    escenario.recomendaciones = [
-        RecomendacionAP(
-            orden=1,
-            accion="AGREGAR",
-            coord_x=40,
-            coord_y=30,
-            banda="5",
-            modelo_ap="AP empresarial de potencia ajustable",
-            costo_estimado=120,
-            rssi_proyectado=-62,
-            justificacion="RSSI proyectado -62 dBm en zona critica.",
-        )
-    ]
-
-    reporte = ReporteService().generar(
-        proyecto=proyecto,
-        escenarios=[escenario],
-        escenario_seleccionado=escenario,
-        cantidad_mediciones=12,
-    )
-
-    assert reporte.contenido.startswith(b"%PDF")
-    assert len(reporte.sha256) == 64
-    assert reporte.tamanio_bytes == len(reporte.contenido)
-
-
-def test_reporte_pdf_deduplica_y_omite_costos_modelos():
-    proyecto = Proyecto(
-        id=1, nombre="Survey Bulldog", estado="en_progreso", tecnico_id=1
-    )
-    escenario = EscenarioOptimizado(
-        id=8,
-        proyecto_id=1,
-        plano_id=1,
-        nombre="Alternativa 3",
-        banda="5",
-        modelo_ap="AP WiFi 6 Bulldog BT-AX1800",
-        pct_cobertura_actual=75.4,
-        pct_cobertura=99.4,
-        costo_estimado=360.0,
-        cantidad_aps=3,
-        resumen="Texto historico con modelo AP WiFi 6 Bulldog BT-AX1800.",
-        restricciones={"max_aps": 3},
-        metricas={"mejora_pct": 24.0},
-    )
-    escenario.recomendaciones = [
-        RecomendacionAP(
-            orden=1,
-            accion="AGREGAR",
-            coord_x=262,
-            coord_y=258,
-            banda="5",
-            modelo_ap="AP WiFi 6 Bulldog BT-AX1800",
-            costo_estimado=120,
-            rssi_proyectado=-52.6,
-            justificacion="Texto historico con modelo AP WiFi 6 Bulldog BT-AX1800.",
-        )
-    ]
-
-    reporte = ReporteService().generar(
-        proyecto=proyecto,
-        escenarios=[escenario, escenario, escenario],
-        escenario_seleccionado=escenario,
-        cantidad_mediciones=233,
-    )
-
-    doc = fitz.open(stream=reporte.contenido, filetype="pdf")
-    texto = "\n".join(page.get_text() for page in doc)
-    doc.close()
-
-    assert "Informe tecnico de cobertura WiFi" in texto
-    assert texto.count("Ubicaciones sugeridas") == 1
-    assert "AP WiFi 6 Bulldog" not in texto
-    assert "costo" not in texto.lower()

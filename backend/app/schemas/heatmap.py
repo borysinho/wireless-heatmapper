@@ -1,6 +1,6 @@
-"""DTOs del módulo de heatmap y análisis.
+"""DTOs del módulo de heatmap y conjuntos AP.
 
-Sprint 4 — PB-05, PB-06.
+Sprint 4 — PB-05.
 """
 
 from __future__ import annotations
@@ -13,14 +13,6 @@ from pydantic import BaseModel, Field
 AlgoritmoHeatmap = Literal["IDW", "KRIGING"]
 ResolucionHeatmap = Literal[64, 128, 256]
 ModoGeneracionHeatmap = Literal["INDIVIDUAL", "SUBCONJUNTO", "CONJUNTO_COMPLETO"]
-EstadoGobernanzaConjunto = Literal[
-    "borrador_tecnico",
-    "preliminar",
-    "pendiente_revision",
-    "aprobado_interno",
-    "publicado_cliente",
-    "descartado",
-]
 
 
 class EscalaHeatmapItem(BaseModel):
@@ -58,7 +50,6 @@ class MapaCalorOut(BaseModel):
     id: int
     plano_id: int
     conjunto_ap_id: int | None = None
-    analisis_id: int | None = None
     modo_generacion: str = "SUBCONJUNTO"
     algoritmo: str
     resolucion: int
@@ -83,21 +74,6 @@ class MapaCalorOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class APDetectadoOut(BaseModel):
-    id: int
-    bssid: str
-    ssid: str
-    canal: int | None
-    frecuencia_mhz: int | None
-    rssi_promedio: float
-    pos_x: float
-    pos_y: float
-    confirmado: bool
-    created_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
 class ConjuntoAPItemOut(BaseModel):
     bssid: str
     ssid: str
@@ -107,6 +83,14 @@ class ConjuntoAPItemOut(BaseModel):
     pos_x: float | None = None
     pos_y: float | None = None
     cantidad_puntos: int | None = None
+    accion_recomendada: str | None = None
+    justificacion: str | None = None
+    altura_m: float | None = None
+    tipo_montaje: str | None = None
+    banda: str | None = None
+    modelo_ap: str | None = None
+    costo_estimado: float | None = None
+    radios: list[dict] | None = None
 
 
 class ConjuntoAPBase(BaseModel):
@@ -127,7 +111,6 @@ class ConjuntoAPActualizarIn(BaseModel):
     descripcion: str | None = Field(default=None, max_length=1000)
     es_principal: bool | None = None
     bssids: list[str] | None = Field(default=None, min_length=1)
-    estado_gobernanza: EstadoGobernanzaConjunto | None = None
 
 
 class ConjuntoAPOut(BaseModel):
@@ -139,8 +122,11 @@ class ConjuntoAPOut(BaseModel):
     descripcion: str | None
     es_principal: bool
     origen: str
-    estado_gobernanza: str
     creado_por_id: int | None
+    resumen_ia: str | None = None
+    metricas_ia: dict | None = None
+    restricciones_ia: dict | None = None
+    version_motor_ia: str | None = None
     cantidad_aps: int
     items: list[ConjuntoAPItemOut]
     created_at: datetime
@@ -160,25 +146,3 @@ class ActualizarUbicacionAPConjuntoIn(BaseModel):
     bssid: str = Field(..., min_length=17, max_length=17)
     pos_x: float = Field(..., ge=0)
     pos_y: float = Field(..., ge=0)
-
-
-class AnalisisCoberturaOut(BaseModel):
-    id: int
-    mapa_calor_id: int
-    pct_cobertura: float
-    pct_zonas_muertas: float
-    celdas_zonas_muertas: int
-    cantidad_solapamientos: int
-    cantidad_interferencias: int
-    hallazgos: dict
-    resumen: str
-    aps_detectados: list[APDetectadoOut]
-    created_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-class ConfirmarAPIn(BaseModel):
-    pos_x: float = Field(..., ge=0)
-    pos_y: float = Field(..., ge=0)
-    confirmado: bool = True

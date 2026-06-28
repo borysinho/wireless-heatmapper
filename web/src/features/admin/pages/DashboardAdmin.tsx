@@ -25,7 +25,7 @@ export default function DashboardAdmin() {
     const items = proyectos?.items ?? [];
     return {
       totalProyectos: proyectos?.total ?? 0,
-      proyectosActivos: items.filter((p) => p.estado === "nuevo" || p.estado === "en_progreso").length,
+      proyectosConDatos: items.filter((p) => p.cantidad_puntos > 0).length,
       puntosCapturados: items.reduce((total, p) => total + p.cantidad_puntos, 0),
       tecnicos: (usuarios ?? []).filter((u) => u.activo && u.rol === "tecnico").length,
       clientes: (clientes ?? []).filter((c) => c.activo).length,
@@ -58,8 +58,8 @@ export default function DashboardAdmin() {
         </article>
         <article className={styles.metrica}>
           <Activity size={20} aria-hidden="true" />
-          <span>Activos</span>
-          <strong>{resumen.proyectosActivos}</strong>
+          <span>Con datos RF</span>
+          <strong>{resumen.proyectosConDatos}</strong>
         </article>
         <article className={styles.metrica}>
           <RadioTower size={20} aria-hidden="true" />
@@ -135,8 +135,8 @@ export default function DashboardAdmin() {
             <button type="button" onClick={() => navigate("/admin/proyectos")}>
               <ClipboardList size={18} aria-hidden="true" />
               <span>
-                <strong>Pipeline de proyectos</strong>
-                <small>Asignación, estado y actividad RF.</small>
+                <strong>Proyectos RF</strong>
+                <small>Datos relevados, escenarios IA y publicación al cliente.</small>
               </span>
             </button>
             <button type="button" onClick={() => navigate("/admin/usuarios")}>

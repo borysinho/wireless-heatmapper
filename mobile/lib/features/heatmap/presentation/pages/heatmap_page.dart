@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../domain/entities/analisis_cobertura.dart';
 import '../../domain/entities/ap_disponible.dart';
-import '../../domain/entities/ap_detectado.dart';
 import '../../domain/entities/conjunto_ap.dart';
 import '../../domain/entities/escala_heatmap.dart';
 import '../../domain/entities/mapa_calor.dart';
@@ -11,7 +9,7 @@ import '../../../planos/domain/entities/plano.dart';
 import '../cubit/heatmap_cubit.dart';
 import '../cubit/heatmap_state.dart';
 
-/// Pantalla de heatmap y análisis. Sprint 4 — PB-05 / PB-06.
+/// Pantalla de heatmap. Sprint 4 — PB-05.
 class HeatmapPage extends StatefulWidget {
   final int planoId;
   final String imagenUrl;
@@ -177,7 +175,6 @@ class _HeatmapPageState extends State<HeatmapPage> {
                     child: _HeatmapCanvas(
                       planoUrl: widget.imagenUrl,
                       tamanoPlano: _tamanoPlano,
-                      aps: const [],
                       apsInteres: state.apsSeleccionados,
                       bssidActivo: state.bssidActivo,
                       apPosXPorBssid: state.apPosXPorBssid,
@@ -203,7 +200,6 @@ class _HeatmapPageState extends State<HeatmapPage> {
                                 posY: pos.dy,
                                 persistir: true,
                               ),
-                      onTapAP: _mostrarDetalleAP,
                     ),
                   ),
                   _SeleccionAPPanel(
@@ -223,7 +219,6 @@ class _HeatmapPageState extends State<HeatmapPage> {
                       puntosLectura: listo.mapa.puntosLectura,
                       poligonoInteres: listo.mapa.poligonoInteres,
                       tamanoPlano: _tamanoPlano,
-                      aps: const [],
                       apsInteres: apsInteresListo,
                       bssidActivo: listo.bssidActivo,
                       apPosXPorBssid: {
@@ -236,20 +231,15 @@ class _HeatmapPageState extends State<HeatmapPage> {
                       },
                       onTapPlano: (_) => _limpiarFiltroAP(),
                       onTapAPInteres: _alternarFiltroAP,
-                      onTapAP: _mostrarDetalleAP,
                       onTapPuntoLectura: _mostrarDetallePuntoLectura,
                     ),
                   ),
-                  _AnalisisPanel(
+                  _HeatmapInfoPanel(
                     mapa: listo.mapa,
-                    analisis: listo.analisis,
-                    analizando: listo.analizando,
                     escala: listo.mapa.escala,
                     apsInteres: apsInteresListo,
                     bssidActivo: listo.bssidActivo,
                     onLimpiarFiltro: _limpiarFiltroAP,
-                    onRefreshAnalisis: () =>
-                        context.read<HeatmapCubit>().regenerarAnalisis(),
                     onRegenerarHeatmap: _generarHeatmap,
                   ),
                 ],
@@ -257,53 +247,6 @@ class _HeatmapPageState extends State<HeatmapPage> {
           },
         );
       },
-    );
-  }
-
-  void _mostrarDetalleAP(APDetectado ap) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(ap.ssid, style: Theme.of(ctx).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            _DatoAP(label: 'BSSID', value: ap.bssid),
-            _DatoAP(label: 'Canal', value: ap.canal?.toString() ?? 'Sin dato'),
-            _DatoAP(
-              label: 'RSSI prom.',
-              value: '${ap.rssiPromedio.toStringAsFixed(1)} dBm',
-            ),
-            _DatoAP(
-              label: 'Ubicación',
-              value:
-                  'x ${ap.posX.toStringAsFixed(1)} · y ${ap.posY.toStringAsFixed(1)}',
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: ap.confirmado
-                    ? null
-                    : () {
-                        context.read<HeatmapCubit>().confirmarAP(ap);
-                        Navigator.of(ctx).pop();
-                      },
-                icon: Icon(ap.confirmado
-                    ? Icons.verified
-                    : Icons.add_location_alt_outlined),
-                label: Text(ap.confirmado
-                    ? 'Ubicación confirmada'
-                    : 'Confirmar ubicación estimada'),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -737,7 +680,6 @@ class _HeatmapCanvas extends StatefulWidget {
   final List<PuntoLecturaHeatmap> puntosLectura;
   final List<PuntoPlano> poligonoInteres;
   final Size tamanoPlano;
-  final List<APDetectado> aps;
   final List<APDisponible> apsInteres;
   final String? bssidActivo;
   final Map<String, double> apPosXPorBssid;
@@ -746,7 +688,6 @@ class _HeatmapCanvas extends StatefulWidget {
   final void Function(APDisponible ap)? onTapAPInteres;
   final void Function(APDisponible ap, Offset posPlano)? onMoverAPInteres;
   final void Function(APDisponible ap, Offset posPlano)? onSoltarAPInteres;
-  final void Function(APDetectado ap) onTapAP;
   final void Function(PuntoLecturaHeatmap punto)? onTapPuntoLectura;
 
   const _HeatmapCanvas({
@@ -755,7 +696,6 @@ class _HeatmapCanvas extends StatefulWidget {
     this.puntosLectura = const [],
     this.poligonoInteres = const [],
     required this.tamanoPlano,
-    required this.aps,
     this.apsInteres = const [],
     this.bssidActivo,
     this.apPosXPorBssid = const {},
@@ -764,7 +704,6 @@ class _HeatmapCanvas extends StatefulWidget {
     this.onTapAPInteres,
     this.onMoverAPInteres,
     this.onSoltarAPInteres,
-    required this.onTapAP,
     this.onTapPuntoLectura,
   });
 
@@ -875,12 +814,6 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
                           zoomEscala: _zoomEscala,
                         ),
                       ),
-                    CustomPaint(
-                      painter: _APPainter(
-                        aps: widget.aps,
-                        tamanoPlano: widget.tamanoPlano,
-                      ),
-                    ),
                     ...widget.apsInteres.map((ap) {
                       final escalaMarcador =
                           _zoomEscala <= 0 ? 1.0 : 1.0 / _zoomEscala;
@@ -902,24 +835,6 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
                         child: Transform.scale(
                           scale: escalaMarcador,
                           child: _APInteresMarker(ap: ap, activo: activo),
-                        ),
-                      );
-                    }),
-                    ...widget.aps.map((ap) {
-                      final left =
-                          (ap.posX / widget.tamanoPlano.width) * w - 22;
-                      final top =
-                          (ap.posY / widget.tamanoPlano.height) * h - 22;
-                      return Positioned(
-                        left: left.clamp(0, w - 44).toDouble(),
-                        top: top.clamp(0, h - 44).toDouble(),
-                        child: IconButton.filledTonal(
-                          tooltip: 'AP ${ap.ssid}',
-                          iconSize: 18,
-                          onPressed: () => widget.onTapAP(ap),
-                          icon: Icon(ap.confirmado
-                              ? Icons.router
-                              : Icons.router_outlined),
                         ),
                       );
                     }),
@@ -1381,32 +1296,25 @@ String _detalleAP(APDisponible ap) {
   return '${ap.bssid} · $canal · ${ap.cantidadPuntos} puntos';
 }
 
-class _AnalisisPanel extends StatelessWidget {
+class _HeatmapInfoPanel extends StatelessWidget {
   final MapaCalor mapa;
-  final AnalisisCobertura? analisis;
-  final bool analizando;
   final List<EscalaHeatmap> escala;
   final List<APDisponible> apsInteres;
   final String? bssidActivo;
   final VoidCallback onLimpiarFiltro;
-  final VoidCallback onRefreshAnalisis;
   final VoidCallback onRegenerarHeatmap;
 
-  const _AnalisisPanel({
+  const _HeatmapInfoPanel({
     required this.mapa,
-    required this.analisis,
-    required this.analizando,
     required this.escala,
     required this.apsInteres,
     required this.bssidActivo,
     required this.onLimpiarFiltro,
-    required this.onRefreshAnalisis,
     required this.onRegenerarHeatmap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final a = analisis;
     APDisponible? apActivo;
     for (final ap in apsInteres) {
       if (ap.bssid == bssidActivo) {
@@ -1445,23 +1353,6 @@ class _AnalisisPanel extends StatelessWidget {
                   icon: const Icon(Icons.info_outline),
                 ),
                 IconButton(
-                  tooltip: a == null ? 'Analizando cobertura' : 'Ver análisis',
-                  onPressed:
-                      a == null ? null : () => _mostrarAnalisis(context, a),
-                  icon: analizando
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.analytics_outlined),
-                ),
-                IconButton(
-                  tooltip: 'Reanalizar',
-                  onPressed: analizando ? null : onRefreshAnalisis,
-                  icon: const Icon(Icons.refresh),
-                ),
-                IconButton(
                   tooltip: 'Regenerar heatmap',
                   onPressed: onRegenerarHeatmap,
                   icon: const Icon(Icons.local_fire_department_outlined),
@@ -1486,14 +1377,6 @@ class _AnalisisPanel extends StatelessWidget {
     );
   }
 
-  void _mostrarAnalisis(BuildContext context, AnalisisCobertura analisis) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (ctx) => _AnalisisHeatmapSheet(analisis: analisis),
-    );
-  }
 }
 
 class _PanelInferiorDesplazable extends StatelessWidget {
@@ -1562,76 +1445,6 @@ class _InfoHeatmapSheet extends StatelessWidget {
                   ),
                 ),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AnalisisHeatmapSheet extends StatelessWidget {
-  final AnalisisCobertura analisis;
-
-  const _AnalisisHeatmapSheet({required this.analisis});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            Text('Análisis de cobertura', style: theme.textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text(analisis.resumen),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _Metrica(
-                    icon: Icons.check_circle_outline,
-                    valor: '${analisis.pctCobertura.toStringAsFixed(1)}%',
-                    label: 'Cobertura',
-                  ),
-                ),
-                Expanded(
-                  child: _Metrica(
-                    icon: Icons.do_not_disturb_on_outlined,
-                    valor: '${analisis.pctZonasMuertas.toStringAsFixed(1)}%',
-                    label: 'Zonas muertas',
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _Metrica(
-                    icon: Icons.hub_outlined,
-                    valor: analisis.cantidadSolapamientos.toString(),
-                    label: 'Solap.',
-                  ),
-                ),
-                Expanded(
-                  child: _Metrica(
-                    icon: Icons.wifi_tethering_error,
-                    valor: analisis.cantidadInterferencias.toString(),
-                    label: 'Interf.',
-                  ),
-                ),
-                Expanded(
-                  child: _Metrica(
-                    icon: Icons.grid_view_outlined,
-                    valor: analisis.celdasZonasMuertas.toString(),
-                    label: 'Celdas',
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),
@@ -1980,35 +1793,6 @@ class _PuntosLecturaPainter extends CustomPainter {
     return oldDelegate.puntos != puntos ||
         oldDelegate.tamanoPlano != tamanoPlano ||
         oldDelegate.zoomEscala != zoomEscala;
-  }
-}
-
-class _APPainter extends CustomPainter {
-  final List<APDetectado> aps;
-  final Size tamanoPlano;
-
-  const _APPainter({
-    required this.aps,
-    required this.tamanoPlano,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.black.withValues(alpha: 0.25)
-      ..strokeWidth = 1;
-    for (final ap in aps) {
-      final center = Offset(
-        (ap.posX / tamanoPlano.width) * size.width,
-        (ap.posY / tamanoPlano.height) * size.height,
-      );
-      canvas.drawCircle(center, 18, paint..style = PaintingStyle.stroke);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _APPainter oldDelegate) {
-    return oldDelegate.aps != aps || oldDelegate.tamanoPlano != tamanoPlano;
   }
 }
 

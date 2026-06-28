@@ -242,27 +242,50 @@
   vector-effect: non-scaling-stroke;
 }
 
-.puntosLectura .puntoLectura,
-.puntosLectura .apMapa {
+.puntosLectura .puntoLectura {
   cursor: help;
   pointer-events: auto;
 }
 
-.apMapa circle {
-  fill: #173f5f;
-  opacity: 0.95;
-  stroke: #fff;
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
+.capaApsMapa {
+  height: 100%;
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  transform-origin: center;
+  width: 100%;
 }
 
-.apMapa path {
-  fill: none;
-  stroke: #fff;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
+.marcadorApMapa {
+  align-items: center;
+  background: #176b9f;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px rgba(15, 23, 42, 0.86),
+    0 5px 12px rgba(15, 23, 42, 0.38);
+  color: #ffffff;
+  cursor: help;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 800;
+  height: 1.85rem;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  pointer-events: auto;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 1.85rem;
+}
+
+.marcadorApMapa::after {
+  border: 2px solid rgba(23, 107, 159, 0.42);
+  border-radius: 50%;
+  content: "";
+  inset: -0.45rem;
+  position: absolute;
 }
 
 .capasMapa {

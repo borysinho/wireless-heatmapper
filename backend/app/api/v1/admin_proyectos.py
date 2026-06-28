@@ -10,7 +10,6 @@ from app.core.database import get_db
 from app.core.security import require_admin
 from app.models.usuario import Usuario
 from app.repositories.cliente_repository import ClienteRepository
-from app.repositories.escenario_repository import ReporteRepository
 from app.repositories.proyecto_repository import ProyectoRepository
 from app.repositories.usuario_repository import UsuarioRepository
 from app.schemas.proyecto import (
@@ -233,10 +232,5 @@ def eliminar_proyecto_admin(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Proyecto no encontrado.",
-        )
-    if ReporteRepository(db).existe_para_proyecto(proyecto_id=proyecto.id):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="No se puede eliminar un proyecto con reportes exportados.",
         )
     repo.eliminar(proyecto=proyecto)

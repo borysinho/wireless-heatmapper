@@ -10,8 +10,6 @@ from app.api.v1.heatmaps import (
     _resolver_aps_interes,
     actualizar_conjunto_ap,
     actualizar_ubicacion_ap_conjunto,
-    analizar_mapa,
-    confirmar_ap,
     crear_conjunto_ap,
     generar_heatmap,
     generar_heatmap_conjunto,
@@ -24,7 +22,6 @@ from app.models.proyecto import Proyecto
 from app.repositories.medicion_repository import MedicionRepository
 from app.schemas.heatmap import (
     ActualizarUbicacionAPConjuntoIn,
-    ConfirmarAPIn,
     ConjuntoAPActualizarIn,
     ConjuntoAPCrearIn,
     GenerarHeatmapConjuntoIn,
@@ -207,35 +204,28 @@ def test_crear_conjunto_ap_y_generar_heatmaps_por_modo(
 
     assert conjunto.nombre == "Red corporativa"
     assert conjunto.origen == "manual_movil"
-    assert conjunto.estado_gobernanza == "borrador_tecnico"
     assert conjunto.creado_por_id == tecnico_usuario.id
     assert conjunto.cantidad_aps == 2
     assert [item.bssid for item in conjunto.items] == [
         "aa:bb:cc:dd:ee:01",
         "aa:bb:cc:dd:ee:02",
     ]
-    assert listar_conjuntos_ap(
-        plano_id=plano_id,
-        db=db_session,
-        current_user=tecnico_usuario,
-    )[0].id == conjunto.id
-
-    with pytest.raises(HTTPException) as exc:
-        actualizar_conjunto_ap(
-            conjunto_id=conjunto.id,
-            body=ConjuntoAPActualizarIn(estado_gobernanza="aprobado_interno"),
+    assert (
+        listar_conjuntos_ap(
+            plano_id=plano_id,
             db=db_session,
             current_user=tecnico_usuario,
-        )
-    assert exc.value.status_code == 403
+        )[0].id
+        == conjunto.id
+    )
 
     revisado = actualizar_conjunto_ap(
         conjunto_id=conjunto.id,
-        body=ConjuntoAPActualizarIn(estado_gobernanza="aprobado_interno"),
+        body=ConjuntoAPActualizarIn(descripcion="Selección técnica validada."),
         db=db_session,
         current_user=admin_usuario,
     )
-    assert revisado.estado_gobernanza == "aprobado_interno"
+    assert revisado.descripcion == "Selección técnica validada."
 
     mapa_completo = generar_heatmap_conjunto(
         conjunto_id=conjunto.id,
@@ -430,9 +420,7 @@ def test_generar_heatmap_retorna_matriz_y_cache(db_session, tecnico_usuario):
         current_user=tecnico_usuario,
     )
     posiciones = {ap.bssid: (ap.pos_x, ap.pos_y) for ap in aps_tras_mapa_individual}
-    seleccionados = {
-        ap.bssid for ap in aps_tras_mapa_individual if ap.seleccionado
-    }
+    seleccionados = {ap.bssid for ap in aps_tras_mapa_individual if ap.seleccionado}
     assert posiciones["aa:bb:cc:dd:ee:01"] == (211, 141)
     assert posiciones["aa:bb:cc:dd:ee:02"] == (300, 120)
     assert seleccionados == {"aa:bb:cc:dd:ee:01"}
@@ -634,64 +622,6 @@ def test_insertar_punto_invalida_cache_heatmap(db_session, tecnico_usuario):
     )
 
     assert mapa2.id != mapa1.id
-
-
-def test_analisis_detecta_metricas_aps_e_interferencias(db_session, tecnico_usuario):
-    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
-    _insertar_puntos_sinteticos(db_session, plano_id, cantidad=6)
-    mapa = generar_heatmap(
-        plano_id=plano_id,
-        request=None,
-        bssid=["aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"],
-        ap_pos_x=[210, 300],
-        ap_pos_y=[140, 120],
-        algoritmo="IDW",
-        resolucion=64,
-        db=db_session,
-        current_user=tecnico_usuario,
-    )
-
-    analisis = analizar_mapa(
-        mapa_id=mapa.id,
-        db=db_session,
-        current_user=tecnico_usuario,
-    )
-
-    assert analisis.mapa_calor_id == mapa.id
-    assert 0 <= analisis.pct_cobertura <= 100
-    assert analisis.celdas_zonas_muertas >= 0
-    assert analisis.cantidad_interferencias >= 1
-    tipos = {
-        item["tipo"]
-        for item in analisis.hallazgos["interferencias_canal"]
-    }
-    assert "CCI" in tipos
-    assert len(analisis.aps_detectados) == 2
-    assert {
-        ap.bssid
-        for ap in analisis.aps_detectados
-    } == {"aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"}
-    ap_principal = next(
-        ap for ap in analisis.aps_detectados if ap.bssid == "aa:bb:cc:dd:ee:01"
-    )
-    assert ap_principal.confirmado is True
-    assert ap_principal.pos_x == 210
-    assert ap_principal.pos_y == 140
-    ap_secundario = next(
-        ap for ap in analisis.aps_detectados if ap.bssid == "aa:bb:cc:dd:ee:02"
-    )
-    assert ap_secundario.confirmado is True
-    assert ap_secundario.pos_x == 300
-    assert ap_secundario.pos_y == 120
-
-    ap = analisis.aps_detectados[0]
-    actualizado = confirmar_ap(
-        ap_id=ap.id,
-        body=ConfirmarAPIn(pos_x=ap.pos_x + 1, pos_y=ap.pos_y + 1),
-        db=db_session,
-        current_user=tecnico_usuario,
-    )
-    assert actualizado.confirmado is True
 
 
 def test_interpolacion_200_puntos_resolucion_128_p95_menor_3s():

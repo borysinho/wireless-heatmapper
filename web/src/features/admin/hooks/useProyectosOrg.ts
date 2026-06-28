@@ -14,38 +14,28 @@ import {
   actualizarProyectoAdmin,
   actualizarEnlaceCliente,
   actualizarConjuntoAP,
-  analizarMapa,
-  cambiarEstadoConjuntoAP,
-  cambiarEstadoEscenario,
   crearEnlaceCliente,
   crearProyectoAdmin,
   crearConjuntoAP,
-  compararEscenario,
-  eliminarEscenario,
-  eliminarEscenariosProyecto,
   eliminarProyectoAdmin,
   enviarCorreoEnlaceCliente,
-  generarEscenariosProyecto,
+  generarConjuntosIAProyecto,
   generarHeatmapConjunto,
   listarConjuntosPlano,
   listarEnlacesCliente,
   listarMapasPlano,
   listarAPsPlano,
-  listarEscenariosProyecto,
   listarPlanosProyecto,
-  listarReportesProyecto,
   listarProyectosOrg,
   reasignarTecnico,
 } from "../api/proyectosApi";
 import type {
   EnlaceClienteCrearIn,
-  EstadoGobernanzaConjunto,
-  EstadoGobernanzaEscenario,
   ProyectoReasignarIn,
   ProyectoAdminCreate,
   ProyectoAdminUpdate,
   ProyectosFilter,
-  RestriccionesEscenarioIn,
+  RestriccionesIAIn,
 } from "../types";
 
 export function useProyectosOrg(
@@ -165,105 +155,17 @@ export function useGenerarHeatmapConjunto() {
   });
 }
 
-export function useAnalizarMapa() {
+export function useGenerarConjuntosIAProyecto(proyectoId: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (mapaId: number) => analizarMapa(mapaId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "planos"] }),
-  });
-}
-
-export function useCambiarEstadoConjuntoAP(proyectoId: number) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      conjuntoId,
-      estadoGobernanza,
-    }: {
-      conjuntoId: number;
-      estadoGobernanza: EstadoGobernanzaConjunto;
-    }) => cambiarEstadoConjuntoAP(conjuntoId, estadoGobernanza),
+    mutationFn: (body: RestriccionesIAIn) =>
+      generarConjuntosIAProyecto(proyectoId, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "planos"] });
       qc.invalidateQueries({
         queryKey: ["admin", "proyectos", proyectoId, "enlaces-cliente"],
       });
     },
-  });
-}
-
-export function useEscenariosProyecto(proyectoId: number) {
-  return useQuery({
-    queryKey: ["admin", "proyectos", proyectoId, "escenarios"],
-    queryFn: () => listarEscenariosProyecto(proyectoId),
-    enabled: proyectoId > 0,
-  });
-}
-
-export function useGenerarEscenariosProyecto(proyectoId: number) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: RestriccionesEscenarioIn) =>
-      generarEscenariosProyecto(proyectoId, body),
-    onSuccess: () =>
-      qc.invalidateQueries({
-        queryKey: ["admin", "proyectos", proyectoId, "escenarios"],
-      }),
-  });
-}
-
-export function useCambiarEstadoEscenario(proyectoId: number) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      escenarioId,
-      estadoGobernanza,
-    }: {
-      escenarioId: number;
-      estadoGobernanza: EstadoGobernanzaEscenario;
-    }) => cambiarEstadoEscenario(escenarioId, estadoGobernanza),
-    onSuccess: () =>
-      qc.invalidateQueries({
-        queryKey: ["admin", "proyectos", proyectoId, "escenarios"],
-      }),
-  });
-}
-
-export function useComparacionEscenario(escenarioId: number | null) {
-  return useQuery({
-    queryKey: ["admin", "escenarios", escenarioId, "comparacion"],
-    queryFn: () => compararEscenario(escenarioId ?? 0),
-    enabled: typeof escenarioId === "number" && escenarioId > 0,
-  });
-}
-
-export function useReportesProyecto(proyectoId: number) {
-  return useQuery({
-    queryKey: ["admin", "proyectos", proyectoId, "reportes"],
-    queryFn: () => listarReportesProyecto(proyectoId),
-    enabled: proyectoId > 0,
-  });
-}
-
-export function useEliminarEscenario(proyectoId: number) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (escenarioId: number) => eliminarEscenario(escenarioId),
-    onSuccess: () =>
-      qc.invalidateQueries({
-        queryKey: ["admin", "proyectos", proyectoId, "escenarios"],
-      }),
-  });
-}
-
-export function useEliminarEscenariosProyecto(proyectoId: number) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: () => eliminarEscenariosProyecto(proyectoId),
-    onSuccess: () =>
-      qc.invalidateQueries({
-        queryKey: ["admin", "proyectos", proyectoId, "escenarios"],
-      }),
   });
 }
 

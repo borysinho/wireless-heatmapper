@@ -19,14 +19,42 @@
 .compacto .visor { height: 18rem; }
 .arrastrando { cursor: grabbing; }
 .lienzo { flex: 0 0 auto; position: relative; transform-origin: center; }
-.plano, .heatmap, .marcadores { height: 100%; inset: 0; position: absolute; width: 100%; }
+.plano, .heatmap, .marcadores, .capaAps { height: 100%; inset: 0; position: absolute; width: 100%; }
 .plano { object-fit: fill; }
 .heatmap { image-rendering: auto; pointer-events: none; }
 .marcadores { overflow: visible; }
 .punto { cursor: pointer; stroke: rgba(255,255,255,.95); stroke-width: 2; vector-effect: non-scaling-stroke; }
-.ap { cursor: pointer; }
-.ap circle { fill: #172033; stroke: #fbbf24; stroke-width: 3; vector-effect: non-scaling-stroke; }
-.ap text { fill: white; font-size: 12px; font-weight: 800; pointer-events: none; }
+.capaAps { pointer-events: none; }
+.marcadorAp {
+  align-items: center;
+  background: #176b9f;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px rgba(15, 23, 42, 0.86),
+    0 5px 12px rgba(15, 23, 42, 0.38);
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 800;
+  height: 1.85rem;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  pointer-events: auto;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 1.85rem;
+}
+.marcadorAp::after {
+  border: 2px solid rgba(23, 107, 159, 0.42);
+  border-radius: 50%;
+  content: "";
+  inset: -0.45rem;
+  position: absolute;
+}
 .tooltip { background: rgba(15,23,42,.94); border: 1px solid rgba(255,255,255,.22); border-radius: .35rem; color: white; font-size: .72rem; padding: .3rem .45rem; pointer-events: none; position: absolute; z-index: 3; }
 .apHint { background: rgba(15,23,42,.97); border: 1px solid rgba(251,191,36,.55); border-radius: .45rem; box-shadow: 0 14px 30px rgba(0,0,0,.28); color: white; display: grid; gap: .35rem; max-width: min(18rem, 86%); min-width: 13rem; padding: .7rem .8rem; pointer-events: none; position: absolute; transform: translate(1rem,-50%); z-index: 4; }
 .apHint strong, .apHint span { display: block; }

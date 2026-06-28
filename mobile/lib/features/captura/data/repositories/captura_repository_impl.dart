@@ -41,6 +41,14 @@ class CapturaRepositoryImpl implements CapturaRepository {
       _datasource.guardarPoligonoInteres(planoId: planoId, puntos: puntos);
 
   @override
+  Future<List<PuntoPlano>> eliminarPoligonoInteres(int planoId) =>
+      _datasource.eliminarPoligonoInteres(planoId);
+
+  @override
+  Future<List<PuntoPlano>> generarPoligonoInteresIA(int planoId) =>
+      _datasource.generarPoligonoInteresIA(planoId);
+
+  @override
   Future<PuntoMedicion> obtenerPunto(int puntoId) =>
       _datasource.obtenerPunto(puntoId);
 

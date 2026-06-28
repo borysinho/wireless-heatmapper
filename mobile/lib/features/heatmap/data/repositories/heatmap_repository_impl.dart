@@ -1,6 +1,4 @@
-import '../../domain/entities/analisis_cobertura.dart';
 import '../../domain/entities/ap_disponible.dart';
-import '../../domain/entities/ap_detectado.dart';
 import '../../domain/entities/conjunto_ap.dart';
 import '../../domain/entities/mapa_calor.dart';
 import '../../domain/entities/inventario_rf.dart';
@@ -131,17 +129,4 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
     );
   }
 
-  @override
-  Future<AnalisisCobertura> analizarMapa(int mapaId) {
-    return _datasource.analizarMapa(mapaId);
-  }
-
-  @override
-  Future<APDetectado> confirmarAP({
-    required int apId,
-    required double posX,
-    required double posY,
-  }) {
-    return _datasource.confirmarAP(apId: apId, posX: posX, posY: posY);
-  }
 }

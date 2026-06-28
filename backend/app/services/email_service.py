@@ -1,12 +1,14 @@
 """Servicio SMTP para correos transaccionales."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 import logging
 import smtplib
-from html import escape
 from datetime import datetime
 from email.message import EmailMessage
+from html import escape
 
 from app.core.config import Settings, settings
 from app.models.usuario import Usuario

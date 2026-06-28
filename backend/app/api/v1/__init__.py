@@ -4,8 +4,8 @@ Agrupa auth, admin/usuarios, admin/proyectos, clientes y proyectos.
 
 Sprint 1 — PB-09, PB-13, PB-18, PB-19.
 Sprint 3 — PB-03, PB-04.
-Sprint 4 — PB-05, PB-06.
-Sprint 5 — PB-07, PB-12, PB-08.
+Sprint 4 — PB-05.
+Sprint 5 — PB-07.
 """
 
 from fastapi import APIRouter
@@ -40,9 +40,6 @@ api_router.include_router(mediciones.router_planos_puntos)
 api_router.include_router(heatmaps.router_planos_heatmap)
 api_router.include_router(heatmaps.router_conjuntos_ap)
 api_router.include_router(heatmaps.router_mapas)
-api_router.include_router(heatmaps.router_aps)
 api_router.include_router(inventario_rf.router)
 api_router.include_router(escenarios.router_proyectos_escenarios)
-api_router.include_router(escenarios.router_escenarios)
-api_router.include_router(escenarios.router_reportes)
 api_router.include_router(share.router)

@@ -11,29 +11,21 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
-from app.api.v1.escenarios import _firmar_descarga
 from app.api.v1.heatmaps import _conjunto_out, _generar_heatmap_core, _mapa_out
 from app.api.v1.planos import _firmar as _firmar_plano
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import require_admin
-from app.models.escenario import EscenarioOptimizado, Reporte
-from app.models.heatmap import AnalisisCobertura, ConjuntoAP, MapaCalor
 from app.models.cliente import Cliente
+from app.models.heatmap import ConjuntoAP, MapaCalor
 from app.models.plano import Plano
 from app.models.proyecto import Proyecto
 from app.models.share import TokenEnlaceCliente
 from app.models.usuario import Usuario
 from app.repositories.proyecto_repository import ProyectoRepository
-from app.schemas.escenario import EscenarioOptimizadoOut
-from app.schemas.heatmap import (
-    AnalisisCoberturaOut,
-    GenerarHeatmapConjuntoIn,
-    MapaCalorOut,
-)
+from app.schemas.heatmap import GenerarHeatmapConjuntoIn, MapaCalorOut
 from app.schemas.plano import PlanoOut
 from app.schemas.share import (
     ContenidoEnlaceIn,
@@ -93,9 +85,6 @@ def _contenido_dict(contenido: ContenidoEnlaceIn) -> dict:
     return {
         "conjunto_ids": list(dict.fromkeys(contenido.conjunto_ids)),
         "mapa_ids": list(dict.fromkeys(contenido.mapa_ids)),
-        "analisis_ids": list(dict.fromkeys(contenido.analisis_ids)),
-        "escenario_ids": list(dict.fromkeys(contenido.escenario_ids)),
-        "reporte_id": contenido.reporte_id,
     }
 
 
@@ -198,19 +187,12 @@ def _validar_contenido(
     *, proyecto: Proyecto, contenido: ContenidoEnlaceIn, db: Session
 ) -> ContenidoEnlaceIn:
     plano_ids = {plano.id for plano in proyecto.planos}
-    escenario_ids = set(contenido.escenario_ids)
     mapa_ids = set(contenido.mapa_ids)
     conjunto_ids = set(contenido.conjunto_ids)
-    analisis_ids = set(contenido.analisis_ids)
-
-    reporte_id = contenido.reporte_id
 
     contenido = ContenidoEnlaceIn(
         conjunto_ids=sorted(conjunto_ids),
         mapa_ids=sorted(mapa_ids),
-        analisis_ids=sorted(analisis_ids),
-        escenario_ids=sorted(escenario_ids),
-        reporte_id=reporte_id,
     )
 
     conjuntos = (
@@ -225,12 +207,6 @@ def _validar_contenido(
             status_code=422,
             detail="Conjunto no pertenece al proyecto.",
         )
-    if any(item.estado_gobernanza != "publicado_cliente" for item in conjuntos):
-        raise HTTPException(
-            status_code=422,
-            detail="Conjunto no publicado para cliente.",
-        )
-
     mapas = (
         db.query(MapaCalor).filter(MapaCalor.id.in_(contenido.mapa_ids)).all()
         if contenido.mapa_ids
@@ -240,50 +216,6 @@ def _validar_contenido(
         item.plano_id not in plano_ids for item in mapas
     ):
         raise HTTPException(status_code=422, detail="Mapa no pertenece al proyecto.")
-
-    analisis = (
-        db.query(AnalisisCobertura)
-        .join(MapaCalor, AnalisisCobertura.mapa_calor_id == MapaCalor.id)
-        .filter(AnalisisCobertura.id.in_(contenido.analisis_ids))
-        .all()
-        if contenido.analisis_ids
-        else []
-    )
-    if {item.id for item in analisis} != set(contenido.analisis_ids) or any(
-        item.mapa.plano_id not in plano_ids for item in analisis
-    ):
-        raise HTTPException(
-            status_code=422,
-            detail="Análisis no pertenece al proyecto.",
-        )
-
-    escenarios = (
-        db.query(EscenarioOptimizado)
-        .filter(EscenarioOptimizado.id.in_(contenido.escenario_ids))
-        .all()
-        if contenido.escenario_ids
-        else []
-    )
-    if {item.id for item in escenarios} != set(contenido.escenario_ids) or any(
-        item.proyecto_id != proyecto.id for item in escenarios
-    ):
-        raise HTTPException(
-            status_code=422,
-            detail="Escenario no pertenece al proyecto.",
-        )
-    if any(item.estado_gobernanza != "publicado_cliente" for item in escenarios):
-        raise HTTPException(
-            status_code=422,
-            detail="Escenario no publicado para cliente.",
-        )
-
-    if contenido.reporte_id is not None:
-        reporte = db.query(Reporte).filter(Reporte.id == contenido.reporte_id).first()
-        if reporte is None or reporte.proyecto_id != proyecto.id:
-            raise HTTPException(
-                status_code=422,
-                detail="Reporte no pertenece al proyecto.",
-            )
 
     return ContenidoEnlaceIn(**_contenido_dict(contenido))
 
@@ -456,7 +388,6 @@ def obtener_portal_cliente(
         .filter(
             ConjuntoAP.id.in_(contenido.conjunto_ids),
             ConjuntoAP.plano_id.in_(plano_ids),
-            ConjuntoAP.estado_gobernanza == "publicado_cliente",
         )
         .all()
         if contenido.conjunto_ids
@@ -470,58 +401,8 @@ def obtener_portal_cliente(
         if contenido.mapa_ids
         else []
     )
-    escenarios = (
-        db.query(EscenarioOptimizado)
-        .filter(
-            EscenarioOptimizado.id.in_(contenido.escenario_ids),
-            EscenarioOptimizado.proyecto_id == proyecto.id,
-            EscenarioOptimizado.estado_gobernanza == "publicado_cliente",
-        )
-        .order_by(EscenarioOptimizado.pct_cobertura.desc())
-        .all()
-        if contenido.escenario_ids
-        else []
-    )
-    mapa_ids_escenarios = {
-        escenario.mapa_proyectado_id
-        for escenario in escenarios
-        if escenario.mapa_proyectado_id is not None
-    }
-    if mapa_ids_escenarios:
-        mapas_escenarios = (
-            db.query(MapaCalor)
-            .filter(
-                MapaCalor.id.in_(mapa_ids_escenarios),
-                MapaCalor.plano_id.in_(plano_ids),
-            )
-            .order_by(MapaCalor.created_at.desc(), MapaCalor.id.desc())
-            .all()
-        )
-        mapas_por_id = {mapa.id: mapa for mapa in mapas}
-        for mapa in mapas_escenarios:
-            mapas_por_id.setdefault(mapa.id, mapa)
-        mapas = sorted(
-            mapas_por_id.values(),
-            key=lambda item: (
-                item.created_at or datetime.min.replace(tzinfo=UTC),
-                item.id,
-            ),
-            reverse=True,
-        )
     planos_mapa = {mapa.plano_id for mapa in mapas}
-    analisis = (
-        db.query(AnalisisCobertura)
-        .join(MapaCalor, AnalisisCobertura.mapa_calor_id == MapaCalor.id)
-        .filter(
-            AnalisisCobertura.id.in_(contenido.analisis_ids),
-            MapaCalor.plano_id.in_(plano_ids),
-        )
-        .all()
-        if contenido.analisis_ids
-        else []
-    )
     planos_visibles = planos_mapa | {conjunto.plano_id for conjunto in conjuntos}
-    planos_visibles.update(escenario.plano_id for escenario in escenarios)
     planos = (
         db.query(Plano)
         .filter(Plano.id.in_(planos_visibles))
@@ -530,18 +411,6 @@ def obtener_portal_cliente(
         if planos_visibles
         else []
     )
-    reporte_disponible = False
-    if contenido.reporte_id is not None:
-        reporte_disponible = (
-            db.query(Reporte)
-            .filter(
-                Reporte.id == contenido.reporte_id,
-                Reporte.proyecto_id == proyecto.id,
-                Reporte.estado == "LISTO",
-            )
-            .first()
-            is not None
-        )
     return PortalClienteOut(
         proyecto=ProyectoPortalOut(
             id=proyecto.id,
@@ -558,9 +427,6 @@ def obtener_portal_cliente(
         ],
         conjuntos=[_conjunto_out(conjunto) for conjunto in conjuntos],
         heatmaps=[_mapa_out(mapa, request) for mapa in mapas],
-        analisis=[AnalisisCoberturaOut.model_validate(item) for item in analisis],
-        escenarios=[EscenarioOptimizadoOut.model_validate(item) for item in escenarios],
-        reporte_disponible=reporte_disponible,
     )
 
 
@@ -587,7 +453,6 @@ def generar_heatmap_portal(
         .filter(
             ConjuntoAP.id == conjunto_id,
             ConjuntoAP.plano_id.in_(plano_ids),
-            ConjuntoAP.estado_gobernanza == "publicado_cliente",
         )
         .first()
     )
@@ -653,26 +518,3 @@ def generar_heatmap_portal(
         conjunto_ap_id=conjunto.id,
         modo_generacion=body.modo,
     )
-
-
-@router.get("/{token}/reporte")
-def descargar_reporte_portal(
-    token: str,
-    db: Session = Depends(get_db),
-) -> RedirectResponse:
-    enlace = _obtener_enlace_publico(token=token, db=db)
-    contenido = _contenido_from_model(enlace)
-    if contenido.reporte_id is None:
-        raise HTTPException(status_code=404, detail="Reporte no disponible.")
-    reporte = (
-        db.query(Reporte)
-        .filter(
-            Reporte.id == contenido.reporte_id,
-            Reporte.proyecto_id == enlace.proyecto_id,
-            Reporte.estado == "LISTO",
-        )
-        .first()
-    )
-    if reporte is None or not reporte.ruta_pdf:
-        raise HTTPException(status_code=404, detail="Reporte no disponible.")
-    return RedirectResponse(url=_firmar_descarga(reporte.ruta_pdf), status_code=302)

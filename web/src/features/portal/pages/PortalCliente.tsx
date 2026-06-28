@@ -3,7 +3,6 @@ import {
   BarChart3,
   BrainCircuit,
   Building2,
-  Download,
   Eye,
   EyeOff,
   Layers3,
@@ -13,7 +12,6 @@ import {
   Plus,
   RadioTower,
   Sparkles,
-  Target,
   TrendingUp,
 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -45,7 +43,6 @@ export default function PortalCliente() {
   );
   const [mapaActivo, setMapaActivo] = useState<MapaCalorPortalOut | null>(null);
   const [parteActiva, setParteActiva] = useState<PartePortal>("RELEVAMIENTO");
-  const [escenarioActivoId, setEscenarioActivoId] = useState<number | null>(null);
 
   const conjuntosRelevados = useMemo(
     () => data?.conjuntos.filter((conjunto) => conjunto.origen !== "ia") ?? [],
@@ -55,7 +52,7 @@ export default function PortalCliente() {
     () => data?.conjuntos.filter((conjunto) => conjunto.origen === "ia") ?? [],
     [data?.conjuntos],
   );
-  const hayContenidoIA = conjuntosIA.length > 0 || (data?.escenarios.length ?? 0) > 0;
+  const hayContenidoIA = conjuntosIA.length > 0;
   const parteVisible =
     parteActiva === "RELEVAMIENTO" && conjuntosRelevados.length === 0 && hayContenidoIA
       ? "IA"
@@ -70,24 +67,15 @@ export default function PortalCliente() {
     [conjuntoActivoId, conjuntosParte],
   );
 
-  const escenarioActivo = useMemo(
+  const mapaConjuntoActivo = useMemo(
     () =>
-      data?.escenarios.find((escenario) => escenario.id === escenarioActivoId) ??
-      data?.escenarios[0] ??
-      null,
-    [data?.escenarios, escenarioActivoId],
-  );
-  const mapaEscenarioActivo = useMemo(
-    () =>
-      escenarioActivo?.mapa_proyectado_id
-        ? data?.heatmaps.find(
-            (mapa) => mapa.id === escenarioActivo.mapa_proyectado_id,
-          ) ?? null
+      conjuntoActivo
+        ? data?.heatmaps.find((mapa) => mapa.conjunto_ap_id === conjuntoActivo.id) ??
+          null
         : null,
-    [data?.heatmaps, escenarioActivo],
+    [conjuntoActivo, data?.heatmaps],
   );
-  const mapaMostrado =
-    mapaActivo ?? (parteVisible === "IA" ? mapaEscenarioActivo : null);
+  const mapaMostrado = mapaActivo ?? mapaConjuntoActivo;
 
   const bssidsEfectivos = useMemo(() => {
     if (!conjuntoActivo) return new Set<string>();
@@ -153,12 +141,6 @@ export default function PortalCliente() {
           <h1>{data.proyecto.nombre}</h1>
           <p>{data.proyecto.cliente ?? "Cliente"} · Portal ejecutivo de cobertura WiFi</p>
         </div>
-        {data.reporte_disponible && (
-          <a className={styles.descarga} href={`/api/share/${token}/reporte`}>
-            <Download size={16} aria-hidden="true" />
-            Descargar reporte
-          </a>
-        )}
       </header>
 
       <section className={styles.tableroEjecutivo} aria-label="Resumen ejecutivo">
@@ -175,8 +157,8 @@ export default function PortalCliente() {
         />
         <Indicador
           icono={<TrendingUp size={18} />}
-          etiqueta="Escenarios IA"
-          valor={data.escenarios.length}
+          etiqueta="Heatmaps"
+          valor={data.heatmaps.length}
         />
       </section>
 
@@ -187,9 +169,7 @@ export default function PortalCliente() {
             <div>
               <h2>{parteVisible === "IA" ? "Vista del modelo IA" : "Vista del relevamiento en sitio"}</h2>
               <p>
-                {parteVisible === "IA" && escenarioActivo
-                  ? `${escenarioActivo.nombre} · heatmap proyectado`
-                  : conjuntoActivo
+                {conjuntoActivo
                   ? `${conjuntoActivo.nombre} · ${_labelModo(modo)}`
                   : "Seleccione un conjunto publicado para explorar el mapa."}
               </p>
@@ -216,7 +196,7 @@ export default function PortalCliente() {
           ) : (
             <div className={styles.vacio}>
               {parteVisible === "IA"
-                ? "Seleccione una propuesta IA publicada para revisar su heatmap proyectado."
+                ? "Seleccione una propuesta IA y genere o revise su heatmap proyectado."
                 : "Seleccione una parte, elija un conjunto y genere el heatmap interactivo."}
             </div>
           )}
@@ -248,7 +228,6 @@ export default function PortalCliente() {
                 onClick={() => {
                   setParteActiva("IA");
                   setConjuntoActivoId(conjuntosIA[0]?.id ?? null);
-                  setEscenarioActivoId(data.escenarios[0]?.id ?? null);
                   setBssidsSeleccionados(new Set());
                   setMapaActivo(null);
                 }}
@@ -256,44 +235,18 @@ export default function PortalCliente() {
                 <BrainCircuit size={16} aria-hidden="true" />
                 <span>
                   <strong>Modelo IA</strong>
-                  <small>
-                    {conjuntosIA.length + data.escenarios.length} elemento(s) publicados
-                  </small>
+                  <small>{conjuntosIA.length} propuesta(s) publicadas</small>
                 </span>
               </button>
             </div>
           </section>
           <section className={styles.resumen}>
             <h2>{parteVisible === "IA" ? "Propuestas IA" : "Generación"}</h2>
-            {parteVisible === "IA" ? (
-              data.escenarios.length === 0 ? (
-                <p>No hay propuestas IA publicadas para este enlace.</p>
-              ) : (
-                <div className={styles.formGenerador}>
-                  <label>
-                    Propuesta
-                    <select
-                      value={escenarioActivo?.id ?? ""}
-                      onChange={(event) => {
-                        setEscenarioActivoId(Number(event.target.value));
-                        setMapaActivo(null);
-                      }}
-                    >
-                      {data.escenarios.map((escenario) => (
-                        <option key={escenario.id} value={escenario.id}>
-                          {escenario.nombre}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {!mapaEscenarioActivo && (
-                    <p>La propuesta seleccionada no tiene heatmap proyectado publicado.</p>
-                  )}
-                </div>
-              )
-            ) : conjuntosParte.length === 0 ? (
+            {conjuntosParte.length === 0 ? (
               <p>
-                No hay conjuntos relevados publicados para este enlace.
+                {parteVisible === "IA"
+                  ? "No hay propuestas IA publicadas para este enlace."
+                  : "No hay conjuntos relevados publicados para este enlace."}
               </p>
             ) : (
               <div className={styles.formGenerador}>
@@ -401,12 +354,12 @@ export default function PortalCliente() {
           <div className={styles.panelHeader}>
             <BrainCircuit size={18} aria-hidden="true" />
             <div>
-              <h2>Subconjuntos y escenarios del modelo IA</h2>
-              <p>Alternativas publicadas para revisar impacto, cobertura y recomendaciones.</p>
+                  <h2>Conjuntos propuestos por IA</h2>
+              <p>Conjuntos propuestos por IA a partir de un conjunto relevado en campo.</p>
             </div>
           </div>
 
-          {conjuntosIA.length === 0 && data.escenarios.length === 0 ? (
+          {conjuntosIA.length === 0 ? (
             <div className={styles.vacio}>No hay resultados IA publicados en este enlace.</div>
           ) : (
             <div className={styles.iaGrid}>
@@ -430,7 +383,7 @@ export default function PortalCliente() {
                   </span>
                   <span>
                     <h3>{conjunto.nombre}</h3>
-                    <small>{conjunto.proposito}</small>
+                    <small>{conjunto.resumen_ia ?? conjunto.proposito}</small>
                     {conjunto.descripcion && <small>{conjunto.descripcion}</small>}
                   </span>
                   <span className={styles.apsConjunto}>
@@ -440,34 +393,6 @@ export default function PortalCliente() {
                       </i>
                     ))}
                   </span>
-                </button>
-              ))}
-
-              {data.escenarios.map((escenario) => (
-                <button
-                  key={escenario.id}
-                  type="button"
-                  className={`${styles.escenario} ${
-                    escenario.id === escenarioActivo?.id ? styles.escenarioActivo : ""
-                  }`}
-                  onClick={() => {
-                    setParteActiva("IA");
-                    setEscenarioActivoId(escenario.id);
-                    setMapaActivo(null);
-                  }}
-                >
-                  <span className={styles.etiquetaIA}>
-                    <Target size={14} aria-hidden="true" />
-                    Escenario IA
-                  </span>
-                  <h3>{escenario.nombre}</h3>
-                  <p>{escenario.resumen}</p>
-                  <div className={styles.metricas}>
-                    <span>Actual {_porcentaje(escenario.pct_cobertura_actual)}</span>
-                    <span>Proyectada {_porcentaje(escenario.pct_cobertura)}</span>
-                    <span>{escenario.cantidad_aps} AP(s)</span>
-                    <span>{escenario.confianza}</span>
-                  </div>
                 </button>
               ))}
             </div>
@@ -599,12 +524,12 @@ function HeatmapCanvas({
   };
 
   const mostrarHint = (
-    event: PointerEvent<SVGElement>,
+    event: PointerEvent<Element>,
     titulo: string,
     lineas: string[],
   ) => {
-    const rect = event.currentTarget.ownerSVGElement
-      ?.closest(`.${styles.heatmapImagen}`)
+    const rect = event.currentTarget
+      .closest(`.${styles.heatmapImagen}`)
       ?.getBoundingClientRect();
     if (!rect) return;
     setHint({
@@ -736,12 +661,26 @@ function HeatmapCanvas({
                 onPointerLeave={() => setHint(null)}
               />
             ))}
-          {verAps &&
-            mapa.aps_interes.map((ap) => (
-              <g
+        </svg>
+        {verAps && (
+          <div
+            className={styles.capaApsMapa}
+            style={{
+              transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
+            }}
+            aria-label="Ubicación de APs"
+          >
+            {mapa.aps_interes.map((ap, indice) => (
+              <button
                 key={ap.bssid}
-                className={styles.apMapa}
-                transform={`translate(${limitar(ap.pos_x, 0, anchoReferencia)} ${limitar(ap.pos_y, 0, altoReferencia)})`}
+                type="button"
+                className={styles.marcadorApMapa}
+                style={{
+                  left: `${(limitar(ap.pos_x, 0, anchoReferencia) / anchoReferencia) * 100}%`,
+                  top: `${(limitar(ap.pos_y, 0, altoReferencia) / altoReferencia) * 100}%`,
+                }}
+                title={`${indice + 1}. ${ap.ssid || "SSID oculto"} · ${ap.bssid}`}
+                aria-label={`AP ${indice + 1}: ${ap.ssid || "SSID oculto"}`}
                 onPointerDown={(event) => event.stopPropagation()}
                 onPointerMove={(event) => {
                   event.stopPropagation();
@@ -756,11 +695,11 @@ function HeatmapCanvas({
                 }}
                 onPointerLeave={() => setHint(null)}
               >
-                <circle r={Math.max(anchoReferencia, altoReferencia) * 0.017} />
-                <RadioTowerIcon escala={Math.max(anchoReferencia, altoReferencia)} />
-              </g>
+                {indice + 1}
+              </button>
             ))}
-        </svg>
+          </div>
+        )}
       </div>
       {hint && (
         <div className={styles.tooltip} style={{ left: hint.x + 12, top: hint.y + 12 }}>
@@ -807,9 +746,6 @@ function _labelModo(modo: string): string {
   return labels[modo] ?? modo;
 }
 
-function _porcentaje(valor: number): string {
-  return `${valor.toFixed(1)}%`;
-}
 
 function nivelCobertura(rssi: number): string {
   if (rssi >= -60) return "Excelente";
@@ -832,17 +768,4 @@ function colorRssi(rssi: number): string {
 
 function limitar(valor: number, minimo: number, maximo: number): number {
   return Math.min(maximo, Math.max(minimo, valor));
-}
-
-function RadioTowerIcon({ escala }: { escala: number }) {
-  const tamano = escala * 0.015;
-  return (
-    <>
-      <path
-        d={`M ${-tamano * 0.7} ${tamano * 0.75} L 0 ${-tamano * 0.75} L ${tamano * 0.7} ${tamano * 0.75}`}
-      />
-      <path d={`M ${-tamano * 0.35} ${0} H ${tamano * 0.35}`} />
-      <path d={`M ${-tamano * 0.5} ${-tamano * 0.35} Q 0 ${-tamano * 0.75} ${tamano * 0.5} ${-tamano * 0.35}`} />
-    </>
-  );
 }

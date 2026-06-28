@@ -1,24 +1,28 @@
 import { useMemo, useState } from "react";
-import { Send, XCircle } from "lucide-react";
+import { Eye, X } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
-import { Badge, Button, EmptyState, useToast } from "@/shared/components";
+import { resolverUrlApi } from "@/shared/api/urlApi";
+import { Button, EmptyState } from "@/shared/components";
 import {
-  useCambiarEstadoConjuntoAP,
   useConjuntosPorPlanos,
   usePlanosProyecto,
 } from "../hooks/useProyectosOrg";
-import type { ConjuntoAPOut, EstadoGobernanzaConjunto } from "../types";
+import type { ConjuntoAPOut, PlanoOut } from "../types";
 import styles from "./ConjuntosAPProyecto.module.css";
 
 type FiltroOrigen = "todos" | "manual_movil" | "ia";
+type VistaPreviaConjunto = {
+  conjunto: ConjuntoAPOut;
+  plano: PlanoOut;
+};
 
 export default function ConjuntosAPProyecto() {
   const { proyectoId } = useOutletContext<{
     proyectoId: number;
     proyectoNombre: string;
   }>();
-  const toast = useToast();
   const [filtroOrigen, setFiltroOrigen] = useState<FiltroOrigen>("todos");
+  const [vistaPrevia, setVistaPrevia] = useState<VistaPreviaConjunto | null>(null);
 
   const {
     data: planos,
@@ -27,8 +31,6 @@ export default function ConjuntosAPProyecto() {
   } = usePlanosProyecto(proyectoId);
   const planoIds = useMemo(() => (planos ?? []).map((plano) => plano.id), [planos]);
   const consultasConjuntos = useConjuntosPorPlanos(planoIds);
-  const { mutateAsync: cambiarEstado, isPending: cambiando } =
-    useCambiarEstadoConjuntoAP(proyectoId);
 
   const conjuntos = useMemo(
     () =>
@@ -49,22 +51,6 @@ export default function ConjuntosAPProyecto() {
       : conjuntos.filter((conjunto) => conjunto.origen === filtroOrigen);
   const resumen = _resumenConjuntos(conjuntos);
 
-  const handleEstadoCliente = async (
-    conjunto: ConjuntoAPOut,
-    estado: EstadoGobernanzaConjunto,
-  ) => {
-    try {
-      await cambiarEstado({ conjuntoId: conjunto.id, estadoGobernanza: estado });
-      toast.exito(
-        estado === "publicado_cliente"
-          ? `Conjunto "${conjunto.nombre}" compartido con el cliente.`
-          : `Conjunto "${conjunto.nombre}" quitado del portal cliente.`,
-      );
-    } catch {
-      toast.error("No se pudo actualizar la selección para cliente.");
-    }
-  };
-
   if (cargandoPlanos || cargandoConjuntos) return <div className={styles.skeleton} />;
   if (errorPlanos || errorConjuntos) {
     return <EmptyState mensaje="No se pudieron cargar los conjuntos de APs." />;
@@ -79,8 +65,8 @@ export default function ConjuntosAPProyecto() {
         <div>
           <h2>Conjuntos de APs para cliente</h2>
           <p>
-            Seleccione qué conjunto podrá consultar el cliente para generar heatmaps
-            por AP individual, subconjunto o conjunto completo.
+            Revise los conjuntos creados por el equipo técnico y las propuestas IA
+            derivadas desde un conjunto de campo.
           </p>
         </div>
       </div>
@@ -88,7 +74,7 @@ export default function ConjuntosAPProyecto() {
       <div className={styles.resumen}>
         <ResumenItem etiqueta="Móvil" valor={resumen.manual_movil} />
         <ResumenItem etiqueta="IA" valor={resumen.ia} />
-        <ResumenItem etiqueta="Compartidos" valor={resumen.publicado_cliente} />
+        <ResumenItem etiqueta="Total" valor={conjuntos.length} />
       </div>
 
       <div className={styles.filtros}>
@@ -115,15 +101,14 @@ export default function ConjuntosAPProyecto() {
               <tr>
                 <th>Conjunto</th>
                 <th>Plano</th>
+                <th>Vista</th>
                 <th>Origen</th>
-                <th>Estado</th>
                 <th>APs</th>
-                <th>Cliente</th>
               </tr>
             </thead>
             <tbody>
               {conjuntosFiltrados.map((conjunto) => {
-                const publicado = conjunto.estado_gobernanza === "publicado_cliente";
+                const plano = planosPorId.get(conjunto.plano_id);
                 return (
                   <tr key={conjunto.id}>
                     <td className={styles.nombre}>
@@ -131,54 +116,37 @@ export default function ConjuntosAPProyecto() {
                       <small>{conjunto.proposito}</small>
                     </td>
                     <td>
-                      {planosPorId.get(conjunto.plano_id)?.nombre ??
-                        `Plano #${conjunto.plano_id}`}
+                      {plano?.nombre ?? `Plano #${conjunto.plano_id}`}
+                    </td>
+                    <td>
+                      <Button
+                        variante="secondary"
+                        tamano="sm"
+                        disabled={!plano || conjunto.items.length === 0}
+                        onClick={() => {
+                          if (plano) setVistaPrevia({ conjunto, plano });
+                        }}
+                      >
+                        <Eye size={14} aria-hidden="true" />
+                        Previsualizar
+                      </Button>
                     </td>
                     <td>{_labelOrigen(conjunto.origen)}</td>
-                    <td>
-                      <Badge
-                        variante="en_progreso"
-                        etiqueta={_labelEstado(conjunto.estado_gobernanza)}
-                      />
-                    </td>
                     <td>{conjunto.cantidad_aps}</td>
-                    <td>
-                      <div className={styles.acciones}>
-                        {publicado ? (
-                          <Button
-                            variante="ghost"
-                            tamano="sm"
-                            disabled={cambiando}
-                            onClick={() =>
-                              handleEstadoCliente(conjunto, "aprobado_interno")
-                            }
-                          >
-                            <XCircle size={14} aria-hidden="true" />
-                            Quitar del cliente
-                          </Button>
-                        ) : (
-                          <Button
-                            variante="secondary"
-                            tamano="sm"
-                            disabled={
-                              cambiando || conjunto.estado_gobernanza === "descartado"
-                            }
-                            onClick={() =>
-                              handleEstadoCliente(conjunto, "publicado_cliente")
-                            }
-                          >
-                            <Send size={14} aria-hidden="true" />
-                            Compartir con cliente
-                          </Button>
-                        )}
-                      </div>
-                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
+      )}
+
+      {vistaPrevia && (
+        <VistaPreviaMapa
+          conjunto={vistaPrevia.conjunto}
+          plano={vistaPrevia.plano}
+          onCerrar={() => setVistaPrevia(null)}
+        />
       )}
     </section>
   );
@@ -199,12 +167,9 @@ function _resumenConjuntos(conjuntos: ConjuntoAPOut[]) {
       if (conjunto.origen in acc) {
         acc[conjunto.origen as "manual_movil" | "ia"] += 1;
       }
-      if (conjunto.estado_gobernanza === "publicado_cliente") {
-        acc.publicado_cliente += 1;
-      }
       return acc;
     },
-    { manual_movil: 0, ia: 0, publicado_cliente: 0 },
+    { manual_movil: 0, ia: 0 },
   );
 }
 
@@ -217,15 +182,82 @@ function _labelOrigen(origen: string): string {
   );
 }
 
-function _labelEstado(estado: string): string {
+function VistaPreviaMapa({
+  conjunto,
+  plano,
+  onCerrar,
+}: {
+  conjunto: ConjuntoAPOut;
+  plano: PlanoOut;
+  onCerrar: () => void;
+}) {
+  const apsConUbicacion = conjunto.items.filter(
+    (ap) => typeof ap.pos_x === "number" && typeof ap.pos_y === "number",
+  );
+
   return (
-    ({
-      borrador_tecnico: "Borrador técnico",
-      preliminar: "Preliminar",
-      pendiente_revision: "Pendiente revisión",
-      aprobado_interno: "Aprobado interno",
-      publicado_cliente: "Compartido con cliente",
-      descartado: "Descartado",
-    } as Record<string, string>)[estado] ?? estado
+    <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby="vista-conjunto-titulo">
+      <div className={styles.modalVista}>
+        <header className={styles.modalHeader}>
+          <div>
+            <p>{plano.nombre}</p>
+            <h2 id="vista-conjunto-titulo">{conjunto.nombre}</h2>
+            <span>
+              {_labelOrigen(conjunto.origen)} · {conjunto.cantidad_aps} AP(s)
+            </span>
+          </div>
+          <button type="button" className={styles.cerrarVista} onClick={onCerrar} aria-label="Cerrar vista previa">
+            <X size={18} aria-hidden="true" />
+          </button>
+        </header>
+
+        <div className={styles.mapaPreview}>
+          <div
+            className={styles.planoPreview}
+            style={{
+              aspectRatio: `${plano.ancho_px} / ${plano.alto_px}`,
+              width: `min(100%, calc(62vh * ${plano.ancho_px / plano.alto_px}))`,
+            }}
+          >
+            <img src={resolverUrlApi(plano.url_firmada)} alt={`Plano ${plano.nombre}`} />
+            <div className={styles.capaMarcadores} aria-label="Ubicación de APs del conjunto">
+              {apsConUbicacion.map((ap, indice) => (
+                <span
+                  key={`${ap.bssid}-${indice}`}
+                  className={styles.marcadorAp}
+                  style={{
+                    left: `${((ap.pos_x ?? 0) / plano.ancho_px) * 100}%`,
+                    top: `${((ap.pos_y ?? 0) / plano.alto_px) * 100}%`,
+                  }}
+                  title={`${indice + 1}. ${ap.ssid || "SSID oculto"} · ${ap.bssid}`}
+                >
+                  {indice + 1}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {apsConUbicacion.length === 0 ? (
+          <p className={styles.sinUbicaciones}>Este conjunto no tiene coordenadas de AP registradas para el plano.</p>
+        ) : (
+          <div className={styles.listaApsPreview}>
+            {apsConUbicacion.map((ap, indice) => (
+              <article key={`${ap.bssid}-detalle-${indice}`}>
+                <strong>{indice + 1}. {ap.ssid || "SSID oculto"}</strong>
+                <span>{ap.bssid}</span>
+                <small>
+                  {typeof ap.rssi_promedio === "number" ? `${ap.rssi_promedio.toFixed(1)} dBm` : "RSSI s/d"}
+                  {" · "}
+                  {ap.canal ? `canal ${ap.canal}` : "canal s/d"}
+                  {" · "}
+                  {ap.cantidad_puntos ?? 0} punto(s)
+                </small>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

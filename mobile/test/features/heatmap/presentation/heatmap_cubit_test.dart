@@ -64,8 +64,6 @@ HeatmapCubit _crearCubit(HeatmapRepository repo) => HeatmapCubit(
       generarHeatmap: GenerarHeatmapUseCase(repo),
       generarHeatmapDesdeConjunto: GenerarHeatmapDesdeConjuntoUseCase(repo),
       actualizarUbicacionAPConjunto: ActualizarUbicacionAPConjuntoUseCase(repo),
-      analizarMapa: AnalizarMapaUseCase(repo),
-      confirmarAP: ConfirmarAPUseCase(repo),
     );
 
 void main() {

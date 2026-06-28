@@ -1,6 +1,4 @@
-import '../entities/analisis_cobertura.dart';
 import '../entities/ap_disponible.dart';
-import '../entities/ap_detectado.dart';
 import '../entities/conjunto_ap.dart';
 import '../entities/mapa_calor.dart';
 import '../entities/inventario_rf.dart';
@@ -61,11 +59,4 @@ abstract class HeatmapRepository {
     List<double>? apPosY,
   });
 
-  Future<AnalisisCobertura> analizarMapa(int mapaId);
-
-  Future<APDetectado> confirmarAP({
-    required int apId,
-    required double posX,
-    required double posY,
-  });
 }

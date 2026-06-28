@@ -1,6 +1,6 @@
-"""Modelos ORM del módulo de heatmap y análisis.
+"""Modelos ORM del módulo de heatmap y conjuntos AP.
 
-Sprint 4 — PB-05 (Generar mapa de calor), PB-06 (Analizar cobertura).
+Sprint 4 — PB-05 (Generar mapa de calor).
 """
 
 import sqlalchemy as sa
@@ -62,12 +62,6 @@ class MapaCalor(Base):
 
     plano = relationship("Plano", back_populates="mapas_calor")
     conjunto_ap = relationship("ConjuntoAP", back_populates="mapas_calor")
-    analisis = relationship(
-        "AnalisisCobertura",
-        back_populates="mapa",
-        cascade="all, delete-orphan",
-        uselist=False,
-    )
 
     __table_args__ = (
         UniqueConstraint(
@@ -104,15 +98,16 @@ class ConjuntoAP(Base):
     descripcion = Column(Text, nullable=True)
     es_principal = Column(Boolean, nullable=False, default=False)
     origen = Column(String(30), nullable=False, default="manual_movil", index=True)
-    estado_gobernanza = Column(
-        String(30), nullable=False, default="borrador_tecnico", index=True
-    )
     creado_por_id = Column(
         Integer,
         ForeignKey("usuario.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
+    resumen_ia = Column(Text, nullable=True)
+    metricas_ia = Column(sa.JSON().with_variant(sa.JSON, "sqlite"), nullable=True)
+    restricciones_ia = Column(sa.JSON().with_variant(sa.JSON, "sqlite"), nullable=True)
+    version_motor_ia = Column(String(30), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True),
@@ -167,6 +162,14 @@ class ConjuntoAPItem(Base):
     rssi_promedio_snapshot = Column(Float, nullable=True)
     pos_x = Column(Float, nullable=True)
     pos_y = Column(Float, nullable=True)
+    accion_recomendada = Column(String(30), nullable=True)
+    justificacion = Column(Text, nullable=True)
+    altura_m = Column(Float, nullable=True)
+    tipo_montaje = Column(String(30), nullable=True)
+    banda = Column(String(10), nullable=True)
+    modelo_ap = Column(String(120), nullable=True)
+    costo_estimado = Column(Float, nullable=True)
+    radios = Column(sa.JSON().with_variant(sa.JSON, "sqlite"), nullable=True)
 
     conjunto = relationship("ConjuntoAP", back_populates="items")
 
@@ -178,59 +181,3 @@ class ConjuntoAPItem(Base):
         ),
         {"sqlite_autoincrement": True},
     )
-
-
-class AnalisisCobertura(Base):
-    """Diagnóstico automático generado a partir de un mapa de calor."""
-
-    __tablename__ = "analisis_cobertura"
-
-    id = Column(Integer, primary_key=True, index=True)
-    mapa_calor_id = Column(
-        Integer,
-        ForeignKey("mapa_calor.id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True,
-        index=True,
-    )
-    pct_cobertura = Column(Float, nullable=False)
-    pct_zonas_muertas = Column(Float, nullable=False)
-    celdas_zonas_muertas = Column(Integer, nullable=False)
-    cantidad_solapamientos = Column(Integer, nullable=False)
-    cantidad_interferencias = Column(Integer, nullable=False)
-    hallazgos = Column(sa.JSON().with_variant(sa.JSON, "sqlite"), nullable=False)
-    resumen = Column(Text, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    mapa = relationship("MapaCalor", back_populates="analisis")
-    aps_detectados = relationship(
-        "APDetectado",
-        back_populates="analisis",
-        cascade="all, delete-orphan",
-        order_by="APDetectado.rssi_promedio.desc()",
-    )
-
-
-class APDetectado(Base):
-    """Access point detectado durante el relevamiento de un plano."""
-
-    __tablename__ = "ap_detectado"
-
-    id = Column(Integer, primary_key=True, index=True)
-    analisis_id = Column(
-        Integer,
-        ForeignKey("analisis_cobertura.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-    bssid = Column(String(17), nullable=False)
-    ssid = Column(String(255), nullable=False)
-    canal = Column(Integer, nullable=True)
-    frecuencia_mhz = Column(Integer, nullable=True)
-    rssi_promedio = Column(Float, nullable=False)
-    pos_x = Column(Float, nullable=False)
-    pos_y = Column(Float, nullable=False)
-    confirmado = Column(Boolean, nullable=False, default=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    analisis = relationship("AnalisisCobertura", back_populates="aps_detectados")

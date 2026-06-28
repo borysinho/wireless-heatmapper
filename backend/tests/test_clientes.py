@@ -44,7 +44,7 @@ class TestListarClientes:
         tecnico_token: str,
         cliente_existente: Cliente,
     ):
-        """CA-3: técnico autenticado puede listar clientes (para el selector en la app)."""
+        """CA-3: técnico autenticado puede listar clientes."""
         resp = client.get(
             "/clientes",
             headers={"Authorization": f"Bearer {tecnico_token}"},
@@ -228,9 +228,7 @@ class TestDesactivarCliente:
             "/clientes",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        assert not any(
-            c["id"] == cliente_existente.id for c in resp_lista.json()
-        )
+        assert not any(c["id"] == cliente_existente.id for c in resp_lista.json())
 
     def test_desactivar_cliente_inexistente_retorna_404(
         self, client: TestClient, admin_token: str

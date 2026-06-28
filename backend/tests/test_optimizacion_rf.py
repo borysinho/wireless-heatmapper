@@ -1,4 +1,4 @@
-"""Pruebas del refinamiento RF de PB-07/PB-12."""
+"""Pruebas del refinamiento RF de PB-07."""
 
 import math
 import tempfile
@@ -8,16 +8,15 @@ from fastapi import HTTPException
 
 from app.ai.modelo_propagacion import ModeloPropagacion, MuestraCalibracionRF
 from app.ai.optimizador_ap_service import OptimizadorAPService
-from app.api.v1.escenarios import _limite_aps_derivado, generar_escenarios
+from app.api.v1.escenarios import _limite_aps_derivado, generar_conjuntos_ia
 from app.api.v1.inventario_rf import crear_ap, obtener_inventario
 from app.core.config import settings
-from app.models.escenario import EscenarioOptimizado, RecomendacionAP
 from app.models.heatmap import ConjuntoAP, ConjuntoAPItem, MapaCalor
 from app.models.medicion import MedicionWifi
 from app.models.plano import Plano
 from app.models.proyecto import Proyecto
 from app.repositories.medicion_repository import MedicionRepository
-from app.schemas.escenario import RestriccionesEscenarioIn
+from app.schemas.ia import RestriccionesIAIn
 from app.schemas.inventario_rf import APFisicoCrearIn, BSSIDRadioIn, RadioAPIn
 from app.schemas.medicion import MedicionItemIn
 from app.services.interpolacion_service import PuntoRSSI
@@ -92,7 +91,6 @@ def _crear_conjunto_ap(
         nombre=nombre,
         proposito=proposito,
         origen="manual_web",
-        estado_gobernanza="aprobado_interno",
         creado_por_id=admin.id,
     )
     for bssid in bssids:
@@ -143,11 +141,14 @@ def test_limite_derivado_devuelve_top_3_recomendaciones():
             )
         )
 
-    assert _limite_aps_derivado(
-        conjunto_fuente=conjunto,
-        bssids_seleccionados=None,
-        aps_existentes=[],
-    ) == 3
+    assert (
+        _limite_aps_derivado(
+            conjunto_fuente=conjunto,
+            bssids_seleccionados=None,
+            aps_existentes=[],
+        )
+        == 3
+    )
 
 
 def test_optimizador_respeta_cantidad_de_mejores_recomendaciones():
@@ -344,9 +345,9 @@ def test_generacion_persiste_proyecciones_sin_alterar_mediciones(
     )
     with tempfile.TemporaryDirectory() as tmp:
         monkeypatch.setattr(settings, "storage_root", tmp)
-        respuesta = generar_escenarios(
+        respuesta = generar_conjuntos_ia(
             proyecto_id=plano.proyecto_id,
-            body=RestriccionesEscenarioIn(
+            body=RestriccionesIAIn(
                 bandas=["2.4", "5"],
                 resolucion=32,
                 umbral_objetivo_dbm=-70,
@@ -355,37 +356,38 @@ def test_generacion_persiste_proyecciones_sin_alterar_mediciones(
                     "conjunto_id": conjunto.id,
                 },
             ),
+            request=None,
             db=db_session,
             current_user=admin_usuario,
-    )
-    assert len(respuesta.escenarios) == 3
-    escenario = respuesta.escenarios[0]
-    assert escenario.origen == "ia"
-    assert escenario.estado_gobernanza == "pendiente_revision"
-    assert escenario.generado_por_id == admin_usuario.id
-    assert escenario.nombre == "Conjunto IA prueba · Propuesta 1"
-    assert set(escenario.bandas) == {"2.4", "5"}
-    assert set(escenario.mapas_por_banda) == {"2.4", "5"}
-    assert set(escenario.mapas_actuales_por_banda) == {"2.4", "5"}
-    assert escenario.mapas_actuales_por_banda["2.4"] is not None
-    assert escenario.mapas_actuales_por_banda["5"] is not None
-    assert escenario.restricciones["fuente_entrada"]["conjunto_id"] == conjunto.id
-    assert escenario.restricciones["limite_aps_derivado"] == 2
-    assert "max_aps" not in escenario.restricciones
-    assert set(escenario.restricciones["fuente_entrada"]["bssids"]) == {
+        )
+    assert len(respuesta.conjuntos) == 3
+    conjunto_ia = respuesta.conjuntos[0]
+    assert conjunto_ia.origen == "ia"
+    assert conjunto_ia.conjunto_origen_id == conjunto.id
+    assert conjunto_ia.creado_por_id == admin_usuario.id
+    assert conjunto_ia.nombre == "Conjunto IA prueba · IA Propuesta 1"
+    assert conjunto_ia.restricciones_ia["fuente_entrada"]["conjunto_id"] == conjunto.id
+    assert conjunto_ia.restricciones_ia["limite_aps_derivado"] == 2
+    assert set(conjunto_ia.restricciones_ia["fuente_entrada"]["bssids"]) == {
         "aa:bb:cc:dd:ee:24",
         "aa:bb:cc:dd:ee:50",
     }
-    assert escenario.metricas["calibracion_modelo"]["tipo"] == (
+    assert conjunto_ia.metricas_ia["calibracion_modelo"]["tipo"] == (
         "calibracion_local_por_plano"
     )
-    assert escenario.metricas["calibracion_modelo"]["muestras"] == 10
-    assert len(escenario.recomendaciones[0].radios) == 2
+    assert conjunto_ia.metricas_ia["calibracion_modelo"]["muestras"] == 10
+    assert set(conjunto_ia.metricas_ia["mapas_por_banda"]) == {"2.4", "5"}
+    assert len(conjunto_ia.items[0].radios) == 2
+    assert conjunto_ia.items[0].accion_recomendada in {
+        "AGREGAR",
+        "RECONFIGURAR",
+        "MOVER",
+    }
     db_session.expire_all()
     assert {
         medicion.id: medicion.rssi for medicion in db_session.query(MedicionWifi).all()
     } == originales
-    assert len(escenario.mapas_por_banda["5"]) == 32
+    assert len(conjunto_ia.metricas_ia["mapas_por_banda"]["5"]) == 32
 
 
 def test_generacion_desde_conjunto_existente_conserva_fuente_y_bssids(
@@ -403,9 +405,9 @@ def test_generacion_desde_conjunto_existente_conserva_fuente_y_bssids(
 
     with tempfile.TemporaryDirectory() as tmp:
         monkeypatch.setattr(settings, "storage_root", tmp)
-        respuesta = generar_escenarios(
+        respuesta = generar_conjuntos_ia(
             proyecto_id=plano.proyecto_id,
-            body=RestriccionesEscenarioIn(
+            body=RestriccionesIAIn(
                 bandas=["5"],
                 resolucion=32,
                 fuente_entrada={
@@ -413,12 +415,13 @@ def test_generacion_desde_conjunto_existente_conserva_fuente_y_bssids(
                     "conjunto_id": conjunto.id,
                 },
             ),
+            request=None,
             db=db_session,
             current_user=admin_usuario,
         )
-        segunda_respuesta = generar_escenarios(
+        segunda_respuesta = generar_conjuntos_ia(
             proyecto_id=plano.proyecto_id,
-            body=RestriccionesEscenarioIn(
+            body=RestriccionesIAIn(
                 bandas=["5"],
                 resolucion=32,
                 fuente_entrada={
@@ -426,33 +429,29 @@ def test_generacion_desde_conjunto_existente_conserva_fuente_y_bssids(
                     "conjunto_id": conjunto.id,
                 },
             ),
+            request=None,
             db=db_session,
             current_user=admin_usuario,
         )
 
-    escenario = respuesta.escenarios[0]
-    segundo_escenario = segunda_respuesta.escenarios[0]
-    assert escenario.nombre == "Conjunto web 5 GHz · Propuesta 1"
-    assert escenario.conjunto_base_id == conjunto.id
-    assert segundo_escenario.mapa_actual_id == escenario.mapa_actual_id
-    assert escenario.restricciones["fuente_entrada"]["conjunto_id"] == conjunto.id
+    conjunto_ia = respuesta.conjuntos[0]
+    segundo_conjunto_ia = segunda_respuesta.conjuntos[0]
+    assert conjunto_ia.nombre == "Conjunto web 5 GHz · IA Propuesta 1"
+    assert conjunto_ia.conjunto_origen_id == conjunto.id
+    assert segundo_conjunto_ia.nombre == "Conjunto web 5 GHz · IA Propuesta 1 (2)"
+    assert conjunto_ia.restricciones_ia["fuente_entrada"]["conjunto_id"] == conjunto.id
     mapa_actual = (
-        db_session.query(MapaCalor).filter_by(id=escenario.mapa_actual_id).one()
+        db_session.query(MapaCalor).filter_by(id=respuesta.mapa_actual.id).one()
     )
     mapa_proyectado = (
-        db_session.query(MapaCalor).filter_by(id=escenario.mapa_proyectado_id).one()
-    )
-    assert mapa_actual.conjunto_ap_id == conjunto.id
-    assert mapa_proyectado.conjunto_ap_id != conjunto.id
-    conjunto_ia = (
-        db_session.query(ConjuntoAP)
-        .filter_by(id=mapa_proyectado.conjunto_ap_id)
+        db_session.query(MapaCalor)
+        .filter_by(id=respuesta.mapas_proyectados[0].id)
         .one()
     )
-    assert conjunto_ia.conjunto_origen_id == conjunto.id
+    assert mapa_actual.conjunto_ap_id == conjunto.id
+    assert mapa_proyectado.conjunto_ap_id == conjunto_ia.id
     assert conjunto_ia.origen == "ia"
-    assert conjunto_ia.estado_gobernanza == "pendiente_revision"
-    assert len(conjunto_ia.items) == escenario.cantidad_aps
+    assert len(conjunto_ia.items) == conjunto_ia.cantidad_aps
     assert mapa_actual.bssids_generacion == ["aa:bb:cc:dd:ee:50"]
 
 
@@ -475,7 +474,6 @@ def test_ia_no_usa_conjunto_propuesto_por_ia_como_fuente(
         nombre="Conjunto IA derivado",
         proposito=conjunto_base.proposito,
         origen="ia",
-        estado_gobernanza="pendiente_revision",
         creado_por_id=admin_usuario.id,
     )
     conjunto_ia.items.append(
@@ -489,9 +487,9 @@ def test_ia_no_usa_conjunto_propuesto_por_ia_como_fuente(
     db_session.commit()
 
     with pytest.raises(HTTPException) as exc:
-        generar_escenarios(
+        generar_conjuntos_ia(
             proyecto_id=plano.proyecto_id,
-            body=RestriccionesEscenarioIn(
+            body=RestriccionesIAIn(
                 bandas=["5"],
                 resolucion=32,
                 fuente_entrada={
@@ -499,6 +497,7 @@ def test_ia_no_usa_conjunto_propuesto_por_ia_como_fuente(
                     "conjunto_id": conjunto_ia.id,
                 },
             ),
+            request=None,
             db=db_session,
             current_user=admin_usuario,
         )
@@ -507,60 +506,24 @@ def test_ia_no_usa_conjunto_propuesto_por_ia_como_fuente(
     assert "conjunto técnico" in exc.value.detail
 
 
-def test_admin_puede_borrar_permanentemente_escenarios_ia(
-    client,
-    db_session,
-    admin_token,
-    tecnico_usuario,
-    admin_usuario,
-    monkeypatch,
-):
+def test_tecnico_no_puede_generar_conjuntos_ia(db_session, tecnico_usuario):
     plano = _plano_con_mediciones(db_session, tecnico_usuario)
     conjunto = _crear_conjunto_ap(
         db_session,
         plano=plano,
-        admin=admin_usuario,
-        nombre="Lote para eliminar",
+        admin=tecnico_usuario,
         bssids=("aa:bb:cc:dd:ee:50",),
     )
-    with tempfile.TemporaryDirectory() as tmp:
-        monkeypatch.setattr(settings, "storage_root", tmp)
-        generar_escenarios(
+    with pytest.raises(HTTPException) as exc:
+        generar_conjuntos_ia(
             proyecto_id=plano.proyecto_id,
-            body=RestriccionesEscenarioIn(
-                bandas=["5"],
-                resolucion=32,
-                umbral_objetivo_dbm=-70,
+            body=RestriccionesIAIn(
                 fuente_entrada={
                     "tipo": "CONJUNTO_EXISTENTE",
                     "conjunto_id": conjunto.id,
-                },
+                }
             ),
-            db=db_session,
-            current_user=admin_usuario,
-        )
-
-    assert db_session.query(EscenarioOptimizado).count() > 0
-    assert db_session.query(RecomendacionAP).count() > 0
-
-    respuesta = client.delete(
-        f"/proyectos/{plano.proyecto_id}/escenarios",
-        headers={"Authorization": f"Bearer {admin_token}"},
-    )
-
-    assert respuesta.status_code == 200
-    assert respuesta.json()["eliminados"] > 0
-    db_session.expire_all()
-    assert db_session.query(EscenarioOptimizado).count() == 0
-    assert db_session.query(RecomendacionAP).count() == 0
-
-
-def test_tecnico_no_puede_generar_escenarios_ia(db_session, tecnico_usuario):
-    plano = _plano_con_mediciones(db_session, tecnico_usuario)
-    with pytest.raises(HTTPException) as exc:
-        generar_escenarios(
-            proyecto_id=plano.proyecto_id,
-            body=RestriccionesEscenarioIn(),
+            request=None,
             db=db_session,
             current_user=tecnico_usuario,
         )

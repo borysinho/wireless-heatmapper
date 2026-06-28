@@ -86,7 +86,7 @@
 .tabla {
   border-collapse: collapse;
   font-size: 0.88rem;
-  min-width: 940px;
+  min-width: 1040px;
   width: 100%;
 }
 
@@ -132,6 +132,194 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.45rem;
+}
+
+.overlay {
+  align-items: center;
+  background: rgba(0, 0, 0, 0.58);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 1rem;
+  position: fixed;
+  z-index: 220;
+}
+
+.modalVista {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  display: grid;
+  gap: 1rem;
+  max-height: calc(100vh - 2rem);
+  max-width: min(72rem, 100%);
+  overflow: auto;
+  padding: 1rem;
+  width: 100%;
+}
+
+.modalHeader {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.modalHeader p,
+.modalHeader h2,
+.modalHeader span {
+  display: block;
+  margin: 0;
+}
+
+.modalHeader p {
+  color: var(--color-primary);
+  font-size: 0.76rem;
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+}
+
+.modalHeader h2 {
+  color: var(--text-h);
+  font-size: 1.15rem;
+  margin-bottom: 0.2rem;
+}
+
+.modalHeader span {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+}
+
+.cerrarVista {
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 2.25rem;
+  justify-content: center;
+  width: 2.25rem;
+}
+
+.cerrarVista:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.mapaPreview {
+  background:
+    linear-gradient(45deg, var(--bg-surface) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--bg-surface) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--bg-surface) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--bg-surface) 75%);
+  background-color: var(--bg);
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-size: 16px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  display: flex;
+  justify-content: center;
+  max-height: 62vh;
+  overflow: auto;
+  padding: 0.75rem;
+}
+
+.planoPreview {
+  flex: 0 0 auto;
+  max-height: 62vh;
+  max-width: 100%;
+  position: relative;
+  width: min(100%, 68rem);
+}
+
+.planoPreview img,
+.capaMarcadores {
+  display: block;
+  height: 100%;
+  inset: 0;
+  position: absolute;
+  width: 100%;
+}
+
+.planoPreview img {
+  object-fit: fill;
+}
+
+.capaMarcadores {
+  pointer-events: none;
+}
+
+.marcadorAp {
+  align-items: center;
+  background: #176b9f;
+  border: 3px solid #ffffff;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 2px rgba(15, 23, 42, 0.86),
+    0 5px 12px rgba(15, 23, 42, 0.38);
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 0.86rem;
+  font-weight: 800;
+  height: 1.85rem;
+  justify-content: center;
+  line-height: 1;
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 1.85rem;
+}
+
+.marcadorAp::after {
+  border: 2px solid rgba(23, 107, 159, 0.42);
+  border-radius: 50%;
+  content: "";
+  inset: -0.45rem;
+  position: absolute;
+}
+
+.sinUbicaciones {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  margin: 0;
+  padding: 0.875rem;
+}
+
+.listaApsPreview {
+  display: grid;
+  gap: 0.625rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.listaApsPreview article {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.625rem;
+}
+
+.listaApsPreview strong,
+.listaApsPreview span,
+.listaApsPreview small {
+  overflow-wrap: anywhere;
+}
+
+.listaApsPreview strong {
+  color: var(--text-h);
+  font-size: 0.84rem;
+}
+
+.listaApsPreview span,
+.listaApsPreview small {
+  color: var(--text-muted);
+  font-size: 0.76rem;
 }
 
 .editor,
@@ -295,6 +483,10 @@
   .resumen {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .listaApsPreview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 560px) {
@@ -304,7 +496,8 @@
 
   .editorCampos,
   .apSelector,
-  .mapasComparados {
+  .mapasComparados,
+  .listaApsPreview {
     grid-template-columns: 1fr;
   }
 }

@@ -164,9 +164,7 @@ class MedicionRepository:
                 {
                     "bssid": bssid,
                     "ssid": ssid,
-                    "canal": Counter(canales).most_common(1)[0][0]
-                    if canales
-                    else None,
+                    "canal": Counter(canales).most_common(1)[0][0] if canales else None,
                     "frecuencia_mhz": Counter(frecuencias).most_common(1)[0][0]
                     if frecuencias
                     else None,
@@ -206,8 +204,7 @@ class MedicionRepository:
             if not rssi_por_bssid:
                 continue
             mejor_rssi = max(
-                sum(valores) / len(valores)
-                for valores in rssi_por_bssid.values()
+                sum(valores) / len(valores) for valores in rssi_por_bssid.values()
             )
             resultado.append(
                 PuntoRSSI(
@@ -289,9 +286,7 @@ class MedicionRepository:
     def obtener_punto_por_id(self, *, punto_id: int) -> PuntoMedicion | None:
         """Retorna el punto con sus mediciones cargadas (eager via relationship)."""
         return (
-            self._db.query(PuntoMedicion)
-            .filter(PuntoMedicion.id == punto_id)
-            .first()
+            self._db.query(PuntoMedicion).filter(PuntoMedicion.id == punto_id).first()
         )
 
     def actualizar_posicion(

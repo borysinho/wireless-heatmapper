@@ -192,34 +192,44 @@ export function MapaCalorInteractivo({
                 onClick={(event) => { event.stopPropagation(); setDetalle(`Medición #${punto.punto_id} · ${punto.rssi.toFixed(1)} dBm · (${punto.pos_x.toFixed(0)}, ${punto.pos_y.toFixed(0)}) px`); }}
               />
             ))}
-            {verAps && mapa.aps_interes.map((ap, indice) => {
-              const hint = apHints?.[indice];
-              return (
-              <g
-                key={ap.bssid}
-                className={styles.ap}
-                transform={`translate(${ap.pos_x} ${ap.pos_y})`}
-                onPointerDown={(event) => event.stopPropagation()}
-                onPointerEnter={() => {
-                  if (!hint) return;
-                  setHintAp({ ...hint, x: ap.pos_x, y: ap.pos_y });
-                }}
-                onPointerLeave={() => setHintAp(null)}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setDetalle(
-                    hint
-                      ? `${hint.titulo} · ${hint.resumen}`
-                      : `${ap.ssid || "SSID oculto"} · ${ap.bssid} · ${ap.rssi_promedio.toFixed(1)} dBm · ${ap.canal ? `canal ${ap.canal}` : "canal s/d"} · ${ap.cantidad_puntos} puntos`,
-                  );
-                }}
-              >
-                <circle r={Math.max(plano.ancho_px, plano.alto_px) * 0.017} />
-                <text textAnchor="middle" dominantBaseline="central">AP</text>
-              </g>
-              );
-            })}
           </svg>
+          {verAps && (
+            <div className={styles.capaAps} aria-label="Ubicación de APs">
+              {mapa.aps_interes.map((ap, indice) => {
+                const hint = apHints?.[indice];
+                const detalleAp = hint
+                  ? `${hint.titulo} · ${hint.resumen}`
+                  : `${ap.ssid || "SSID oculto"} · ${ap.bssid} · ${ap.rssi_promedio.toFixed(1)} dBm · ${ap.canal ? `canal ${ap.canal}` : "canal s/d"} · ${ap.cantidad_puntos} puntos`;
+
+                return (
+                  <button
+                    key={ap.bssid}
+                    type="button"
+                    className={styles.marcadorAp}
+                    style={{
+                      left: `${(ap.pos_x / plano.ancho_px) * 100}%`,
+                      top: `${(ap.pos_y / plano.alto_px) * 100}%`,
+                    }}
+                    title={detalleAp}
+                    aria-label={`AP ${indice + 1}: ${ap.ssid || "SSID oculto"}`}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onPointerMove={(event) => event.stopPropagation()}
+                    onPointerEnter={() => {
+                      if (!hint) return;
+                      setHintAp({ ...hint, x: ap.pos_x, y: ap.pos_y });
+                    }}
+                    onPointerLeave={() => setHintAp(null)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setDetalle(detalleAp);
+                    }}
+                  >
+                    {indice + 1}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {hintAp && !arrastrando && (
             <div
               className={styles.apHint}

@@ -1,6 +1,5 @@
 import 'package:equatable/equatable.dart';
 
-import '../../domain/entities/analisis_cobertura.dart';
 import '../../domain/entities/ap_disponible.dart';
 import '../../domain/entities/conjunto_ap.dart';
 import '../../domain/entities/mapa_calor.dart';
@@ -124,8 +123,6 @@ class HeatmapReady extends HeatmapState {
   final String? bssidActivo;
   final Map<String, double> apPosXPorBssid;
   final Map<String, double> apPosYPorBssid;
-  final AnalisisCobertura? analisis;
-  final bool analizando;
   final String? mensaje;
 
   HeatmapReady({
@@ -136,8 +133,6 @@ class HeatmapReady extends HeatmapState {
     required this.bssidActivo,
     required Map<String, double> apPosXPorBssid,
     required Map<String, double> apPosYPorBssid,
-    this.analisis,
-    this.analizando = false,
     this.mensaje,
   })  : aps = List<APDisponible>.unmodifiable(aps),
         bssidsSeleccionados = Set.unmodifiable(bssidsSeleccionados),
@@ -151,8 +146,6 @@ class HeatmapReady extends HeatmapState {
     Object? bssidActivo = _sinCambio,
     Map<String, double>? apPosXPorBssid,
     Map<String, double>? apPosYPorBssid,
-    AnalisisCobertura? analisis,
-    bool? analizando,
     String? mensaje,
   }) {
     return HeatmapReady(
@@ -164,8 +157,6 @@ class HeatmapReady extends HeatmapState {
           bssidActivo == _sinCambio ? this.bssidActivo : bssidActivo as String?,
       apPosXPorBssid: apPosXPorBssid ?? this.apPosXPorBssid,
       apPosYPorBssid: apPosYPorBssid ?? this.apPosYPorBssid,
-      analisis: analisis ?? this.analisis,
-      analizando: analizando ?? this.analizando,
       mensaje: mensaje,
     );
   }
@@ -185,8 +176,6 @@ class HeatmapReady extends HeatmapState {
             .map((entry) => '${entry.key}:${entry.value}')
             .toList()
           ..sort(),
-        analisis,
-        analizando,
         mensaje,
       ];
 }

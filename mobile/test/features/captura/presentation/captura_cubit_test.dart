@@ -9,6 +9,7 @@ import 'package:heatmapper/features/captura/domain/entities/resultado_escaneo.da
 import 'package:heatmapper/features/captura/domain/repositories/captura_repository.dart';
 import 'package:heatmapper/features/captura/presentation/cubit/captura_cubit.dart';
 import 'package:heatmapper/features/captura/presentation/cubit/captura_state.dart';
+import 'package:heatmapper/features/planos/domain/entities/plano.dart';
 import 'package:mocktail/mocktail.dart';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
@@ -93,6 +94,33 @@ void main() {
         isA<CapturaActiva>().having((s) => s.puntos, 'puntos', isEmpty),
       ],
     );
+  });
+
+  group('poligonoInteres', () {
+    test('delega eliminación del polígono al repositorio', () async {
+      when(() => repo.eliminarPoligonoInteres(10))
+          .thenAnswer((_) async => const <PuntoPlano>[]);
+
+      final puntos = await cubit.eliminarPoligonoInteres(10);
+
+      expect(puntos, isEmpty);
+      verify(() => repo.eliminarPoligonoInteres(10)).called(1);
+    });
+
+    test('delega generación del polígono con IA al repositorio', () async {
+      const puntosGenerados = [
+        PuntoPlano(x: 10, y: 10),
+        PuntoPlano(x: 100, y: 10),
+        PuntoPlano(x: 100, y: 80),
+      ];
+      when(() => repo.generarPoligonoInteresIA(10))
+          .thenAnswer((_) async => puntosGenerados);
+
+      final puntos = await cubit.generarPoligonoInteresIA(10);
+
+      expect(puntos, puntosGenerados);
+      verify(() => repo.generarPoligonoInteresIA(10)).called(1);
+    });
   });
 
   // ── marcarPunto ────────────────────────────────────────────────────────────

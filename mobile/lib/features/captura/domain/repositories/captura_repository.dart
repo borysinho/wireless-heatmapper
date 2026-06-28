@@ -26,6 +26,12 @@ abstract class CapturaRepository {
     required List<PuntoPlano> puntos,
   });
 
+  /// Elimina el polígono de interés asociado al plano.
+  Future<List<PuntoPlano>> eliminarPoligonoInteres(int planoId);
+
+  /// Solicita al backend que genere el polígono de interés con IA.
+  Future<List<PuntoPlano>> generarPoligonoInteresIA(int planoId);
+
   /// Obtiene el detalle de un punto con todas sus mediciones.
   Future<PuntoMedicion> obtenerPunto(int puntoId);
 

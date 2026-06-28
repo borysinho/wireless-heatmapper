@@ -1,17 +1,11 @@
-"""Repositorios del módulo de heatmap y análisis.
+"""Repositorios del módulo de heatmap y conjuntos AP.
 
-Sprint 4 — PB-05, PB-06.
+Sprint 4 — PB-05.
 """
 
 from sqlalchemy.orm import Session
 
-from app.models.heatmap import (
-    AnalisisCobertura,
-    APDetectado,
-    ConjuntoAP,
-    ConjuntoAPItem,
-    MapaCalor,
-)
+from app.models.heatmap import ConjuntoAP, ConjuntoAPItem, MapaCalor
 
 
 class MapaCalorRepository:
@@ -125,11 +119,7 @@ class ConjuntoAPRepository:
         )
 
     def obtener_por_id(self, *, conjunto_id: int) -> ConjuntoAP | None:
-        return (
-            self._db.query(ConjuntoAP)
-            .filter(ConjuntoAP.id == conjunto_id)
-            .first()
-        )
+        return self._db.query(ConjuntoAP).filter(ConjuntoAP.id == conjunto_id).first()
 
     def existe_nombre(
         self,
@@ -156,9 +146,12 @@ class ConjuntoAPRepository:
         es_principal: bool,
         items: list[dict],
         origen: str = "manual_movil",
-        estado_gobernanza: str = "borrador_tecnico",
         creado_por_id: int | None = None,
         conjunto_origen_id: int | None = None,
+        resumen_ia: str | None = None,
+        metricas_ia: dict | None = None,
+        restricciones_ia: dict | None = None,
+        version_motor_ia: str | None = None,
     ) -> ConjuntoAP:
         conjunto = ConjuntoAP(
             plano_id=plano_id,
@@ -168,8 +161,11 @@ class ConjuntoAPRepository:
             descripcion=descripcion,
             es_principal=es_principal,
             origen=origen,
-            estado_gobernanza=estado_gobernanza,
             creado_por_id=creado_por_id,
+            resumen_ia=resumen_ia,
+            metricas_ia=metricas_ia,
+            restricciones_ia=restricciones_ia,
+            version_motor_ia=version_motor_ia,
         )
         self._db.add(conjunto)
         self._db.flush()
@@ -187,7 +183,6 @@ class ConjuntoAPRepository:
         descripcion: str | None = None,
         es_principal: bool | None = None,
         items: list[dict] | None = None,
-        estado_gobernanza: str | None = None,
     ) -> ConjuntoAP:
         if nombre is not None:
             conjunto.nombre = nombre
@@ -197,8 +192,6 @@ class ConjuntoAPRepository:
             conjunto.descripcion = descripcion
         if es_principal is not None:
             conjunto.es_principal = es_principal
-        if estado_gobernanza is not None:
-            conjunto.estado_gobernanza = estado_gobernanza
         if items is not None:
             self._reemplazar_items(conjunto=conjunto, items=items)
         self._db.commit()
@@ -218,11 +211,7 @@ class ConjuntoAPRepository:
         pos_y: float,
     ) -> ConjuntoAP | None:
         item = next(
-            (
-                item
-                for item in conjunto.items
-                if item.bssid.lower() == bssid.lower()
-            ),
+            (item for item in conjunto.items if item.bssid.lower() == bssid.lower()),
             None,
         )
         if item is None:
@@ -238,63 +227,3 @@ class ConjuntoAPRepository:
         self._db.flush()
         for item in items:
             conjunto.items.append(ConjuntoAPItem(**item))
-
-
-class AnalisisCoberturaRepository:
-    def __init__(self, db: Session) -> None:
-        self._db = db
-
-    def obtener_ap_por_id(self, *, ap_id: int) -> APDetectado | None:
-        return self._db.query(APDetectado).filter(APDetectado.id == ap_id).first()
-
-    def reemplazar(
-        self,
-        *,
-        mapa: MapaCalor,
-        pct_cobertura: float,
-        pct_zonas_muertas: float,
-        celdas_zonas_muertas: int,
-        cantidad_solapamientos: int,
-        cantidad_interferencias: int,
-        hallazgos: dict,
-        resumen: str,
-        aps_detectados: list[dict],
-    ) -> AnalisisCobertura:
-        if mapa.analisis is not None:
-            self._db.delete(mapa.analisis)
-            self._db.flush()
-
-        analisis = AnalisisCobertura(
-            mapa_calor_id=mapa.id,
-            pct_cobertura=pct_cobertura,
-            pct_zonas_muertas=pct_zonas_muertas,
-            celdas_zonas_muertas=celdas_zonas_muertas,
-            cantidad_solapamientos=cantidad_solapamientos,
-            cantidad_interferencias=cantidad_interferencias,
-            hallazgos=hallazgos,
-            resumen=resumen,
-        )
-        self._db.add(analisis)
-        self._db.flush()
-
-        for ap_data in aps_detectados:
-            self._db.add(APDetectado(analisis_id=analisis.id, **ap_data))
-
-        self._db.commit()
-        self._db.refresh(analisis)
-        return analisis
-
-    def confirmar_ap(
-        self,
-        *,
-        ap: APDetectado,
-        pos_x: float,
-        pos_y: float,
-        confirmado: bool,
-    ) -> APDetectado:
-        ap.pos_x = pos_x
-        ap.pos_y = pos_y
-        ap.confirmado = confirmado
-        self._db.commit()
-        self._db.refresh(ap)
-        return ap

@@ -132,62 +132,43 @@
   flex-wrap: wrap;
 }
 
-.pipeline {
-  align-items: start;
+.resumenFlujo {
   display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(4, minmax(15rem, 1fr));
-  overflow-x: auto;
-  padding-bottom: 0.35rem;
+  gap: 0.875rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 1rem;
 }
 
-.columna {
+.resumenFlujo article {
+  align-items: center;
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  min-width: 15rem;
-  padding: 0.75rem;
+  display: grid;
+  gap: 0.25rem 0.625rem;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  padding: 0.875rem;
 }
 
-.columnaHeader {
-  align-items: flex-start;
-  display: flex;
-  gap: 0.75rem;
-  justify-content: space-between;
-  margin-bottom: 0.75rem;
+.resumenFlujo svg {
+  color: var(--color-primary);
+  grid-row: span 2;
 }
 
-.columnaHeader h2 {
-  color: var(--text-h);
-  font-size: 0.92rem;
-  margin: 0 0 0.1rem;
-}
-
-.columnaHeader p {
+.resumenFlujo span {
   color: var(--text-muted);
   font-size: 0.76rem;
-  line-height: 1.3;
-  margin: 0;
 }
 
-.columnaHeader span {
-  align-items: center;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
+.resumenFlujo strong {
   color: var(--text-h);
-  display: inline-flex;
-  flex: 0 0 auto;
-  font-size: 0.78rem;
-  font-weight: 700;
-  justify-content: center;
-  min-width: 1.7rem;
-  padding: 0.15rem 0.45rem;
+  font-size: 0.92rem;
+  line-height: 1.25;
 }
 
-.tarjetas {
+.listaProyectos {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.875rem;
 }
 
 .tarjetaProyecto {
@@ -207,9 +188,9 @@
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
-.tarjetaHeader h3 {
+.tarjetaHeader h2 {
   color: var(--text-h);
-  font-size: 0.95rem;
+  font-size: 1rem;
   line-height: 1.25;
   margin: 0 0 0.15rem;
 }
@@ -219,6 +200,16 @@
   font-size: 0.78rem;
   line-height: 1.3;
   margin: 0;
+}
+
+.actividad {
+  align-items: center;
+  color: var(--text-muted);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.78rem;
+  gap: 0.3rem;
+  white-space: nowrap;
 }
 
 .detalles {
@@ -252,24 +243,17 @@
   white-space: nowrap;
 }
 
-.atajosRF {
+.flujoRF {
   display: grid;
   gap: 0.45rem;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.atajosRF button,
+.flujoRF button,
 .acciones button {
   justify-content: center;
-}
-
-.columnaVacia {
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-md);
-  color: var(--text-muted);
-  font-size: 0.82rem;
-  padding: 1rem;
-  text-align: center;
+  min-height: 2.25rem;
+  white-space: normal;
 }
 
 /* Modal de reasignación */
@@ -399,17 +383,16 @@
     flex-direction: column;
   }
 
-  .pipeline {
+  .resumenFlujo {
     grid-template-columns: 1fr;
-    overflow-x: visible;
   }
 
-  .columna {
-    min-width: 0;
+  .tarjetaHeader {
+    grid-template-columns: 1fr;
   }
 
   .detalles,
-  .atajosRF {
+  .flujoRF {
     grid-template-columns: 1fr;
   }
 

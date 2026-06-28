@@ -239,7 +239,9 @@ class OptimizadorAPService:
             if coord not in unicos:
                 unicos.append(coord)
         filtrados = [
-            coord for coord in unicos if self._coord_en_poligono(*coord, poligono_interes)
+            coord
+            for coord in unicos
+            if self._coord_en_poligono(*coord, poligono_interes)
         ]
         if filtrados:
             return filtrados
@@ -287,7 +289,9 @@ class OptimizadorAPService:
         poligono_interes: list[dict] | None = None,
     ) -> list[tuple[float, float]]:
         seleccionados = iniciales[:cantidad]
-        restantes = [candidato for candidato in candidatos if candidato not in seleccionados]
+        restantes = [
+            candidato for candidato in candidatos if candidato not in seleccionados
+        ]
         while len(seleccionados) < cantidad and restantes:
             mejor = max(
                 restantes,
@@ -412,10 +416,7 @@ class OptimizadorAPService:
         umbral_objetivo_dbm: int,
         ap_existente: dict | None,
     ) -> dict:
-        if (
-            ap_existente
-            and ap_existente.get("restriccion_movimiento") == "FIJO"
-        ):
+        if ap_existente and ap_existente.get("restriccion_movimiento") == "FIJO":
             x = float(ap_existente["coord_x"])
             y = float(ap_existente["coord_y"])
         punto_critico = min(puntos, key=lambda p: math.hypot(p.x - x, p.y - y))

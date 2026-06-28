@@ -125,14 +125,6 @@ export interface APDisponibleOut {
   seleccionado: boolean;
 }
 
-export type EstadoGobernanzaConjunto =
-  | "borrador_tecnico"
-  | "preliminar"
-  | "pendiente_revision"
-  | "aprobado_interno"
-  | "publicado_cliente"
-  | "descartado";
-
 export interface ConjuntoAPItemOut {
   bssid: string;
   ssid: string;
@@ -142,6 +134,14 @@ export interface ConjuntoAPItemOut {
   pos_x: number | null;
   pos_y: number | null;
   cantidad_puntos: number | null;
+  accion_recomendada: string | null;
+  justificacion: string | null;
+  altura_m: number | null;
+  tipo_montaje: string | null;
+  banda: string | null;
+  modelo_ap: string | null;
+  costo_estimado: number | null;
+  radios: Array<Record<string, unknown>> | null;
 }
 
 export interface ConjuntoAPOut {
@@ -153,124 +153,41 @@ export interface ConjuntoAPOut {
   descripcion: string | null;
   es_principal: boolean;
   origen: "manual_movil" | "manual_web" | "ia" | string;
-  estado_gobernanza: EstadoGobernanzaConjunto | string;
   creado_por_id: number | null;
+  resumen_ia: string | null;
+  metricas_ia: Record<string, unknown> | null;
+  restricciones_ia: Record<string, unknown> | null;
+  version_motor_ia: string | null;
   cantidad_aps: number;
   items: ConjuntoAPItemOut[];
   created_at: string;
   updated_at: string;
 }
 
-export interface FuenteEntradaEscenarioIn {
-  tipo:
-    | "SELECCION_APS_MAPA"
-    | "INVENTARIO_RF"
-    | "BASELINE_OBSERVADO"
-    | "CONJUNTO_EXISTENTE";
-  nombre?: string;
-  proposito?: string;
-  ap_ids: number[];
-  bssids?: string[];
-  conjunto_id?: number | null;
+export interface FuenteEntradaIAIn {
+  tipo: "CONJUNTO_EXISTENTE";
+  conjunto_id: number;
 }
 
-export interface RecomendacionAPOut {
-  id: number;
-  orden: number;
-  accion: string;
-  coord_x: number;
-  coord_y: number;
-  altura_m: number;
-  tipo_montaje: string;
-  banda: string;
-  modelo_ap: string;
-  costo_estimado: number;
-  rssi_proyectado: number;
-  radios: Array<Record<string, unknown>>;
-  justificacion: string;
-}
-
-export interface EscenarioOptimizadoOut {
-  id: number;
-  proyecto_id: number;
-  plano_id: number;
-  mapa_actual_id: number | null;
-  mapa_proyectado_id: number | null;
-  conjunto_base_id: number | null;
-  origen: string;
-  estado_gobernanza:
-    | "pendiente_revision"
-    | "aprobado_interno"
-    | "publicado_cliente"
-    | "descartado"
-    | string;
-  generado_por_id: number | null;
-  aprobado_por_id: number | null;
-  publicado_por_id: number | null;
-  aprobado_at: string | null;
-  publicado_at: string | null;
-  nombre: string;
-  tipo_negocio: string;
-  perfil: string;
-  politica_combinacion: string;
-  banda: string;
-  bandas: string[];
-  modelo_ap: string;
-  pct_cobertura_actual: number;
-  pct_cobertura: number;
-  costo_estimado: number;
-  cantidad_aps: number;
-  resumen: string;
-  restricciones: Record<string, unknown>;
-  metricas: Record<string, unknown>;
-  mapas_por_banda: Record<string, unknown>;
-  mapas_actuales_por_banda: Record<string, unknown>;
-  supuestos: string[];
-  confianza: string;
-  version_motor: string;
-  recomendaciones: RecomendacionAPOut[];
-  created_at: string;
-}
-
-export interface RestriccionesEscenarioIn {
+export interface RestriccionesIAIn {
   plano_id?: number;
-  fuente_entrada?: FuenteEntradaEscenarioIn;
+  fuente_entrada: FuenteEntradaIAIn;
   bandas: Array<"2.4" | "5">;
   umbral_objetivo_dbm: number;
   resolucion: number;
   cantidad_recomendaciones: number;
 }
 
-export interface EscenariosGeneradosOut {
-  escenarios: EscenarioGeneradoResumenOut[];
+export interface ConjuntosIAGeneradosOut {
+  conjunto_base_id: number;
+  mapa_actual: MapaCalorOut;
+  conjuntos: ConjuntoAPOut[];
+  mapas_proyectados: MapaCalorOut[];
 }
-
-export interface EscenarioGeneradoResumenOut {
-  id: number;
-  proyecto_id: number;
-  plano_id: number;
-  conjunto_base_id: number | null;
-  estado_gobernanza: EstadoGobernanzaEscenario | string;
-  nombre: string;
-  pct_cobertura_actual: number;
-  pct_cobertura: number;
-  cantidad_aps: number;
-  confianza: string;
-  created_at: string;
-}
-
-export type EstadoGobernanzaEscenario =
-  | "pendiente_revision"
-  | "aprobado_interno"
-  | "publicado_cliente"
-  | "descartado";
 
 export interface ContenidoEnlaceIn {
   conjunto_ids?: number[];
   mapa_ids?: number[];
-  analisis_ids?: number[];
-  escenario_ids?: number[];
-  reporte_id?: number | null;
 }
 
 export interface EnlaceClienteOut {
@@ -309,36 +226,10 @@ export interface PortalProyectoOut {
   descripcion: string | null;
 }
 
-export interface AnalisisCoberturaOut {
-  id: number;
-  mapa_calor_id: number;
-  pct_cobertura: number;
-  pct_zonas_muertas: number;
-  celdas_zonas_muertas: number;
-  cantidad_solapamientos: number;
-  cantidad_interferencias: number;
-  hallazgos: Record<string, unknown>;
-  resumen: string;
-  aps_detectados: Array<{
-    id: number;
-    bssid: string;
-    ssid: string;
-    canal: number | null;
-    frecuencia_mhz: number | null;
-    rssi_promedio: number;
-    pos_x: number;
-    pos_y: number;
-    confirmado: boolean;
-    created_at: string;
-  }>;
-  created_at: string;
-}
-
 export interface MapaCalorPortalOut {
   id: number;
   plano_id: number;
   conjunto_ap_id: number | null;
-  analisis_id: number | null;
   modo_generacion: string;
   algoritmo: string;
   resolucion: number;
@@ -362,40 +253,9 @@ export interface MapaCalorPortalOut {
 
 export type MapaCalorOut = MapaCalorPortalOut;
 
-export interface ComparacionEscenarioOut {
-  escenario: EscenarioOptimizadoOut;
-  heatmap_actual: MapaCalorOut;
-  heatmap_proyectado: MapaCalorOut;
-  matriz_diferencia: number[][];
-  comparacion_por_banda: Record<string, unknown>;
-  resumen: {
-    delta_pct_cobertura: number;
-    delta_zonas_muertas: number;
-    costo_estimado: number;
-    cantidad_cambios: number;
-    lectura: string;
-  };
-}
-
-export interface ReporteOut {
-  id: number;
-  proyecto_id: number;
-  escenario_id: number | null;
-  estado: string;
-  url_descarga: string | null;
-  sha256: string | null;
-  tamanio_bytes: number;
-  error: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface PortalClienteOut {
   proyecto: PortalProyectoOut;
   planos: PlanoOut[];
   conjuntos: ConjuntoAPOut[];
   heatmaps: MapaCalorPortalOut[];
-  analisis: AnalisisCoberturaOut[];
-  escenarios: EscenarioOptimizadoOut[];
-  reporte_disponible: boolean;
 }

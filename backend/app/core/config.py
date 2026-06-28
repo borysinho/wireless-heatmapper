@@ -54,5 +54,12 @@ class Settings(BaseSettings):
     smtp_from_name: str = "Wireless HeatMapper"
     public_web_url: str = ""
 
+    # Azure OpenAI (generación asistida de polígono de interés)
+    azure_openai_api_key: str = ""
+    azure_openai_endpoint: str = ""
+    azure_openai_poligono_deployment: str = "whm-poligono-gpt5-nano"
+    azure_openai_poligono_max_px: int = 768
+    azure_openai_poligono_timeout_seconds: int = 30
+
 
 settings = Settings()

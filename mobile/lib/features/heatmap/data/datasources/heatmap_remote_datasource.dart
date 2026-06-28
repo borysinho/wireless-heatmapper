@@ -1,8 +1,6 @@
 import 'package:dio/dio.dart';
 
-import '../models/analisis_cobertura_model.dart';
 import '../models/ap_disponible_model.dart';
-import '../models/ap_detectado_model.dart';
 import '../models/conjunto_ap_model.dart';
 import '../models/inventario_rf_model.dart';
 import '../models/mapa_calor_model.dart';
@@ -175,39 +173,6 @@ class HeatmapRemoteDatasource {
         },
       );
       return MapaCalorModel.fromJson(response.data!);
-    } on DioException catch (e) {
-      throw HeatmapApiException(
-        _mensajeDesdeError(e),
-        statusCode: e.response?.statusCode,
-      );
-    }
-  }
-
-  Future<AnalisisCoberturaModel> analizarMapa(int mapaId) async {
-    try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/mapas/$mapaId/analisis',
-      );
-      return AnalisisCoberturaModel.fromJson(response.data!);
-    } on DioException catch (e) {
-      throw HeatmapApiException(
-        _mensajeDesdeError(e),
-        statusCode: e.response?.statusCode,
-      );
-    }
-  }
-
-  Future<APDetectadoModel> confirmarAP({
-    required int apId,
-    required double posX,
-    required double posY,
-  }) async {
-    try {
-      final response = await _dio.patch<Map<String, dynamic>>(
-        '/aps/$apId',
-        data: {'pos_x': posX, 'pos_y': posY, 'confirmado': true},
-      );
-      return APDetectadoModel.fromJson(response.data!);
     } on DioException catch (e) {
       throw HeatmapApiException(
         _mensajeDesdeError(e),

@@ -162,9 +162,7 @@ class ModeloPropagacion:
                 )
                 distancia = math.log2(max(1.0, muestra.distancia_m))
                 perdidas.append(
-                    eirp
-                    - (muestra.rssi_dbm + penalizacion)
-                    - perdida * distancia
+                    eirp - (muestra.rssi_dbm + penalizacion) - perdida * distancia
                 )
             perdida_sistema = cls._promedio_recortado(
                 perdidas,

@@ -270,10 +270,7 @@ def mover_punto(
     "/{punto_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Eliminar punto de medición",
-    description=(
-        "Elimina el punto y sus mediciones en cascada. "
-        "PB-04 — CA-5."
-    ),
+    description=("Elimina el punto y sus mediciones en cascada. PB-04 — CA-5."),
 )
 def eliminar_punto(
     punto_id: int,

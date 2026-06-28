@@ -76,6 +76,7 @@ class _CapturaPageState extends State<CapturaPage> {
   bool _poligonoCerrado = false;
   bool _guardandoPoligono = false;
   List<Offset> _poligonoInteres = [];
+  List<Offset>? _poligonoAntesRedibujar;
   Offset? _ultimoTapPoligono;
   DateTime? _ultimoTapPoligonoAt;
 
@@ -257,6 +258,7 @@ class _CapturaPageState extends State<CapturaPage> {
         _poligonoCerrado = true;
         _modoPoligono = false;
         _guardandoPoligono = false;
+        _poligonoAntesRedibujar = null;
         _ultimoTapPoligono = null;
         _ultimoTapPoligonoAt = null;
       });
@@ -271,6 +273,128 @@ class _CapturaPageState extends State<CapturaPage> {
       final mensaje = e is CapturaApiException
           ? e.mensaje
           : 'No se pudo guardar el polígono.';
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(mensaje),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+    }
+  }
+
+  Future<void> _confirmarEliminarPoligono() async {
+    if (_guardandoPoligono || _poligonoInteres.isEmpty) return;
+    final confirmado = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Eliminar polígono'),
+        content: const Text(
+          '¿Eliminar el polígono de interés? Los puntos y mediciones del plano se conservan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmado != true || !mounted) return;
+
+    setState(() => _guardandoPoligono = true);
+    try {
+      await context
+          .read<CapturaCubit>()
+          .eliminarPoligonoInteres(widget.planoId);
+      if (!mounted) return;
+      setState(() {
+        _poligonoInteres = [];
+        _poligonoCerrado = false;
+        _modoPoligono = false;
+        _guardandoPoligono = false;
+        _poligonoAntesRedibujar = null;
+        _ultimoTapPoligono = null;
+        _ultimoTapPoligonoAt = null;
+      });
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Polígono de interés eliminado.')),
+        );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _guardandoPoligono = false);
+      final mensaje = e is CapturaApiException
+          ? e.mensaje
+          : 'No se pudo eliminar el polígono.';
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(mensaje),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+    }
+  }
+
+  Future<void> _generarPoligonoIA() async {
+    if (_guardandoPoligono) return;
+    if (_poligonoCerrado && _poligonoInteres.length >= 3) {
+      final confirmado = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Generar con IA'),
+          content: const Text(
+            'La IA reemplazará el polígono actual. Los puntos y mediciones se conservan.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Generar'),
+            ),
+          ],
+        ),
+      );
+      if (confirmado != true || !mounted) return;
+    }
+
+    setState(() => _guardandoPoligono = true);
+    try {
+      final puntos = await context
+          .read<CapturaCubit>()
+          .generarPoligonoInteresIA(widget.planoId);
+      if (!mounted) return;
+      setState(() {
+        _poligonoInteres = puntos.map((p) => Offset(p.x, p.y)).toList();
+        _poligonoCerrado = _poligonoInteres.length >= 3;
+        _modoPoligono = false;
+        _guardandoPoligono = false;
+        _poligonoAntesRedibujar = null;
+        _ultimoTapPoligono = null;
+        _ultimoTapPoligonoAt = null;
+      });
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('Polígono generado con IA.')),
+        );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _guardandoPoligono = false);
+      final mensaje = e is CapturaApiException
+          ? e.mensaje
+          : 'No se pudo generar el polígono con IA.';
       ScaffoldMessenger.of(context)
         ..clearSnackBars()
         ..showSnackBar(
@@ -392,9 +516,20 @@ class _CapturaPageState extends State<CapturaPage> {
   void _alternarModoPoligono() {
     if (_guardandoPoligono) return;
     setState(() {
-      _modoPoligono = !_modoPoligono;
+      if (_modoPoligono) {
+        final anterior = _poligonoAntesRedibujar;
+        _poligonoInteres = anterior ?? [];
+        _poligonoCerrado = _poligonoInteres.length >= 3;
+        _poligonoAntesRedibujar = null;
+      } else {
+        _poligonoAntesRedibujar =
+            _poligonoCerrado ? List<Offset>.from(_poligonoInteres) : null;
+        _poligonoInteres = [];
+        _poligonoCerrado = false;
+      }
       _ultimoTapPoligono = null;
       _ultimoTapPoligonoAt = null;
+      _modoPoligono = !_modoPoligono;
     });
   }
 
@@ -629,6 +764,9 @@ class _CapturaPageState extends State<CapturaPage> {
                   cerrado: _poligonoCerrado,
                   guardando: _guardandoPoligono,
                   onPressed: _alternarModoPoligono,
+                  onGenerate: _modoPoligono ? null : _generarPoligonoIA,
+                  onDelete:
+                      _poligonoCerrado ? _confirmarEliminarPoligono : null,
                 ),
               ),
               if (_modoPoligono || _guardandoPoligono)
@@ -655,12 +793,16 @@ class _BotonPoligonoInteres extends StatelessWidget {
   final bool cerrado;
   final bool guardando;
   final VoidCallback onPressed;
+  final VoidCallback? onGenerate;
+  final VoidCallback? onDelete;
 
   const _BotonPoligonoInteres({
     required this.activo,
     required this.cerrado,
     required this.guardando,
     required this.onPressed,
+    this.onGenerate,
+    this.onDelete,
   });
 
   @override
@@ -685,11 +827,42 @@ class _BotonPoligonoInteres extends StatelessWidget {
           );
 
     return SafeArea(
-      child: Material(
-        elevation: 4,
-        borderRadius: BorderRadius.circular(8),
-        color: Colors.transparent,
-        child: boton,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!activo && onGenerate != null) ...[
+            Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(8),
+              color: Theme.of(context).colorScheme.surface,
+              child: IconButton(
+                tooltip: 'Generar área con IA',
+                onPressed: guardando ? null : onGenerate,
+                icon: const Icon(Icons.auto_awesome),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          if (!activo && cerrado && onDelete != null) ...[
+            Material(
+              elevation: 4,
+              borderRadius: BorderRadius.circular(8),
+              color: Theme.of(context).colorScheme.surface,
+              child: IconButton(
+                tooltip: 'Eliminar área',
+                onPressed: guardando ? null : onDelete,
+                icon: const Icon(Icons.delete_outline),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.transparent,
+            child: boton,
+          ),
+        ],
       ),
     );
   }
