@@ -9,15 +9,18 @@ from fastapi import HTTPException
 from app.ai.modelo_propagacion import ModeloPropagacion, MuestraCalibracionRF
 from app.ai.optimizador_ap_service import OptimizadorAPService
 from app.api.v1.escenarios import _limite_aps_derivado, generar_conjuntos_ia
-from app.api.v1.inventario_rf import crear_ap, obtener_inventario
+from app.api.v1.heatmaps import eliminar_conjunto_ap
 from app.core.config import settings
 from app.models.heatmap import ConjuntoAP, ConjuntoAPItem, MapaCalor
-from app.models.medicion import MedicionWifi
+from app.models.medicion import LecturaRSSI
 from app.models.plano import Plano
 from app.models.proyecto import Proyecto
-from app.repositories.medicion_repository import MedicionRepository
+from app.repositories.medicion_repository import (
+    ORIGEN_CAMPO,
+    ORIGEN_IA_ESTIMADA,
+    MedicionRepository,
+)
 from app.schemas.ia import RestriccionesIAIn
-from app.schemas.inventario_rf import APFisicoCrearIn, BSSIDRadioIn, RadioAPIn
 from app.schemas.medicion import MedicionItemIn
 from app.services.interpolacion_service import PuntoRSSI
 
@@ -84,12 +87,14 @@ def _crear_conjunto_ap(
     admin,
     nombre: str = "Conjunto IA prueba",
     proposito: str = "Validar conjunto completo de entrada",
-    bssids: tuple[str, ...] = ("aa:bb:cc:dd:ee:24", "aa:bb:cc:dd:ee:50"),
+    banda_objetivo: str = "5",
+    bssids: tuple[str, ...] = ("aa:bb:cc:dd:ee:50",),
 ) -> ConjuntoAP:
     conjunto = ConjuntoAP(
         plano_id=plano.id,
         nombre=nombre,
         proposito=proposito,
+        banda_objetivo=banda_objetivo,
         origen="manual_web",
         creado_por_id=admin.id,
     )
@@ -100,6 +105,9 @@ def _crear_conjunto_ap(
                 ssid_snapshot="Bulldog-5" if bssid.endswith(":50") else "Bulldog-24",
                 canal_snapshot=44 if bssid.endswith(":50") else 6,
                 rssi_promedio_snapshot=-70,
+                pos_x=120 if bssid.endswith(":50") else 100,
+                pos_y=100 if bssid.endswith(":50") else 90,
+                banda="5" if bssid.endswith(":50") else "2.4",
             )
         )
     db.add(conjunto)
@@ -243,48 +251,32 @@ def test_optimizador_dual_band_respeta_umbral_y_ap_fijo():
     assert len(escenario.recomendaciones[0]["radios"]) == 2
 
 
-def test_inventario_modela_ap_radio_y_bssid(db_session, tecnico_usuario):
+def test_conjunto_tecnico_aporta_posiciones_para_calibracion_ia(
+    db_session, tecnico_usuario, admin_usuario, monkeypatch
+):
     plano = _plano_con_mediciones(db_session, tecnico_usuario)
-    ap = crear_ap(
-        plano_id=plano.id,
-        body=APFisicoCrearIn(
-            nombre="AP existente 1",
-            fabricante="Bulldog Tech.",
-            modelo="BT-AX1800",
-            coord_x=100,
-            coord_y=90,
-            altura_m=2.8,
-            verificado=True,
-            radios=[
-                RadioAPIn(
-                    banda="2.4",
-                    canal=6,
-                    potencia_original=8,
-                    potencia_dbm=8,
-                    potencia_max_dbm=20,
-                    bssids=[BSSIDRadioIn(bssid="aa:bb:cc:dd:ee:24", ssid="Bulldog-24")],
-                ),
-                RadioAPIn(
-                    banda="5",
-                    canal=44,
-                    potencia_original=14,
-                    potencia_dbm=14,
-                    potencia_max_dbm=23,
-                    bssids=[BSSIDRadioIn(bssid="aa:bb:cc:dd:ee:50", ssid="Bulldog-5")],
-                ),
-            ],
-        ),
-        db=db_session,
-        current_user=tecnico_usuario,
+    conjunto = _crear_conjunto_ap(db_session, plano=plano, admin=admin_usuario)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        monkeypatch.setattr(settings, "storage_root", tmp)
+        respuesta = generar_conjuntos_ia(
+            proyecto_id=plano.proyecto_id,
+            body=RestriccionesIAIn(
+                resolucion=32,
+                fuente_entrada={
+                    "tipo": "CONJUNTO_EXISTENTE",
+                    "conjunto_id": conjunto.id,
+                },
+            ),
+            request=None,
+            db=db_session,
+            current_user=admin_usuario,
+        )
+
+    assert respuesta.conjuntos[0].metricas_ia["calibracion_modelo"]["tipo"] == (
+        "calibracion_local_por_plano"
     )
-    inventario = obtener_inventario(
-        plano_id=plano.id,
-        db=db_session,
-        current_user=tecnico_usuario,
-    )
-    assert ap.id
-    assert len(inventario.aps[0].radios) == 2
-    assert inventario.nivel_completitud == "ALTO"
+    assert respuesta.conjuntos[0].metricas_ia["calibracion_modelo"]["muestras"] == 5
 
 
 def test_generacion_persiste_proyecciones_sin_alterar_mediciones(
@@ -292,50 +284,11 @@ def test_generacion_persiste_proyecciones_sin_alterar_mediciones(
 ):
     plano = _plano_con_mediciones(db_session, tecnico_usuario)
     originales = {
-        medicion.id: medicion.rssi for medicion in db_session.query(MedicionWifi).all()
+        lectura.id: lectura.rssi
+        for lectura in db_session.query(LecturaRSSI)
+        .filter(LecturaRSSI.origen == ORIGEN_CAMPO)
+        .all()
     }
-    crear_ap(
-        plano_id=plano.id,
-        body=APFisicoCrearIn(
-            nombre="AP existente calibracion",
-            fabricante="Bulldog Tech.",
-            modelo="BT-AX1800",
-            coord_x=120,
-            coord_y=100,
-            altura_m=2.8,
-            verificado=True,
-            radios=[
-                RadioAPIn(
-                    banda="2.4",
-                    canal=6,
-                    potencia_original=8,
-                    potencia_dbm=8,
-                    potencia_max_dbm=20,
-                    bssids=[
-                        BSSIDRadioIn(
-                            bssid="aa:bb:cc:dd:ee:24",
-                            ssid="Bulldog-24",
-                        )
-                    ],
-                ),
-                RadioAPIn(
-                    banda="5",
-                    canal=44,
-                    potencia_original=14,
-                    potencia_dbm=14,
-                    potencia_max_dbm=23,
-                    bssids=[
-                        BSSIDRadioIn(
-                            bssid="aa:bb:cc:dd:ee:50",
-                            ssid="Bulldog-5",
-                        )
-                    ],
-                ),
-            ],
-        ),
-        db=db_session,
-        current_user=tecnico_usuario,
-    )
     conjunto = _crear_conjunto_ap(
         db_session,
         plano=plano,
@@ -348,7 +301,6 @@ def test_generacion_persiste_proyecciones_sin_alterar_mediciones(
         respuesta = generar_conjuntos_ia(
             proyecto_id=plano.proyecto_id,
             body=RestriccionesIAIn(
-                bandas=["2.4", "5"],
                 resolucion=32,
                 umbral_objetivo_dbm=-70,
                 fuente_entrada={
@@ -360,24 +312,43 @@ def test_generacion_persiste_proyecciones_sin_alterar_mediciones(
             db=db_session,
             current_user=admin_usuario,
         )
-    assert len(respuesta.conjuntos) == 3
+    assert len(respuesta.conjuntos) == 2
+    assert len(respuesta.mapas_proyectados) == 2
     conjunto_ia = respuesta.conjuntos[0]
+    mapas_conjunto_ia = [
+        mapa for mapa in respuesta.mapas_proyectados if mapa.conjunto_ap_id == conjunto_ia.id
+    ]
+    assert len(mapas_conjunto_ia) == 1
+    assert {mapa.modo_generacion for mapa in mapas_conjunto_ia} == {"PROYECTADO"}
     assert conjunto_ia.origen == "ia"
     assert conjunto_ia.conjunto_origen_id == conjunto.id
     assert conjunto_ia.creado_por_id == admin_usuario.id
     assert conjunto_ia.nombre == "Conjunto IA prueba · IA Propuesta 1"
     assert conjunto_ia.restricciones_ia["fuente_entrada"]["conjunto_id"] == conjunto.id
-    assert conjunto_ia.restricciones_ia["limite_aps_derivado"] == 2
+    assert conjunto_ia.restricciones_ia["cantidad_aps_propuestos"] == 3
+    assert conjunto_ia.restricciones_ia["fuente_entrada"]["banda_objetivo"] == "5"
     assert set(conjunto_ia.restricciones_ia["fuente_entrada"]["bssids"]) == {
-        "aa:bb:cc:dd:ee:24",
         "aa:bb:cc:dd:ee:50",
     }
     assert conjunto_ia.metricas_ia["calibracion_modelo"]["tipo"] == (
         "calibracion_local_por_plano"
     )
-    assert conjunto_ia.metricas_ia["calibracion_modelo"]["muestras"] == 10
-    assert set(conjunto_ia.metricas_ia["mapas_por_banda"]) == {"2.4", "5"}
-    assert len(conjunto_ia.items[0].radios) == 2
+    assert conjunto_ia.metricas_ia["calibracion_modelo"]["muestras"] == 5
+    assert "mapas_por_banda" not in conjunto_ia.metricas_ia
+    assert "lecturas_estimadas" not in conjunto_ia.metricas_ia
+    assert len(conjunto_ia.items[0].radios) == 1
+    assert conjunto_ia.metricas_ia["cantidad_lecturas_estimadas"] == (
+        len(conjunto_ia.items) * 5
+    )
+    assert (
+        db_session.query(LecturaRSSI)
+        .filter(
+            LecturaRSSI.origen == ORIGEN_IA_ESTIMADA,
+            LecturaRSSI.conjunto_ap_id == conjunto_ia.id,
+        )
+        .count()
+        == len(conjunto_ia.items) * 5
+    )
     assert conjunto_ia.items[0].accion_recomendada in {
         "AGREGAR",
         "RECONFIGURAR",
@@ -385,9 +356,13 @@ def test_generacion_persiste_proyecciones_sin_alterar_mediciones(
     }
     db_session.expire_all()
     assert {
-        medicion.id: medicion.rssi for medicion in db_session.query(MedicionWifi).all()
+        lectura.id: lectura.rssi
+        for lectura in db_session.query(LecturaRSSI)
+        .filter(LecturaRSSI.origen == ORIGEN_CAMPO)
+        .all()
     } == originales
-    assert len(conjunto_ia.metricas_ia["mapas_por_banda"]["5"]) == 32
+    conjunto_ia_db = db_session.query(ConjuntoAP).filter_by(id=conjunto_ia.id).one()
+    assert len(conjunto_ia_db.metricas_ia["mapas_por_banda"]["5"]) == 32
 
 
 def test_generacion_desde_conjunto_existente_conserva_fuente_y_bssids(
@@ -408,7 +383,6 @@ def test_generacion_desde_conjunto_existente_conserva_fuente_y_bssids(
         respuesta = generar_conjuntos_ia(
             proyecto_id=plano.proyecto_id,
             body=RestriccionesIAIn(
-                bandas=["5"],
                 resolucion=32,
                 fuente_entrada={
                     "tipo": "CONJUNTO_EXISTENTE",
@@ -422,7 +396,6 @@ def test_generacion_desde_conjunto_existente_conserva_fuente_y_bssids(
         segunda_respuesta = generar_conjuntos_ia(
             proyecto_id=plano.proyecto_id,
             body=RestriccionesIAIn(
-                bandas=["5"],
                 resolucion=32,
                 fuente_entrada={
                     "tipo": "CONJUNTO_EXISTENTE",
@@ -453,6 +426,85 @@ def test_generacion_desde_conjunto_existente_conserva_fuente_y_bssids(
     assert conjunto_ia.origen == "ia"
     assert len(conjunto_ia.items) == conjunto_ia.cantidad_aps
     assert mapa_actual.bssids_generacion == ["aa:bb:cc:dd:ee:50"]
+
+
+def test_generacion_ia_funciona_despues_de_eliminar_propuestas(
+    db_session,
+    tecnico_usuario,
+    admin_usuario,
+    monkeypatch,
+):
+    plano = _plano_con_mediciones(db_session, tecnico_usuario)
+    conjunto = _crear_conjunto_ap(
+        db_session,
+        plano=plano,
+        admin=admin_usuario,
+        nombre="Conjunto regenerable 5 GHz",
+        proposito="Optimizar la cobertura tras eliminar propuestas",
+        bssids=("aa:bb:cc:dd:ee:50",),
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        monkeypatch.setattr(settings, "storage_root", tmp)
+        primera_respuesta = generar_conjuntos_ia(
+            proyecto_id=plano.proyecto_id,
+            body=RestriccionesIAIn(
+                resolucion=32,
+                fuente_entrada={
+                    "tipo": "CONJUNTO_EXISTENTE",
+                    "conjunto_id": conjunto.id,
+                },
+            ),
+            request=None,
+            db=db_session,
+            current_user=admin_usuario,
+        )
+        for propuesta in primera_respuesta.conjuntos:
+            eliminar_conjunto_ap(
+                conjunto_id=propuesta.id,
+                db=db_session,
+                current_user=admin_usuario,
+            )
+        assert (
+            db_session.query(MapaCalor)
+            .filter(
+                MapaCalor.conjunto_ap_id.in_(
+                    [propuesta.id for propuesta in primera_respuesta.conjuntos]
+                )
+            )
+            .count()
+            == 0
+        )
+        assert (
+            db_session.query(LecturaRSSI)
+            .filter(
+                LecturaRSSI.conjunto_ap_id.in_(
+                    [propuesta.id for propuesta in primera_respuesta.conjuntos]
+                )
+            )
+            .count()
+            == 0
+        )
+
+        segunda_respuesta = generar_conjuntos_ia(
+            proyecto_id=plano.proyecto_id,
+            body=RestriccionesIAIn(
+                resolucion=32,
+                fuente_entrada={
+                    "tipo": "CONJUNTO_EXISTENTE",
+                    "conjunto_id": conjunto.id,
+                },
+            ),
+            request=None,
+            db=db_session,
+            current_user=admin_usuario,
+        )
+
+    assert len(segunda_respuesta.conjuntos) == len(primera_respuesta.conjuntos)
+    assert segunda_respuesta.conjuntos[0].nombre == (
+        "Conjunto regenerable 5 GHz · IA Propuesta 1"
+    )
+    assert all(conjunto.origen == "ia" for conjunto in segunda_respuesta.conjuntos)
 
 
 def test_ia_no_usa_conjunto_propuesto_por_ia_como_fuente(
@@ -490,7 +542,6 @@ def test_ia_no_usa_conjunto_propuesto_por_ia_como_fuente(
         generar_conjuntos_ia(
             proyecto_id=plano.proyecto_id,
             body=RestriccionesIAIn(
-                bandas=["5"],
                 resolucion=32,
                 fuente_entrada={
                     "tipo": "CONJUNTO_EXISTENTE",

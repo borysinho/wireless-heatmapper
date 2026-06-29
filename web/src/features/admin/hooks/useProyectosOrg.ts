@@ -19,8 +19,11 @@ import {
   crearConjuntoAP,
   eliminarProyectoAdmin,
   enviarCorreoEnlaceCliente,
+  eliminarConjuntoAP,
+  eliminarMapaCalor,
   generarConjuntosIAProyecto,
   generarHeatmapConjunto,
+  generarHeatmapsFaltantesConjunto,
   listarConjuntosPlano,
   listarEnlacesCliente,
   listarMapasPlano,
@@ -146,11 +149,41 @@ export function useActualizarConjuntoAP() {
   });
 }
 
+export function useEliminarConjuntoAP() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (conjuntoId: number) => eliminarConjuntoAP(conjuntoId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "planos"] }),
+  });
+}
+
+export function useEliminarMapaCalor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (mapaId: number) => eliminarMapaCalor(mapaId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "planos"] }),
+  });
+}
+
 export function useGenerarHeatmapConjunto() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ conjuntoId, body }: { conjuntoId: number; body: Parameters<typeof generarHeatmapConjunto>[1] }) =>
       generarHeatmapConjunto(conjuntoId, body),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "planos"] }),
+  });
+}
+
+export function useGenerarHeatmapsFaltantesConjunto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      conjuntoId,
+      body,
+    }: {
+      conjuntoId: number;
+      body: Parameters<typeof generarHeatmapsFaltantesConjunto>[1];
+    }) => generarHeatmapsFaltantesConjunto(conjuntoId, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "planos"] }),
   });
 }

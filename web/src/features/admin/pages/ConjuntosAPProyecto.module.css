@@ -25,7 +25,7 @@
 .resumen {
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
 }
 
 .resumenItem {
@@ -134,6 +134,19 @@
   gap: 0.45rem;
 }
 
+.banda {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-h);
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.35rem 0.5rem;
+  white-space: nowrap;
+}
+
 .overlay {
   align-items: center;
   background: rgba(0, 0, 0, 0.58);
@@ -153,7 +166,7 @@
   display: grid;
   gap: 1rem;
   max-height: calc(100vh - 2rem);
-  max-width: min(72rem, 100%);
+  max-width: min(94rem, 100%);
   overflow: auto;
   padding: 1rem;
   width: 100%;
@@ -210,6 +223,195 @@
   color: var(--color-primary);
 }
 
+.seccionGaleria {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.tituloGaleria {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.tituloGaleria h3 {
+  color: var(--text-h);
+  font-size: 0.98rem;
+  margin: 0;
+}
+
+.tituloGaleria span {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.accionesGaleria {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.5rem;
+}
+
+.carruselHeatmaps {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.controlesCarrusel {
+  align-items: center;
+  display: flex;
+  gap: 0.625rem;
+  justify-content: center;
+}
+
+.controlesCarrusel button {
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  height: 2.25rem;
+  justify-content: center;
+  width: 2.25rem;
+}
+
+.controlesCarrusel button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.controlesCarrusel span {
+  color: var(--text-h);
+  font-size: 0.84rem;
+  font-weight: 800;
+  min-width: 4rem;
+  text-align: center;
+}
+
+.indicadoresCarrusel {
+  align-items: center;
+  display: flex;
+  gap: 0.45rem;
+  justify-content: center;
+}
+
+.indicadoresCarrusel button {
+  background: var(--border);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  height: 0.55rem;
+  padding: 0;
+  width: 0.55rem;
+}
+
+.indicadoresCarrusel .indicadorActivo {
+  background: var(--color-primary);
+  width: 1.5rem;
+}
+
+.heatmapCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.75rem;
+}
+
+.heatmapCardHeader {
+  align-items: flex-start;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.heatmapCardHeader strong,
+.heatmapCardHeader span {
+  display: block;
+}
+
+.heatmapCardHeader strong {
+  color: var(--text-h);
+  font-size: 0.9rem;
+}
+
+.heatmapCardHeader span {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  margin-top: 0.15rem;
+}
+
+.algoritmoBadge {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-h) !important;
+  flex: 0 0 auto;
+  font-size: 0.75rem !important;
+  font-weight: 800;
+  line-height: 1;
+  margin: 0 !important;
+  padding: 0.38rem 0.5rem;
+  white-space: nowrap;
+}
+
+.accionesMapa {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 0.4rem;
+}
+
+.generarFaltantes {
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-h);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 800;
+  gap: 0.35rem;
+  height: 2rem;
+  justify-content: center;
+  padding: 0 0.65rem;
+  white-space: nowrap;
+}
+
+.generarFaltantes:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.generarFaltantes:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.eliminarMapa {
+  align-items: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 2rem;
+  justify-content: center;
+  width: 2rem;
+}
+
+.eliminarMapa:hover {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
 .mapaPreview {
   background:
     linear-gradient(45deg, var(--bg-surface) 25%, transparent 25%),
@@ -223,14 +425,14 @@
   border-radius: var(--radius-md);
   display: flex;
   justify-content: center;
-  max-height: 62vh;
+  max-height: 72vh;
   overflow: auto;
   padding: 0.75rem;
 }
 
 .planoPreview {
   flex: 0 0 auto;
-  max-height: 62vh;
+  max-height: 72vh;
   max-width: 100%;
   position: relative;
   width: min(100%, 68rem);
@@ -249,8 +451,20 @@
   object-fit: fill;
 }
 
+.planoBase {
+  z-index: 0;
+}
+
+.heatmapCapa {
+  image-rendering: auto;
+  opacity: 0.74;
+  pointer-events: none;
+  z-index: 1;
+}
+
 .capaMarcadores {
   pointer-events: none;
+  z-index: 2;
 }
 
 .marcadorAp {
@@ -289,6 +503,26 @@
   padding: 0.875rem;
 }
 
+.sinMapasWrapper {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.metricasMapa {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.metricasMapa span {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  padding: 0.3rem 0.45rem;
+}
+
 .listaApsPreview {
   display: grid;
   gap: 0.625rem;
@@ -320,6 +554,12 @@
 .listaApsPreview small {
   color: var(--text-muted);
   font-size: 0.76rem;
+}
+
+@media (max-width: 900px) {
+  .listaApsPreview {
+    grid-template-columns: 1fr;
+  }
 }
 
 .editor,

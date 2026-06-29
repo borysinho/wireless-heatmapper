@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/theme/app_tokens.dart';
-import '../../domain/entities/medicion_wifi.dart';
+import '../../domain/entities/lectura_rssi.dart';
 import '../../domain/entities/nivel_senal.dart';
 import '../../domain/entities/punto_medicion.dart';
 import '../cubit/captura_cubit.dart';
@@ -153,7 +153,7 @@ class PuntoDetalleSheet extends StatelessWidget {
 
 class _ListaMedicionesAgrupadas extends StatelessWidget {
   final ScrollController scrollCtrl;
-  final List<MedicionWifi> mediciones;
+  final List<LecturaRSSI> mediciones;
   final ThemeData theme;
 
   const _ListaMedicionesAgrupadas({
@@ -165,7 +165,7 @@ class _ListaMedicionesAgrupadas extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Agrupar por numero_lectura manteniendo el orden del backend
-    final grupos = <int, List<MedicionWifi>>{};
+    final grupos = <int, List<LecturaRSSI>>{};
     for (final m in mediciones) {
       (grupos[m.numeroLectura] ??= []).add(m);
     }

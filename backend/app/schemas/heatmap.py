@@ -10,9 +10,10 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-AlgoritmoHeatmap = Literal["IDW", "KRIGING"]
+AlgoritmoHeatmap = Literal["IDW"]
 ResolucionHeatmap = Literal[64, 128, 256]
 ModoGeneracionHeatmap = Literal["INDIVIDUAL", "SUBCONJUNTO", "CONJUNTO_COMPLETO"]
+BandaWifi = Literal["2.4", "5"]
 
 
 class EscalaHeatmapItem(BaseModel):
@@ -74,6 +75,27 @@ class MapaCalorOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class MapaCalorResumenOut(BaseModel):
+    id: int
+    plano_id: int
+    conjunto_ap_id: int | None = None
+    modo_generacion: str = "SUBCONJUNTO"
+    algoritmo: str
+    resolucion: int
+    bssid: str
+    ssid: str
+    aps_interes: list[APDisponibleOut]
+    bssids_generacion: list[str]
+    url_imagen: str
+    cantidad_puntos: int
+    rssi_min: float
+    rssi_max: float
+    rssi_promedio: float
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class ConjuntoAPItemOut(BaseModel):
     bssid: str
     ssid: str
@@ -98,6 +120,7 @@ class ConjuntoAPBase(BaseModel):
     proposito: str = Field(default="", max_length=255)
     descripcion: str | None = Field(default=None, max_length=1000)
     es_principal: bool = False
+    banda_objetivo: BandaWifi = "5"
     bssids: list[str] = Field(..., min_length=1)
 
 
@@ -110,6 +133,7 @@ class ConjuntoAPActualizarIn(BaseModel):
     proposito: str | None = Field(default=None, max_length=255)
     descripcion: str | None = Field(default=None, max_length=1000)
     es_principal: bool | None = None
+    banda_objetivo: BandaWifi | None = None
     bssids: list[str] | None = Field(default=None, min_length=1)
 
 
@@ -121,6 +145,7 @@ class ConjuntoAPOut(BaseModel):
     proposito: str
     descripcion: str | None
     es_principal: bool
+    banda_objetivo: str
     origen: str
     creado_por_id: int | None
     resumen_ia: str | None = None
@@ -140,6 +165,14 @@ class GenerarHeatmapConjuntoIn(BaseModel):
     ap_pos_y: list[float] | None = None
     algoritmo: AlgoritmoHeatmap = "IDW"
     resolucion: ResolucionHeatmap = 128
+
+
+class GenerarHeatmapsFaltantesIn(BaseModel):
+    algoritmo: AlgoritmoHeatmap | None = None
+    algoritmos: list[AlgoritmoHeatmap] | None = Field(default=None, min_length=1)
+    resolucion: ResolucionHeatmap = 64
+    actualizar_existentes: bool = False
+    reemplazar_existentes: bool = False
 
 
 class ActualizarUbicacionAPConjuntoIn(BaseModel):

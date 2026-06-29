@@ -4,6 +4,7 @@ import 'package:heatmapper/features/heatmap/domain/entities/conjunto_ap.dart';
 import 'package:heatmapper/features/heatmap/domain/repositories/heatmap_repository.dart';
 import 'package:heatmapper/features/heatmap/domain/usecases/heatmap_usecases.dart';
 import 'package:heatmapper/features/heatmap/presentation/cubit/heatmap_cubit.dart';
+import 'package:heatmapper/features/heatmap/presentation/cubit/heatmap_state.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockHeatmapRepository extends Mock implements HeatmapRepository {}
@@ -30,13 +31,21 @@ const _apSecundario = APDisponible(
   cantidadPuntos: 10,
 );
 
-ConjuntoAP _conjunto({double posX = 0, double posY = 0}) => ConjuntoAP(
-      id: 9,
+ConjuntoAP _conjunto({
+  double posX = 0,
+  double posY = 0,
+  int id = 9,
+  String nombre = 'LCM 2.4',
+  String origen = 'manual_movil',
+}) =>
+    ConjuntoAP(
+      id: id,
       planoId: 37,
-      nombre: 'LCM 2.4',
+      nombre: nombre,
       proposito: 'Lecturas de red LCM 2.4 GHz',
       descripcion: null,
       esPrincipal: false,
+      origen: origen,
       cantidadAps: 2,
       items: [
         APDisponible(
@@ -76,6 +85,21 @@ void main() {
   });
 
   tearDown(() => cubit.close());
+
+  test('lista solo conjuntos creados por el técnico de campo', () async {
+    final conjuntoCampo = _conjunto();
+    final conjuntoIA = _conjunto(id: 10, nombre: 'Propuesta IA', origen: 'ia');
+    when(() => repo.listarAPsDisponibles(37))
+        .thenAnswer((_) async => const [_apPrincipal, _apSecundario]);
+    when(() => repo.listarConjuntosAP(37))
+        .thenAnswer((_) async => [conjuntoIA, conjuntoCampo]);
+
+    await cubit.iniciar(37);
+
+    final state = cubit.state;
+    expect(state, isA<HeatmapConjuntos>());
+    expect((state as HeatmapConjuntos).conjuntos, [conjuntoCampo]);
+  });
 
   test('persiste ubicación luego de seleccionar un AP dentro del conjunto',
       () async {

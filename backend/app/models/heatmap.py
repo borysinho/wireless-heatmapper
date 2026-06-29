@@ -97,6 +97,7 @@ class ConjuntoAP(Base):
     proposito = Column(String(255), nullable=False)
     descripcion = Column(Text, nullable=True)
     es_principal = Column(Boolean, nullable=False, default=False)
+    banda_objetivo = Column(String(10), nullable=False, default="5")
     origen = Column(String(30), nullable=False, default="manual_movil", index=True)
     creado_por_id = Column(
         Integer,

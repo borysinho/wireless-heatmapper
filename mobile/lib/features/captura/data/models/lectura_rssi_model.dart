@@ -1,8 +1,8 @@
-import '../../domain/entities/medicion_wifi.dart';
+import '../../domain/entities/lectura_rssi.dart';
 import '../../domain/entities/nivel_senal.dart';
 
-class MedicionWifiModel extends MedicionWifi {
-  const MedicionWifiModel({
+class LecturaRSSIModel extends LecturaRSSI {
+  const LecturaRSSIModel({
     required super.id,
     required super.puntoId,
     required super.ssid,
@@ -12,10 +12,11 @@ class MedicionWifiModel extends MedicionWifi {
     super.frecuenciaMhz,
     required super.nivel,
     super.numeroLectura = 1,
+    super.origen = 'CAMPO',
   });
 
-  factory MedicionWifiModel.fromJson(Map<String, dynamic> json) {
-    return MedicionWifiModel(
+  factory LecturaRSSIModel.fromJson(Map<String, dynamic> json) {
+    return LecturaRSSIModel(
       id: json['id'] as int,
       puntoId: json['punto_id'] as int,
       ssid: json['ssid'] as String,
@@ -25,6 +26,7 @@ class MedicionWifiModel extends MedicionWifi {
       frecuenciaMhz: json['frecuencia_mhz'] as int?,
       nivel: NivelSenal.fromString(json['nivel'] as String),
       numeroLectura: json['numero_lectura'] as int? ?? 1,
+      origen: json['origen'] as String? ?? 'CAMPO',
     );
   }
 }

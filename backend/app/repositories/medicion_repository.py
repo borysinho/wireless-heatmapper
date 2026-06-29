@@ -1,4 +1,4 @@
-"""Repositorio de acceso a datos para mediciones WiFi.
+"""Repositorio de acceso a datos para lecturas RSSI.
 
 Sprint 3 — PB-03 (Captura WiFi en línea), PB-04 (Marcar puntos de medición).
 """
@@ -8,9 +8,13 @@ from collections import Counter, defaultdict
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models.medicion import MedicionWifi, PuntoMedicion, clasificar_nivel
+from app.models.medicion import LecturaRSSI, PuntoMedicion, clasificar_nivel
 from app.schemas.medicion import MedicionItemIn
 from app.services.interpolacion_service import PuntoRSSI
+
+RSSI_NO_DETECTADO_DBM = -95.0
+ORIGEN_CAMPO = "CAMPO"
+ORIGEN_IA_ESTIMADA = "IA_ESTIMADA"
 
 
 class MedicionRepository:
@@ -33,7 +37,7 @@ class MedicionRepository:
 
         1. Calcula el ``nivel`` de cada medición individual.
         2. Determina el peor nivel del lote (el del punto).
-        3. Inserta ``punto_medicion`` + N filas ``medicion_wifi``.
+        3. Inserta ``punto_medicion`` + N filas ``lectura_rssi`` de campo.
         """
         # Clasificar individualmente cada ítem
         niveles_rssi = [clasificar_nivel(item.rssi) for item in items]
@@ -50,7 +54,7 @@ class MedicionRepository:
         self._db.flush()  # obtiene punto.id sin cerrar la transacción
 
         for item, nivel_item in zip(items, niveles_rssi):
-            medicion = MedicionWifi(
+            lectura = LecturaRSSI(
                 punto_id=punto.id,
                 ssid=item.ssid,
                 bssid=item.bssid.lower(),
@@ -59,8 +63,9 @@ class MedicionRepository:
                 frecuencia_mhz=item.frecuencia_mhz,
                 nivel=nivel_item,
                 numero_lectura=1,
+                origen=ORIGEN_CAMPO,
             )
-            self._db.add(medicion)
+            self._db.add(lectura)
 
         self._db.commit()
         self._db.refresh(punto)
@@ -91,7 +96,7 @@ class MedicionRepository:
 
         for item in items:
             nivel_item = clasificar_nivel(item.rssi)
-            medicion = MedicionWifi(
+            lectura = LecturaRSSI(
                 punto_id=punto.id,
                 ssid=item.ssid,
                 bssid=item.bssid.lower(),
@@ -100,8 +105,9 @@ class MedicionRepository:
                 frecuencia_mhz=item.frecuencia_mhz,
                 nivel=nivel_item,
                 numero_lectura=siguiente_lectura,
+                origen=ORIGEN_CAMPO,
             )
-            self._db.add(medicion)
+            self._db.add(lectura)
 
         self._db.flush()  # inserta las nuevas filas sin cerrar la transacción
         self._db.refresh(punto)  # recarga la relación mediciones
@@ -126,22 +132,44 @@ class MedicionRepository:
             .all()
         )
 
-    def listar_mediciones_por_plano(self, *, plano_id: int) -> list[MedicionWifi]:
-        """Retorna mediciones de todos los puntos del plano con el punto cargado."""
-        return (
-            self._db.query(MedicionWifi)
-            .join(PuntoMedicion, MedicionWifi.punto_id == PuntoMedicion.id)
+    def listar_lecturas_por_plano(
+        self,
+        *,
+        plano_id: int,
+        origen: str = ORIGEN_CAMPO,
+        conjunto_ap_id: int | None = None,
+    ) -> list[LecturaRSSI]:
+        """Retorna lecturas RSSI de todos los puntos del plano."""
+        query = (
+            self._db.query(LecturaRSSI)
+            .join(PuntoMedicion, LecturaRSSI.punto_id == PuntoMedicion.id)
             .filter(PuntoMedicion.plano_id == plano_id)
-            .order_by(MedicionWifi.bssid.asc(), MedicionWifi.rssi.desc())
-            .all()
+            .filter(LecturaRSSI.origen == origen)
         )
+        if conjunto_ap_id is not None:
+            query = query.filter(LecturaRSSI.conjunto_ap_id == conjunto_ap_id)
+        return query.order_by(LecturaRSSI.bssid.asc(), LecturaRSSI.rssi.desc()).all()
 
-    def listar_aps_por_plano(self, *, plano_id: int) -> list[dict]:
-        """Agrupa mediciones por BSSID para seleccionar APs de interés."""
-        mediciones = self.listar_mediciones_por_plano(plano_id=plano_id)
-        por_bssid: dict[str, list[MedicionWifi]] = defaultdict(list)
-        for medicion in mediciones:
-            por_bssid[medicion.bssid].append(medicion)
+    def listar_mediciones_por_plano(self, *, plano_id: int) -> list[LecturaRSSI]:
+        """Compatibilidad: retorna solo lecturas reales de campo."""
+        return self.listar_lecturas_por_plano(plano_id=plano_id)
+
+    def listar_aps_por_plano(
+        self,
+        *,
+        plano_id: int,
+        origen: str = ORIGEN_CAMPO,
+        conjunto_ap_id: int | None = None,
+    ) -> list[dict]:
+        """Agrupa lecturas por BSSID para seleccionar APs de interés."""
+        lecturas = self.listar_lecturas_por_plano(
+            plano_id=plano_id,
+            origen=origen,
+            conjunto_ap_id=conjunto_ap_id,
+        )
+        por_bssid: dict[str, list[LecturaRSSI]] = defaultdict(list)
+        for lectura in lecturas:
+            por_bssid[lectura.bssid].append(lectura)
 
         aps: list[dict] = []
         for bssid, items in por_bssid.items():
@@ -191,20 +219,31 @@ class MedicionRepository:
         *,
         plano_id: int,
         bssids: list[str],
+        origen: str = ORIGEN_CAMPO,
+        conjunto_ap_id: int | None = None,
     ) -> list[PuntoRSSI]:
-        """Agrega cada punto al mejor RSSI de los APs de interés seleccionados."""
+        """Agrega cada punto al mejor RSSI de los APs de interés seleccionados.
+
+        Si ningún AP seleccionado aparece en un punto de captura, se registra un
+        piso de no-detección. Omitir esos puntos vuelve optimista el heatmap:
+        elimina precisamente las zonas donde el cliente dejó de ver la red.
+        """
         bssids_norm = {bssid.lower() for bssid in bssids}
         puntos = self.listar_puntos_por_plano(plano_id=plano_id)
         resultado: list[PuntoRSSI] = []
         for punto in puntos:
             rssi_por_bssid: dict[str, list[int]] = defaultdict(list)
-            for medicion in punto.mediciones:
-                if medicion.bssid in bssids_norm:
-                    rssi_por_bssid[medicion.bssid].append(medicion.rssi)
-            if not rssi_por_bssid:
-                continue
-            mejor_rssi = max(
-                sum(valores) / len(valores) for valores in rssi_por_bssid.values()
+            for lectura in punto.lecturas:
+                if lectura.origen != origen:
+                    continue
+                if conjunto_ap_id is not None and lectura.conjunto_ap_id != conjunto_ap_id:
+                    continue
+                if lectura.bssid in bssids_norm:
+                    rssi_por_bssid[lectura.bssid].append(lectura.rssi)
+            mejor_rssi = (
+                max(sum(valores) / len(valores) for valores in rssi_por_bssid.values())
+                if rssi_por_bssid
+                else RSSI_NO_DETECTADO_DBM
             )
             resultado.append(
                 PuntoRSSI(
@@ -221,6 +260,8 @@ class MedicionRepository:
         *,
         plano_id: int,
         bssids: list[str],
+        origen: str = ORIGEN_CAMPO,
+        conjunto_ap_id: int | None = None,
     ) -> dict[str, list[PuntoRSSI]]:
         """Agrupa lecturas RSSI por AP de interés y punto de medición."""
         bssids_norm = {bssid.lower() for bssid in bssids}
@@ -228,9 +269,13 @@ class MedicionRepository:
         resultado: dict[str, list[PuntoRSSI]] = {bssid: [] for bssid in bssids_norm}
         for punto in puntos:
             rssi_por_bssid: dict[str, list[int]] = defaultdict(list)
-            for medicion in punto.mediciones:
-                if medicion.bssid in bssids_norm:
-                    rssi_por_bssid[medicion.bssid].append(medicion.rssi)
+            for lectura in punto.lecturas:
+                if lectura.origen != origen:
+                    continue
+                if conjunto_ap_id is not None and lectura.conjunto_ap_id != conjunto_ap_id:
+                    continue
+                if lectura.bssid in bssids_norm:
+                    rssi_por_bssid[lectura.bssid].append(lectura.rssi)
 
             for bssid, valores in rssi_por_bssid.items():
                 resultado[bssid].append(
@@ -251,11 +296,12 @@ class MedicionRepository:
     ) -> dict[str, float]:
         """Retorna el RSSI máximo observado para cada AP de interés."""
         filas = (
-            self._db.query(MedicionWifi.bssid, func.max(MedicionWifi.rssi))
-            .join(PuntoMedicion, MedicionWifi.punto_id == PuntoMedicion.id)
+            self._db.query(LecturaRSSI.bssid, func.max(LecturaRSSI.rssi))
+            .join(PuntoMedicion, LecturaRSSI.punto_id == PuntoMedicion.id)
             .filter(PuntoMedicion.plano_id == plano_id)
-            .filter(MedicionWifi.bssid.in_([bssid.lower() for bssid in bssids]))
-            .group_by(MedicionWifi.bssid)
+            .filter(LecturaRSSI.origen == ORIGEN_CAMPO)
+            .filter(LecturaRSSI.bssid.in_([bssid.lower() for bssid in bssids]))
+            .group_by(LecturaRSSI.bssid)
             .all()
         )
         return {bssid: float(rssi) for bssid, rssi in filas if rssi is not None}
@@ -265,23 +311,63 @@ class MedicionRepository:
         *,
         plano_id: int,
         bssids: list[str] | None = None,
+        origen: str = ORIGEN_CAMPO,
+        conjunto_ap_id: int | None = None,
     ) -> str:
-        """Firma liviana del estado de mediciones usada para cache del heatmap."""
+        """Firma liviana del estado de lecturas usada para cache del heatmap."""
         query = (
             self._db.query(
-                func.count(MedicionWifi.id),
+                func.count(LecturaRSSI.id),
                 func.max(PuntoMedicion.id),
-                func.max(MedicionWifi.id),
+                func.max(LecturaRSSI.id),
             )
-            .join(PuntoMedicion, MedicionWifi.punto_id == PuntoMedicion.id)
+            .join(PuntoMedicion, LecturaRSSI.punto_id == PuntoMedicion.id)
             .filter(PuntoMedicion.plano_id == plano_id)
+            .filter(LecturaRSSI.origen == origen)
         )
+        if conjunto_ap_id is not None:
+            query = query.filter(LecturaRSSI.conjunto_ap_id == conjunto_ap_id)
         if bssids is not None:
             query = query.filter(
-                MedicionWifi.bssid.in_([bssid.lower() for bssid in bssids])
+                LecturaRSSI.bssid.in_([bssid.lower() for bssid in bssids])
             )
-        conteo, max_punto, max_medicion = query.one()
-        return f"{conteo or 0}:{max_punto or 0}:{max_medicion or 0}"
+        conteo, max_punto, max_lectura = query.one()
+        return f"{origen}:{conjunto_ap_id or 0}:{conteo or 0}:{max_punto or 0}:{max_lectura or 0}"
+
+    def reemplazar_lecturas_estimadas(
+        self,
+        *,
+        conjunto_ap_id: int,
+        lecturas: list[dict],
+    ) -> None:
+        """Reemplaza las lecturas IA de un conjunto derivado."""
+        (
+            self._db.query(LecturaRSSI)
+            .filter(
+                LecturaRSSI.origen == ORIGEN_IA_ESTIMADA,
+                LecturaRSSI.conjunto_ap_id == conjunto_ap_id,
+            )
+            .delete(synchronize_session=False)
+        )
+        for item in lecturas:
+            rssi = int(round(float(item["rssi"])))
+            self._db.add(
+                LecturaRSSI(
+                    punto_id=int(item["punto_id"]),
+                    ssid=str(item["ssid"]),
+                    bssid=str(item["bssid"]).lower(),
+                    rssi=max(-120, min(0, rssi)),
+                    canal=item.get("canal"),
+                    frecuencia_mhz=item.get("frecuencia_mhz"),
+                    nivel=clasificar_nivel(max(-120, min(0, rssi))),
+                    numero_lectura=1,
+                    origen=ORIGEN_IA_ESTIMADA,
+                    conjunto_ap_id=conjunto_ap_id,
+                    modelo_origen=item.get("modelo_origen"),
+                    incertidumbre_db=item.get("incertidumbre_db"),
+                )
+            )
+        self._db.commit()
 
     def obtener_punto_por_id(self, *, punto_id: int) -> PuntoMedicion | None:
         """Retorna el punto con sus mediciones cargadas (eager via relationship)."""

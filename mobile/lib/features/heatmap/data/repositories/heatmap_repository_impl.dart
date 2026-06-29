@@ -1,7 +1,6 @@
 import '../../domain/entities/ap_disponible.dart';
 import '../../domain/entities/conjunto_ap.dart';
 import '../../domain/entities/mapa_calor.dart';
-import '../../domain/entities/inventario_rf.dart';
 import '../../domain/repositories/heatmap_repository.dart';
 import '../datasources/heatmap_remote_datasource.dart';
 
@@ -9,19 +8,6 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
   final HeatmapRemoteDatasource _datasource;
 
   const HeatmapRepositoryImpl(this._datasource);
-
-  @override
-  Future<InventarioRF> obtenerInventarioRF(int proyectoId) {
-    return _datasource.obtenerInventarioRF(proyectoId);
-  }
-
-  @override
-  Future<APFisicoRF> crearAPFisicoRF({
-    required int proyectoId,
-    required Map<String, dynamic> datos,
-  }) {
-    return _datasource.crearAPFisicoRF(proyectoId: proyectoId, datos: datos);
-  }
 
   @override
   Future<List<APDisponible>> listarAPsDisponibles(int planoId) async {
@@ -41,6 +27,7 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
     required String nombre,
     required String proposito,
     String? descripcion,
+    required String bandaObjetivo,
     required List<String> bssids,
   }) {
     return _datasource.crearConjuntoAP(
@@ -48,6 +35,7 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
       nombre: nombre,
       proposito: proposito,
       descripcion: descripcion,
+      bandaObjetivo: bandaObjetivo,
       bssids: bssids,
     );
   }
@@ -58,6 +46,7 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
     required String nombre,
     required String proposito,
     String? descripcion,
+    required String bandaObjetivo,
     required List<String> bssids,
   }) {
     return _datasource.actualizarConjuntoAP(
@@ -65,6 +54,7 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
       nombre: nombre,
       proposito: proposito,
       descripcion: descripcion,
+      bandaObjetivo: bandaObjetivo,
       bssids: bssids,
     );
   }
@@ -128,5 +118,4 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
       apPosY: apPosY,
     );
   }
-
 }

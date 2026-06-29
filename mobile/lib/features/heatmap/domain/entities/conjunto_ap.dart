@@ -10,6 +10,7 @@ class ConjuntoAP extends Equatable {
   final String proposito;
   final String? descripcion;
   final bool esPrincipal;
+  final String bandaObjetivo;
   final String origen;
   final int? creadoPorId;
   final String? resumenIa;
@@ -29,6 +30,7 @@ class ConjuntoAP extends Equatable {
     required this.proposito,
     required this.descripcion,
     required this.esPrincipal,
+    this.bandaObjetivo = '5',
     this.origen = 'manual_movil',
     this.creadoPorId,
     this.resumenIa,
@@ -50,6 +52,7 @@ class ConjuntoAP extends Equatable {
         proposito,
         descripcion,
         esPrincipal,
+        bandaObjetivo,
         origen,
         creadoPorId,
         resumenIa,

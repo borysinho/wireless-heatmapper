@@ -2,8 +2,8 @@ import 'package:equatable/equatable.dart';
 
 import 'nivel_senal.dart';
 
-/// Resultado de un BSSID individual en un escaneo WiFi.
-class MedicionWifi extends Equatable {
+/// Lectura RSSI de un BSSID individual, real o estimada por el backend.
+class LecturaRSSI extends Equatable {
   final int id;
   final int puntoId;
   final String ssid;
@@ -13,8 +13,9 @@ class MedicionWifi extends Equatable {
   final int? frecuenciaMhz;
   final NivelSenal nivel;
   final int numeroLectura;
+  final String origen;
 
-  const MedicionWifi({
+  const LecturaRSSI({
     required this.id,
     required this.puntoId,
     required this.ssid,
@@ -24,6 +25,7 @@ class MedicionWifi extends Equatable {
     this.frecuenciaMhz,
     required this.nivel,
     this.numeroLectura = 1,
+    this.origen = 'CAMPO',
   });
 
   @override
@@ -36,6 +38,7 @@ class MedicionWifi extends Equatable {
         canal,
         frecuenciaMhz,
         nivel,
-        numeroLectura
+        numeroLectura,
+        origen,
       ];
 }

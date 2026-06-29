@@ -1,6 +1,6 @@
 import '../../domain/entities/nivel_senal.dart';
 import '../../domain/entities/punto_medicion.dart';
-import 'medicion_wifi_model.dart';
+import 'lectura_rssi_model.dart';
 
 class PuntoMedicionModel extends PuntoMedicion {
   const PuntoMedicionModel({
@@ -21,8 +21,7 @@ class PuntoMedicionModel extends PuntoMedicion {
       posY: (json['pos_y'] as num).toDouble(),
       nivel: NivelSenal.fromString(json['nivel'] as String),
       mediciones: medicionesJson
-              ?.map(
-                  (e) => MedicionWifiModel.fromJson(e as Map<String, dynamic>))
+              ?.map((e) => LecturaRSSIModel.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
     );

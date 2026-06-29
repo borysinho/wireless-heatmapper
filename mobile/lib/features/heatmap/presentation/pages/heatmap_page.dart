@@ -29,7 +29,6 @@ class HeatmapPage extends StatefulWidget {
 }
 
 class _HeatmapPageState extends State<HeatmapPage> {
-  String _algoritmo = 'IDW';
   int _resolucion = 128;
 
   Size get _tamanoPlano => Size(widget.anchoPlanoPx, widget.altoPlanoPx);
@@ -47,7 +46,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
   void _generarHeatmap() {
     context.read<HeatmapCubit>().generar(
           planoId: widget.planoId,
-          algoritmo: _algoritmo,
+          algoritmo: 'IDW',
           resolucion: _resolucion,
         );
   }
@@ -56,7 +55,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
     context.read<HeatmapCubit>().alternarFiltroAP(
           planoId: widget.planoId,
           ap: ap,
-          algoritmo: _algoritmo,
+          algoritmo: 'IDW',
           resolucion: _resolucion,
         );
   }
@@ -64,7 +63,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
   void _limpiarFiltroAP() {
     context.read<HeatmapCubit>().limpiarFiltroAP(
           planoId: widget.planoId,
-          algoritmo: _algoritmo,
+          algoritmo: 'IDW',
           resolucion: _resolucion,
         );
   }
@@ -129,10 +128,6 @@ class _HeatmapPageState extends State<HeatmapPage> {
                   onPressed: context.read<HeatmapCubit>().volverAConjuntos,
                 ),
               if (state is HeatmapSeleccionAP || state is HeatmapReady) ...[
-                _SelectorAlgoritmo(
-                  valor: _algoritmo,
-                  onChanged: (valor) => setState(() => _algoritmo = valor),
-                ),
                 _SelectorResolucion(
                   valor: _resolucion,
                   onChanged: (valor) => setState(() => _resolucion = valor),
@@ -268,6 +263,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
         onGuardar: ({
           required nombre,
           required proposito,
+          required bandaObjetivo,
           required bssids,
         }) {
           context.read<HeatmapCubit>().crearConjunto(
@@ -275,6 +271,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
                 nombre: nombre,
                 proposito: proposito,
                 descripcion: null,
+                bandaObjetivo: bandaObjetivo,
                 bssids: bssids,
               );
         },
@@ -293,6 +290,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
         onGuardar: ({
           required nombre,
           required proposito,
+          required bandaObjetivo,
           required bssids,
         }) {
           context.read<HeatmapCubit>().actualizarConjunto(
@@ -300,6 +298,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
                 nombre: nombre,
                 proposito: proposito,
                 descripcion: null,
+                bandaObjetivo: bandaObjetivo,
                 bssids: bssids,
               );
         },
@@ -338,6 +337,7 @@ class _CrearConjuntoAPSheet extends StatefulWidget {
   final void Function({
     required String nombre,
     required String proposito,
+    required String bandaObjetivo,
     required List<String> bssids,
   }) onGuardar;
 
@@ -355,7 +355,8 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
   late final TextEditingController _nombreCtrl;
   late final TextEditingController _propositoCtrl;
   late final TextEditingController _filtroCtrl;
-  late final Set<String> _seleccionados;
+  late Set<String> _seleccionados;
+  late String _bandaObjetivo;
 
   @override
   void initState() {
@@ -365,8 +366,12 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
       text: widget.conjunto?.proposito ?? '',
     );
     _filtroCtrl = TextEditingController();
+    _bandaObjetivo = widget.conjunto?.bandaObjetivo ?? '5';
     _seleccionados = widget.conjunto == null
-        ? {for (final ap in widget.aps) ap.bssid}
+        ? {
+            for (final ap in widget.aps)
+              if (_bandaAP(ap) == _bandaObjetivo) ap.bssid,
+          }
         : {for (final ap in widget.conjunto!.items) ap.bssid};
   }
 
@@ -381,15 +386,18 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
   @override
   Widget build(BuildContext context) {
     final filtro = _filtroCtrl.text.trim().toLowerCase();
+    final apsDeBanda =
+        widget.aps.where((ap) => _bandaAP(ap) == _bandaObjetivo).toList();
     final apsFiltrados = filtro.isEmpty
-        ? widget.aps
-        : widget.aps.where((ap) {
+        ? apsDeBanda
+        : apsDeBanda.where((ap) {
             final canal = ap.canal?.toString() ?? '';
             return ap.ssid.toLowerCase().contains(filtro) ||
                 ap.bssid.toLowerCase().contains(filtro) ||
                 canal.contains(filtro);
           }).toList();
-    final todosSeleccionados = _seleccionados.length == widget.aps.length;
+    final todosSeleccionados =
+        apsDeBanda.isNotEmpty && _seleccionados.length == apsDeBanda.length;
     return Padding(
       padding: EdgeInsets.fromLTRB(
         20,
@@ -419,11 +427,37 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
             maxLines: 2,
           ),
           const SizedBox(height: 16),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(
+                value: '2.4',
+                label: Text('2.4 GHz'),
+                icon: Icon(Icons.settings_input_antenna),
+              ),
+              ButtonSegment(
+                value: '5',
+                label: Text('5 GHz'),
+                icon: Icon(Icons.router_outlined),
+              ),
+            ],
+            selected: {_bandaObjetivo},
+            onSelectionChanged: (seleccion) {
+              final banda = seleccion.first;
+              setState(() {
+                _bandaObjetivo = banda;
+                _seleccionados = {
+                  for (final ap in widget.aps)
+                    if (_bandaAP(ap) == banda) ap.bssid,
+                };
+              });
+            },
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: Text(
-                  'APs seleccionados: ${_seleccionados.length}/${widget.aps.length}',
+                  'APs $_bandaObjetivo GHz: ${_seleccionados.length}/${apsDeBanda.length}',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
@@ -435,7 +469,7 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
                     } else {
                       _seleccionados
                         ..clear()
-                        ..addAll(widget.aps.map((ap) => ap.bssid));
+                        ..addAll(apsDeBanda.map((ap) => ap.bssid));
                     }
                   });
                 },
@@ -471,9 +505,13 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
           ),
           const SizedBox(height: 8),
           if (apsFiltrados.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Text('No hay APs que coincidan con el filtro.'),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                apsDeBanda.isEmpty
+                    ? 'No hay APs detectados en $_bandaObjetivo GHz.'
+                    : 'No hay APs que coincidan con el filtro.',
+              ),
             )
           else
             ...apsFiltrados.map(
@@ -519,6 +557,7 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
     widget.onGuardar(
       nombre: nombre,
       proposito: proposito,
+      bandaObjetivo: _bandaObjetivo,
       bssids: _seleccionados.toList(),
     );
     Navigator.of(context).pop();
@@ -626,8 +665,8 @@ class _ConjuntoAPTile extends StatelessWidget {
           title: Text(conjunto.nombre),
           subtitle: Text(
             proposito.isEmpty
-                ? '${conjunto.cantidadAps} APs'
-                : '$proposito\n${conjunto.cantidadAps} APs',
+                ? '${conjunto.cantidadAps} APs · ${conjunto.bandaObjetivo} GHz'
+                : '$proposito\n${conjunto.cantidadAps} APs · ${conjunto.bandaObjetivo} GHz',
           ),
           isThreeLine: proposito.isNotEmpty,
           trailing: PopupMenuButton<_AccionConjuntoAP>(
@@ -1293,7 +1332,13 @@ class _APResumen extends StatelessWidget {
 
 String _detalleAP(APDisponible ap) {
   final canal = ap.canal == null ? 'Canal s/d' : 'Canal ${ap.canal}';
-  return '${ap.bssid} · $canal · ${ap.cantidadPuntos} puntos';
+  return '${ap.bssid} · ${_bandaAP(ap)} GHz · $canal · ${ap.cantidadPuntos} puntos';
+}
+
+String _bandaAP(APDisponible ap) {
+  final frecuencia = ap.frecuenciaMhz;
+  if (frecuencia == null) return '5';
+  return frecuencia < 3000 ? '2.4' : '5';
 }
 
 class _HeatmapInfoPanel extends StatelessWidget {
@@ -1376,7 +1421,6 @@ class _HeatmapInfoPanel extends StatelessWidget {
       ),
     );
   }
-
 }
 
 class _PanelInferiorDesplazable extends StatelessWidget {
@@ -1701,34 +1745,13 @@ class _HeatmapMatrixPainter extends CustomPainter {
   }
 
   Color _colorParaRssi(double rssi) {
-    const paradas = [
-      _ColorStop(-120, Color(0xFFD7263D)),
-      _ColorStop(-91, Color(0xFFD7263D)),
-      _ColorStop(-90, Color(0xFFD95D39)),
-      _ColorStop(-80, Color(0xFFD95D39)),
-      _ColorStop(-76, Color(0xFFF08A24)),
-      _ColorStop(-75, Color(0xFFF4D35E)),
-      _ColorStop(-71, Color(0xFFF4D35E)),
-      _ColorStop(-70, Color(0xFFA7C957)),
-      _ColorStop(-68, Color(0xFFA7C957)),
-      _ColorStop(-67, Color(0xFF57B65A)),
-      _ColorStop(-61, Color(0xFF57B65A)),
-      _ColorStop(-60, Color(0xFF0B7A3B)),
-      _ColorStop(-50, Color(0xFF0B7A3B)),
-      _ColorStop(0, Color(0xFF0B7A3B)),
-    ];
-    if (rssi <= paradas.first.valor) {
-      return paradas.first.color.withValues(alpha: 0.60);
-    }
-    for (var i = 1; i < paradas.length; i++) {
-      final inicio = paradas[i - 1];
-      final fin = paradas[i];
-      if (rssi <= fin.valor) {
-        final t = (rssi - inicio.valor) / (fin.valor - inicio.valor);
-        return Color.lerp(inicio.color, fin.color, t)!.withValues(alpha: 0.60);
-      }
-    }
-    return paradas.last.color.withValues(alpha: 0.60);
+    if (rssi >= -60) return const Color(0xFF0B7A3B).withValues(alpha: 0.60);
+    if (rssi >= -67) return const Color(0xFF57B65A).withValues(alpha: 0.60);
+    if (rssi >= -70) return const Color(0xFFF4D35E).withValues(alpha: 0.60);
+    if (rssi >= -75) return const Color(0xFFF08A24).withValues(alpha: 0.60);
+    if (rssi >= -80) return const Color(0xFFD95D39).withValues(alpha: 0.60);
+    if (rssi >= -90) return const Color(0xFFB91C1C).withValues(alpha: 0.60);
+    return const Color(0xFFD7263D).withValues(alpha: 0.60);
   }
 
   @override
@@ -1737,13 +1760,6 @@ class _HeatmapMatrixPainter extends CustomPainter {
         oldDelegate.poligonoInteres != poligonoInteres ||
         oldDelegate.tamanoPlano != tamanoPlano;
   }
-}
-
-class _ColorStop {
-  final double valor;
-  final Color color;
-
-  const _ColorStop(this.valor, this.color);
 }
 
 class _PuntosLecturaPainter extends CustomPainter {
@@ -1781,10 +1797,10 @@ class _PuntosLecturaPainter extends CustomPainter {
   Color _colorParaRssi(double rssi) {
     if (rssi >= -60) return const Color(0xFF0B7A3B);
     if (rssi >= -67) return const Color(0xFF57B65A);
-    if (rssi >= -70) return const Color(0xFFA7C957);
-    if (rssi >= -75) return const Color(0xFFF4D35E);
-    if (rssi >= -80) return const Color(0xFFF08A24);
-    if (rssi >= -90) return const Color(0xFFD95D39);
+    if (rssi >= -70) return const Color(0xFFF4D35E);
+    if (rssi >= -75) return const Color(0xFFF08A24);
+    if (rssi >= -80) return const Color(0xFFD95D39);
+    if (rssi >= -90) return const Color(0xFFB91C1C);
     return const Color(0xFFD7263D);
   }
 
@@ -1793,30 +1809,6 @@ class _PuntosLecturaPainter extends CustomPainter {
     return oldDelegate.puntos != puntos ||
         oldDelegate.tamanoPlano != tamanoPlano ||
         oldDelegate.zoomEscala != zoomEscala;
-  }
-}
-
-class _SelectorAlgoritmo extends StatelessWidget {
-  final String valor;
-  final ValueChanged<String> onChanged;
-
-  const _SelectorAlgoritmo({
-    required this.valor,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
-      tooltip: 'Algoritmo',
-      icon: const Icon(Icons.functions),
-      initialValue: valor,
-      onSelected: onChanged,
-      itemBuilder: (_) => const [
-        PopupMenuItem(value: 'IDW', child: Text('IDW')),
-        PopupMenuItem(value: 'KRIGING', child: Text('Kriging')),
-      ],
-    );
   }
 }
 

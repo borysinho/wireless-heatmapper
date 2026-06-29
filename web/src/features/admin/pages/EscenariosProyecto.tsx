@@ -4,22 +4,42 @@
  */
 
 import { useMemo, useState } from "react";
-import { BrainCircuit, Layers3, RadioTower, Sparkles } from "lucide-react";
+import {
+  BrainCircuit,
+  Eye,
+  Layers3,
+  RadioTower,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { useParams } from "react-router-dom";
-import { Badge, Button, EmptyState, useToast } from "@/shared/components";
+import {
+  Button,
+  ConfirmDialog,
+  EmptyState,
+  useToast,
+} from "@/shared/components";
+import { ConjuntoAPPreviewModal } from "../components/ConjuntoAPPreviewModal";
 import {
   useConjuntosPorPlanos,
+  useEliminarConjuntoAP,
   useGenerarConjuntosIAProyecto,
+  useMapasPorPlanos,
   usePlanosProyecto,
 } from "../hooks/useProyectosOrg";
-import type { ConjuntoAPOut, RestriccionesIAIn } from "../types";
+import type {
+  ConjuntoAPOut,
+  MapaCalorOut,
+  RestriccionesIAIn,
+} from "../types";
+import conjuntosStyles from "./ConjuntosAPProyecto.module.css";
 import styles from "./EscenariosProyecto.module.css";
 
 const DEFAULT_FORM: Omit<RestriccionesIAIn, "fuente_entrada"> = {
-  bandas: ["2.4", "5"],
   umbral_objetivo_dbm: -70,
   resolucion: 64,
-  cantidad_recomendaciones: 3,
+  cantidad_aps_propuestos: 3,
+  cantidad_recomendaciones: 2,
 };
 
 export default function EscenariosProyecto() {
@@ -30,6 +50,8 @@ export default function EscenariosProyecto() {
   const [form, setForm] = useState(DEFAULT_FORM);
   const [planoId, setPlanoId] = useState<number | null>(null);
   const [conjuntoFuenteId, setConjuntoFuenteId] = useState<number | null>(null);
+  const [confirmarEliminacion, setConfirmarEliminacion] = useState(false);
+  const [vistaPrevia, setVistaPrevia] = useState<ConjuntoAPOut | null>(null);
 
   const {
     data: planos,
@@ -54,9 +76,16 @@ export default function EscenariosProyecto() {
     [planosOrdenados],
   );
   const consultasConjuntos = useConjuntosPorPlanos(planoIds);
+  const consultasMapas = useMapasPorPlanos(
+    planoSeleccionadoId ? [planoSeleccionadoId] : [],
+  );
   const conjuntos = useMemo(
     () => consultasConjuntos.flatMap((consulta) => consulta.data ?? []),
     [consultasConjuntos],
+  );
+  const mapasPlano = useMemo(
+    () => consultasMapas.flatMap((consulta) => consulta.data ?? []),
+    [consultasMapas],
   );
   const conjuntosPlano = useMemo(
     () =>
@@ -66,27 +95,46 @@ export default function EscenariosProyecto() {
     [conjuntos, planoSeleccionadoId],
   );
   const conjuntosFuente = conjuntosPlano.filter((conjunto) => conjunto.origen !== "ia");
-  const conjuntosIA = conjuntosPlano.filter((conjunto) => conjunto.origen === "ia");
+  const conjuntosIA = useMemo(
+    () =>
+      conjuntosPlano
+        .filter((conjunto) => conjunto.origen === "ia")
+        .sort((a, b) => {
+          const coberturaA = coberturaProyectada(a);
+          const coberturaB = coberturaProyectada(b);
+          if (coberturaA !== coberturaB) return coberturaB - coberturaA;
+          return a.created_at < b.created_at ? 1 : -1;
+        }),
+    [conjuntosPlano],
+  );
   const conjuntoFuente =
     conjuntosFuente.find((conjunto) => conjunto.id === conjuntoFuenteId) ??
     conjuntosFuente[0] ??
     null;
   const cargandoConjuntos = consultasConjuntos.some((consulta) => consulta.isLoading);
   const errorConjuntos = consultasConjuntos.some((consulta) => consulta.isError);
+  const cargandoMapas = consultasMapas.some((consulta) => consulta.isLoading);
+  const errorMapas = consultasMapas.some((consulta) => consulta.isError);
+  const mapasPorConjunto = useMemo(() => {
+    const resultado = new Map<number, MapaCalorOut[]>();
+    for (const mapa of mapasPlano) {
+      if (!mapa.conjunto_ap_id) continue;
+      const lista = resultado.get(mapa.conjunto_ap_id) ?? [];
+      lista.push(mapa);
+      resultado.set(mapa.conjunto_ap_id, lista);
+    }
+    for (const lista of resultado.values()) {
+      lista.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    }
+    return resultado;
+  }, [mapasPlano]);
 
   const { mutateAsync: generar, isPending: generando } =
     useGenerarConjuntosIAProyecto(proyectoId);
+  const { mutateAsync: eliminarConjunto, isPending: eliminandoPropuestas } =
+    useEliminarConjuntoAP();
   const puedeGenerar =
     Boolean(planoSeleccionado?.calibrado) && conjuntoFuente !== null && !generando;
-
-  const handleToggleBanda = (banda: "2.4" | "5") => {
-    setForm((prev) => {
-      const bandas = prev.bandas.includes(banda)
-        ? prev.bandas.filter((item) => item !== banda)
-        : [...prev.bandas, banda];
-      return { ...prev, bandas: bandas.length > 0 ? bandas : [banda] };
-    });
-  };
 
   const handleGenerar = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -108,13 +156,26 @@ export default function EscenariosProyecto() {
         },
       });
       toast.exito(`${respuesta.conjuntos.length} conjunto(s) IA generado(s).`);
-    } catch {
-      toast.error("No se pudieron generar las propuestas IA.");
+    } catch (error) {
+      toast.error(_detalleError(error, "No se pudieron generar las propuestas IA."));
     }
   };
 
-  if (cargandoPlanos || cargandoConjuntos) return <div className={styles.skeleton} />;
-  if (errorPlanos || errorConjuntos) {
+  const handleEliminarPropuestas = async () => {
+    if (conjuntosIA.length === 0) return;
+    try {
+      await Promise.all(conjuntosIA.map((conjunto) => eliminarConjunto(conjunto.id)));
+      toast.exito("Propuestas IA eliminadas del plano.");
+      setConfirmarEliminacion(false);
+    } catch {
+      toast.error("No se pudieron eliminar las propuestas IA.");
+    }
+  };
+
+  if (cargandoPlanos || cargandoConjuntos || cargandoMapas) {
+    return <div className={styles.skeleton} />;
+  }
+  if (errorPlanos || errorConjuntos || errorMapas) {
     return <EmptyState mensaje="No se pudo cargar la información RF del proyecto." />;
   }
   if (!planosOrdenados.length) {
@@ -212,23 +273,10 @@ export default function EscenariosProyecto() {
               <h2>Parámetros IA</h2>
             </div>
             <div className={styles.formularioConjunto}>
-              <label>
-                Bandas
-                <div className={styles.selectorBandas}>
-                  {(["2.4", "5"] as const).map((banda) => (
-                    <button
-                      key={banda}
-                      type="button"
-                      className={
-                        form.bandas.includes(banda) ? styles.bandaActiva : ""
-                      }
-                      onClick={() => handleToggleBanda(banda)}
-                    >
-                      {banda} GHz
-                    </button>
-                  ))}
-                </div>
-              </label>
+              <div className={styles.parametroLectura}>
+                <span>Banda del conjunto fuente</span>
+                <strong>{conjuntoFuente?.banda_objetivo ?? "5"} GHz</strong>
+              </div>
               <label>
                 Umbral objetivo
                 <input
@@ -255,6 +303,21 @@ export default function EscenariosProyecto() {
                     setForm((prev) => ({
                       ...prev,
                       resolucion: Number(event.target.value),
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                APs propuestos
+                <input
+                  type="number"
+                  min={1}
+                  max={8}
+                  value={form.cantidad_aps_propuestos}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      cantidad_aps_propuestos: Number(event.target.value),
                     }))
                   }
                 />
@@ -287,66 +350,102 @@ export default function EscenariosProyecto() {
               {conjuntosIA.length} conjunto(s) IA asociado(s) al plano seleccionado.
             </p>
           </div>
+          <Button
+            variante="danger"
+            disabled={conjuntosIA.length === 0 || eliminandoPropuestas}
+            onClick={() => setConfirmarEliminacion(true)}
+          >
+            <Trash2 size={15} aria-hidden="true" />
+            Eliminar propuestas IA
+          </Button>
         </div>
         {conjuntosIA.length === 0 ? (
           <EmptyState mensaje="Todavía no hay conjuntos IA generados para este plano." />
         ) : (
-          <div className={styles.resultadosLista}>
-            {conjuntosIA.map((conjunto) => (
-              <ConjuntoIACard key={conjunto.id} conjunto={conjunto} />
-            ))}
+          <div className={conjuntosStyles.tablaWrapper}>
+            <table className={conjuntosStyles.tabla}>
+              <thead>
+                <tr>
+                  <th>Conjunto</th>
+                  <th>Plano</th>
+                  <th>Vista</th>
+                  <th>Origen</th>
+                  <th>Banda</th>
+                  <th>APs</th>
+                </tr>
+              </thead>
+              <tbody>
+                {conjuntosIA.map((conjunto) => (
+                  <tr key={conjunto.id}>
+                    <td className={conjuntosStyles.nombre}>
+                      <strong>{conjunto.nombre}</strong>
+                      <small>
+                        {coberturaProyectada(conjunto).toFixed(1)}% cobertura
+                      </small>
+                    </td>
+                    <td>{planoSeleccionado?.nombre ?? `Plano #${conjunto.plano_id}`}</td>
+                    <td>
+                      <Button
+                        variante="secondary"
+                        tamano="sm"
+                        disabled={!planoSeleccionado || conjunto.items.length === 0}
+                        onClick={() => setVistaPrevia(conjunto)}
+                      >
+                        <Eye size={14} aria-hidden="true" />
+                        Previsualizar
+                      </Button>
+                    </td>
+                    <td>{_labelOrigen(conjunto.origen)}</td>
+                    <td>
+                      <span className={conjuntosStyles.banda}>
+                        {conjunto.banda_objetivo} GHz
+                      </span>
+                    </td>
+                    <td>{conjunto.cantidad_aps}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </section>
+
+      {vistaPrevia && planoSeleccionado && (
+        <ConjuntoAPPreviewModal
+          conjunto={vistaPrevia}
+          mapas={mapasPorConjunto.get(vistaPrevia.id) ?? []}
+          plano={planoSeleccionado}
+          onCerrar={() => setVistaPrevia(null)}
+        />
+      )}
+
+      {confirmarEliminacion && (
+        <ConfirmDialog
+          titulo="¿Eliminar propuestas IA del plano?"
+          descripcion="Se eliminarán los conjuntos AP generados por IA del plano seleccionado. Los conjuntos técnicos usados como fuente no serán modificados."
+          textoConfirmar="Eliminar propuestas"
+          cargando={eliminandoPropuestas}
+          onCancelar={() => setConfirmarEliminacion(false)}
+          onConfirmar={handleEliminarPropuestas}
+        />
+      )}
     </section>
   );
 }
 
-function ConjuntoIACard({ conjunto }: { conjunto: ConjuntoAPOut }) {
-  const cobertura =
-    typeof conjunto.metricas_ia?.pct_cobertura === "number"
-      ? `${conjunto.metricas_ia.pct_cobertura.toFixed(1)}% cobertura`
-      : null;
-  const confianza =
-    typeof conjunto.metricas_ia?.confianza === "string"
-      ? conjunto.metricas_ia.confianza
-      : null;
+function numeroMetrica(
+  metricas: Record<string, unknown> | null,
+  clave: string,
+): number | null {
+  const valor = metricas?.[clave];
+  return typeof valor === "number" ? valor : null;
+}
 
+function coberturaProyectada(conjunto: ConjuntoAPOut): number {
   return (
-    <article className={styles.escenario}>
-      <div className={styles.escenarioHeader}>
-        <div>
-          <h2>{conjunto.nombre}</h2>
-          <p>{conjunto.resumen_ia ?? conjunto.descripcion ?? conjunto.proposito}</p>
-        </div>
-        <Badge variante="activo" etiqueta="Conjunto IA" />
-      </div>
-      <div className={styles.metricas}>
-        <span>{conjunto.cantidad_aps} AP(s)</span>
-        {cobertura && <span>{cobertura}</span>}
-        {confianza && <span>Confianza {confianza}</span>}
-        {conjunto.conjunto_origen_id && (
-          <span>Fuente #{conjunto.conjunto_origen_id}</span>
-        )}
-      </div>
-      <div className={styles.recomendaciones}>
-        {conjunto.items.map((item, index) => (
-          <article key={`${conjunto.id}-${item.bssid}-${index}`}>
-            <strong>
-              {index + 1}. {item.ssid || "SSID oculto"}
-            </strong>
-            <span>{item.accion_recomendada ?? "Mantener AP en propuesta"}</span>
-            <small>
-              {item.bssid} · {item.banda ?? "banda s/d"} ·{" "}
-              {typeof item.rssi_promedio === "number"
-                ? `${item.rssi_promedio.toFixed(1)} dBm`
-                : "RSSI s/d"}
-            </small>
-            {item.justificacion && <p>{item.justificacion}</p>}
-          </article>
-        ))}
-      </div>
-    </article>
+    numeroMetrica(conjunto.metricas_ia, "pct_cobertura_proyectada") ??
+    numeroMetrica(conjunto.metricas_ia, "pct_cobertura") ??
+    0
   );
 }
 
@@ -357,4 +456,11 @@ function _labelOrigen(origen: string): string {
     ia: "IA",
   };
   return labels[origen] ?? origen;
+}
+
+function _detalleError(error: unknown, alternativo: string): string {
+  return (
+    (error as { response?: { data?: { detail?: string } } })?.response?.data
+      ?.detail ?? alternativo
+  );
 }

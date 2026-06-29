@@ -1,16 +1,16 @@
 import { useMemo, useState } from "react";
-import { Eye, X } from "lucide-react";
+import { Eye } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
-import { resolverUrlApi } from "@/shared/api/urlApi";
 import { Button, EmptyState } from "@/shared/components";
+import { ConjuntoAPPreviewModal } from "../components/ConjuntoAPPreviewModal";
 import {
   useConjuntosPorPlanos,
+  useMapasPorPlanos,
   usePlanosProyecto,
 } from "../hooks/useProyectosOrg";
-import type { ConjuntoAPOut, PlanoOut } from "../types";
+import type { ConjuntoAPOut, MapaCalorOut, PlanoOut } from "../types";
 import styles from "./ConjuntosAPProyecto.module.css";
 
-type FiltroOrigen = "todos" | "manual_movil" | "ia";
 type VistaPreviaConjunto = {
   conjunto: ConjuntoAPOut;
   plano: PlanoOut;
@@ -21,7 +21,6 @@ export default function ConjuntosAPProyecto() {
     proyectoId: number;
     proyectoNombre: string;
   }>();
-  const [filtroOrigen, setFiltroOrigen] = useState<FiltroOrigen>("todos");
   const [vistaPrevia, setVistaPrevia] = useState<VistaPreviaConjunto | null>(null);
 
   const {
@@ -31,11 +30,13 @@ export default function ConjuntosAPProyecto() {
   } = usePlanosProyecto(proyectoId);
   const planoIds = useMemo(() => (planos ?? []).map((plano) => plano.id), [planos]);
   const consultasConjuntos = useConjuntosPorPlanos(planoIds);
+  const consultasMapas = useMapasPorPlanos(planoIds);
 
   const conjuntos = useMemo(
     () =>
       consultasConjuntos
         .flatMap((consulta) => consulta.data ?? [])
+        .filter((conjunto) => conjunto.origen === "manual_movil")
         .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1)),
     [consultasConjuntos],
   );
@@ -43,16 +44,31 @@ export default function ConjuntosAPProyecto() {
     () => new Map((planos ?? []).map((plano) => [plano.id, plano])),
     [planos],
   );
+  const mapas = useMemo(
+    () => consultasMapas.flatMap((consulta) => consulta.data ?? []),
+    [consultasMapas],
+  );
+  const mapasPorConjunto = useMemo(() => {
+    const resultado = new Map<number, MapaCalorOut[]>();
+    for (const mapa of mapas) {
+      if (!mapa.conjunto_ap_id) continue;
+      const lista = resultado.get(mapa.conjunto_ap_id) ?? [];
+      lista.push(mapa);
+      resultado.set(mapa.conjunto_ap_id, lista);
+    }
+    for (const lista of resultado.values()) {
+      lista.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    }
+    return resultado;
+  }, [mapas]);
   const cargandoConjuntos = consultasConjuntos.some((consulta) => consulta.isLoading);
+  const cargandoMapas = consultasMapas.some((consulta) => consulta.isLoading);
   const errorConjuntos = consultasConjuntos.some((consulta) => consulta.isError);
-  const conjuntosFiltrados =
-    filtroOrigen === "todos"
-      ? conjuntos
-      : conjuntos.filter((conjunto) => conjunto.origen === filtroOrigen);
+  const errorMapas = consultasMapas.some((consulta) => consulta.isError);
   const resumen = _resumenConjuntos(conjuntos);
 
-  if (cargandoPlanos || cargandoConjuntos) return <div className={styles.skeleton} />;
-  if (errorPlanos || errorConjuntos) {
+  if (cargandoPlanos || cargandoConjuntos || cargandoMapas) return <div className={styles.skeleton} />;
+  if (errorPlanos || errorConjuntos || errorMapas) {
     return <EmptyState mensaje="No se pudieron cargar los conjuntos de APs." />;
   }
   if (!planos || planos.length === 0) {
@@ -65,35 +81,18 @@ export default function ConjuntosAPProyecto() {
         <div>
           <h2>Conjuntos de APs para cliente</h2>
           <p>
-            Revise los conjuntos creados por el equipo técnico y las propuestas IA
-            derivadas desde un conjunto de campo.
+            Revise los conjuntos creados por el técnico desde la aplicación móvil.
           </p>
         </div>
       </div>
 
       <div className={styles.resumen}>
         <ResumenItem etiqueta="Móvil" valor={resumen.manual_movil} />
-        <ResumenItem etiqueta="IA" valor={resumen.ia} />
         <ResumenItem etiqueta="Total" valor={conjuntos.length} />
       </div>
 
-      <div className={styles.filtros}>
-        {(["todos", "manual_movil", "ia"] as FiltroOrigen[]).map(
-          (origen) => (
-            <button
-              key={origen}
-              type="button"
-              className={filtroOrigen === origen ? styles.filtroActivo : ""}
-              onClick={() => setFiltroOrigen(origen)}
-            >
-              {_labelOrigen(origen)}
-            </button>
-          ),
-        )}
-      </div>
-
-      {conjuntosFiltrados.length === 0 ? (
-        <EmptyState mensaje="No hay conjuntos de APs para el filtro seleccionado." />
+      {conjuntos.length === 0 ? (
+        <EmptyState mensaje="No hay conjuntos de APs móviles en este proyecto." />
       ) : (
         <div className={styles.tablaWrapper}>
           <table className={styles.tabla}>
@@ -103,11 +102,12 @@ export default function ConjuntosAPProyecto() {
                 <th>Plano</th>
                 <th>Vista</th>
                 <th>Origen</th>
+                <th>Banda</th>
                 <th>APs</th>
               </tr>
             </thead>
             <tbody>
-              {conjuntosFiltrados.map((conjunto) => {
+              {conjuntos.map((conjunto) => {
                 const plano = planosPorId.get(conjunto.plano_id);
                 return (
                   <tr key={conjunto.id}>
@@ -132,6 +132,9 @@ export default function ConjuntosAPProyecto() {
                       </Button>
                     </td>
                     <td>{_labelOrigen(conjunto.origen)}</td>
+                    <td>
+                      <span className={styles.banda}>{conjunto.banda_objetivo} GHz</span>
+                    </td>
                     <td>{conjunto.cantidad_aps}</td>
                   </tr>
                 );
@@ -142,8 +145,9 @@ export default function ConjuntosAPProyecto() {
       )}
 
       {vistaPrevia && (
-        <VistaPreviaMapa
+        <ConjuntoAPPreviewModal
           conjunto={vistaPrevia.conjunto}
+          mapas={mapasPorConjunto.get(vistaPrevia.conjunto.id) ?? []}
           plano={vistaPrevia.plano}
           onCerrar={() => setVistaPrevia(null)}
         />
@@ -179,85 +183,5 @@ function _labelOrigen(origen: string): string {
       string,
       string
     >)[origen] ?? origen
-  );
-}
-
-function VistaPreviaMapa({
-  conjunto,
-  plano,
-  onCerrar,
-}: {
-  conjunto: ConjuntoAPOut;
-  plano: PlanoOut;
-  onCerrar: () => void;
-}) {
-  const apsConUbicacion = conjunto.items.filter(
-    (ap) => typeof ap.pos_x === "number" && typeof ap.pos_y === "number",
-  );
-
-  return (
-    <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby="vista-conjunto-titulo">
-      <div className={styles.modalVista}>
-        <header className={styles.modalHeader}>
-          <div>
-            <p>{plano.nombre}</p>
-            <h2 id="vista-conjunto-titulo">{conjunto.nombre}</h2>
-            <span>
-              {_labelOrigen(conjunto.origen)} · {conjunto.cantidad_aps} AP(s)
-            </span>
-          </div>
-          <button type="button" className={styles.cerrarVista} onClick={onCerrar} aria-label="Cerrar vista previa">
-            <X size={18} aria-hidden="true" />
-          </button>
-        </header>
-
-        <div className={styles.mapaPreview}>
-          <div
-            className={styles.planoPreview}
-            style={{
-              aspectRatio: `${plano.ancho_px} / ${plano.alto_px}`,
-              width: `min(100%, calc(62vh * ${plano.ancho_px / plano.alto_px}))`,
-            }}
-          >
-            <img src={resolverUrlApi(plano.url_firmada)} alt={`Plano ${plano.nombre}`} />
-            <div className={styles.capaMarcadores} aria-label="Ubicación de APs del conjunto">
-              {apsConUbicacion.map((ap, indice) => (
-                <span
-                  key={`${ap.bssid}-${indice}`}
-                  className={styles.marcadorAp}
-                  style={{
-                    left: `${((ap.pos_x ?? 0) / plano.ancho_px) * 100}%`,
-                    top: `${((ap.pos_y ?? 0) / plano.alto_px) * 100}%`,
-                  }}
-                  title={`${indice + 1}. ${ap.ssid || "SSID oculto"} · ${ap.bssid}`}
-                >
-                  {indice + 1}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {apsConUbicacion.length === 0 ? (
-          <p className={styles.sinUbicaciones}>Este conjunto no tiene coordenadas de AP registradas para el plano.</p>
-        ) : (
-          <div className={styles.listaApsPreview}>
-            {apsConUbicacion.map((ap, indice) => (
-              <article key={`${ap.bssid}-detalle-${indice}`}>
-                <strong>{indice + 1}. {ap.ssid || "SSID oculto"}</strong>
-                <span>{ap.bssid}</span>
-                <small>
-                  {typeof ap.rssi_promedio === "number" ? `${ap.rssi_promedio.toFixed(1)} dBm` : "RSSI s/d"}
-                  {" · "}
-                  {ap.canal ? `canal ${ap.canal}` : "canal s/d"}
-                  {" · "}
-                  {ap.cantidad_puntos ?? 0} punto(s)
-                </small>
-              </article>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
   );
 }

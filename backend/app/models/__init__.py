@@ -5,12 +5,7 @@ from app.models.heatmap import (  # noqa: F401
     ConjuntoAPItem,
     MapaCalor,
 )
-from app.models.inventario_rf import (  # noqa: F401
-    APFisico,
-    BSSIDRadio,
-    RadioAP,
-)
-from app.models.medicion import MedicionWifi, PuntoMedicion  # noqa: F401
+from app.models.medicion import LecturaRSSI, PuntoMedicion  # noqa: F401
 from app.models.plano import Plano  # noqa: F401
 from app.models.proyecto import Proyecto  # noqa: F401
 from app.models.refresh_token import RefreshToken  # noqa: F401

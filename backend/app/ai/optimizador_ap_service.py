@@ -58,6 +58,7 @@ class OptimizadorAPService:
         if not puntos_actuales:
             raise ValueError("Se requieren puntos de medición para optimizar.")
 
+        resolucion_busqueda = min(resolucion, 32)
         bandas_objetivo = list(dict.fromkeys(bandas or [banda]))
         if banda not in bandas_objetivo:
             banda = "5" if "5" in bandas_objetivo else bandas_objetivo[0]
@@ -90,7 +91,7 @@ class OptimizadorAPService:
                 alto_px=alto_px,
                 metros_por_pixel=metros_por_pixel,
                 banda=banda,
-                resolucion=resolucion,
+                resolucion=resolucion_busqueda,
                 umbral_objetivo_dbm=umbral_objetivo_dbm,
                 poligono_interes=poligono_interes,
             )
@@ -100,7 +101,7 @@ class OptimizadorAPService:
                 alto_px=alto_px,
                 metros_por_pixel=metros_por_pixel,
                 banda=banda,
-                resolucion=resolucion,
+                resolucion=resolucion_busqueda,
                 umbral_objetivo_dbm=umbral_objetivo_dbm,
                 poligono_interes=poligono_interes,
             )
@@ -202,7 +203,7 @@ class OptimizadorAPService:
                     ),
                     supuestos=[
                         "Antena omnidireccional de 2,14 dBi cuando no existe "
-                        "inventario verificado.",
+                        "configuración declarada por el técnico.",
                         "Ancho de canal inicial de 20 MHz para favorecer "
                         "reutilización.",
                     ],
@@ -432,16 +433,13 @@ class OptimizadorAPService:
             self._configuracion_radio(banda_actual, orden) for banda_actual in bandas
         ]
         accion = "AGREGAR"
-        ap_fisico_id = None
         if ap_existente:
-            ap_fisico_id = ap_existente.get("id")
             accion = (
                 "RECONFIGURAR"
                 if ap_existente.get("restriccion_movimiento") == "FIJO"
                 else "MOVER"
             )
         return {
-            "ap_fisico_id": ap_fisico_id,
             "accion": accion,
             "coord_x": round(x, 2),
             "coord_y": round(y, 2),
@@ -515,6 +513,8 @@ class OptimizadorAPService:
                 valores.append(
                     {
                         "punto_medicion_id": punto.punto_id,
+                        "pos_x": round(punto.x, 2),
+                        "pos_y": round(punto.y, 2),
                         "banda": banda,
                         "rssi_observado_dbm": observado,
                         "rssi_proyectado_dbm": mejor,

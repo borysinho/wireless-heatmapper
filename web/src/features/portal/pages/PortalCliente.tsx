@@ -182,7 +182,7 @@ export default function PortalCliente() {
                 <strong>{_labelModo(mapaMostrado.modo_generacion)}</strong>
                 <span>
                   {mapaMostrado.cantidad_puntos} puntos ·{" "}
-                  {mapaMostrado.rssi_promedio.toFixed(1)} dBm promedio
+                  RSSI prom. {mapaMostrado.rssi_promedio.toFixed(1)} dBm
                 </span>
               </div>
               <HeatmapCanvas
@@ -750,19 +750,20 @@ function _labelModo(modo: string): string {
 function nivelCobertura(rssi: number): string {
   if (rssi >= -60) return "Excelente";
   if (rssi >= -67) return "Muy buena";
-  if (rssi >= -70) return "Objetivo CWNA-107";
-  if (rssi >= -80) return "Aceptable";
-  if (rssi >= -90) return "Débil";
+  if (rssi >= -70) return "Objetivo mínimo CWNA-107";
+  if (rssi >= -75) return "Inestable";
+  if (rssi >= -80) return "Débil";
+  if (rssi >= -90) return "Muy débil";
   return "Zona muerta CWNA-107";
 }
 
 function colorRssi(rssi: number): string {
   if (rssi >= -60) return "#0B7A3B";
   if (rssi >= -67) return "#57B65A";
-  if (rssi >= -70) return "#A7C957";
-  if (rssi >= -75) return "#F4D35E";
-  if (rssi >= -80) return "#F08A24";
-  if (rssi >= -90) return "#D95D39";
+  if (rssi >= -70) return "#F4D35E";
+  if (rssi >= -75) return "#F08A24";
+  if (rssi >= -80) return "#D95D39";
+  if (rssi >= -90) return "#B91C1C";
   return "#D7263D";
 }
 

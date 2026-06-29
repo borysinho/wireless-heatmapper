@@ -5115,7 +5115,144 @@
                     "y": 867.3131
                 }
             ],
-            "ruta_storage_origen": "1/140680835fd0720c_SAVE_20260623_015639.jpg"
+            "ruta_storage_origen": "1/140680835fd0720c_SAVE_20260623_015639.jpg",
+            "aps_fisicos": [
+                {
+                    "nombre": "AP Campo Villamontes CH 11",
+                    "fabricante": "No identificado",
+                    "modelo": "No identificado",
+                    "rol": "EXISTENTE",
+                    "restriccion_movimiento": "MOVIBLE",
+                    "coord_x": 678.77,
+                    "coord_y": 705.25,
+                    "altura_m": 2.5,
+                    "tipo_montaje": "TECHO",
+                    "verificado": true,
+                    "fuente": {
+                        "tabla_origen": "ap_detectado",
+                        "ids_origen": [1, 6],
+                        "rssi_promedio": -70.87
+                    },
+                    "radios": [
+                        {
+                            "banda": "2.4",
+                            "habilitada": true,
+                            "canal": 11,
+                            "ancho_canal_mhz": 20,
+                            "referencia_potencia": "DESCONOCIDA",
+                            "potencia_dbm": 0.0,
+                            "potencia_max_dbm": 20.0,
+                            "tipo_antena": "OMNIDIRECCIONAL",
+                            "ganancia_dbi": 2.14,
+                            "perdida_cable_db": 0.0,
+                            "bssids": [
+                                {
+                                    "bssid": "20:cc:27:3b:0e:20",
+                                    "ssid": "LCM"
+                                },
+                                {
+                                    "bssid": "20:cc:27:3b:0e:21",
+                                    "ssid": "WRIC"
+                                },
+                                {
+                                    "bssid": "20:cc:27:3b:0e:22",
+                                    "ssid": "GUEST"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "nombre": "AP Campo Villamontes CH 6",
+                    "fabricante": "No identificado",
+                    "modelo": "No identificado",
+                    "rol": "EXISTENTE",
+                    "restriccion_movimiento": "MOVIBLE",
+                    "coord_x": 363.58,
+                    "coord_y": 282.0,
+                    "altura_m": 2.5,
+                    "tipo_montaje": "TECHO",
+                    "verificado": true,
+                    "fuente": {
+                        "tabla_origen": "ap_detectado",
+                        "ids_origen": [2, 4, 7],
+                        "rssi_promedio": -74.43
+                    },
+                    "radios": [
+                        {
+                            "banda": "2.4",
+                            "habilitada": true,
+                            "canal": 6,
+                            "ancho_canal_mhz": 20,
+                            "referencia_potencia": "DESCONOCIDA",
+                            "potencia_dbm": 0.0,
+                            "potencia_max_dbm": 20.0,
+                            "tipo_antena": "OMNIDIRECCIONAL",
+                            "ganancia_dbi": 2.14,
+                            "perdida_cable_db": 0.0,
+                            "bssids": [
+                                {
+                                    "bssid": "20:cc:27:3b:3d:c0",
+                                    "ssid": "LCM"
+                                },
+                                {
+                                    "bssid": "20:cc:27:3b:3d:c1",
+                                    "ssid": "WRIC"
+                                },
+                                {
+                                    "bssid": "20:cc:27:3b:3d:c2",
+                                    "ssid": "GUEST"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "nombre": "AP Campo Villamontes CH 1",
+                    "fabricante": "No identificado",
+                    "modelo": "No identificado",
+                    "rol": "EXISTENTE",
+                    "restriccion_movimiento": "MOVIBLE",
+                    "coord_x": 286.24,
+                    "coord_y": 682.26,
+                    "altura_m": 2.5,
+                    "tipo_montaje": "TECHO",
+                    "verificado": true,
+                    "fuente": {
+                        "tabla_origen": "ap_detectado",
+                        "ids_origen": [3, 5, 8],
+                        "rssi_promedio": -70.0
+                    },
+                    "radios": [
+                        {
+                            "banda": "2.4",
+                            "habilitada": true,
+                            "canal": 1,
+                            "ancho_canal_mhz": 20,
+                            "referencia_potencia": "DESCONOCIDA",
+                            "potencia_dbm": 0.0,
+                            "potencia_max_dbm": 20.0,
+                            "tipo_antena": "OMNIDIRECCIONAL",
+                            "ganancia_dbi": 2.14,
+                            "perdida_cable_db": 0.0,
+                            "bssids": [
+                                {
+                                    "bssid": "3c:41:0e:a8:70:a0",
+                                    "ssid": "LCM"
+                                },
+                                {
+                                    "bssid": "3c:41:0e:a8:70:a1",
+                                    "ssid": "WRIC"
+                                },
+                                {
+                                    "bssid": "3c:41:0e:a8:70:a2",
+                                    "ssid": "GUEST"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
         }
     ],
     "cliente": {

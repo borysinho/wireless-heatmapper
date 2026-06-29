@@ -92,6 +92,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
     required String nombre,
     required String proposito,
     String? descripcion,
+    required String bandaObjetivo,
     required List<String> bssids,
   }) async {
     final actual = state;
@@ -103,6 +104,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
         nombre: nombre,
         proposito: proposito,
         descripcion: descripcion,
+        bandaObjetivo: bandaObjetivo,
         bssids: bssids,
       );
       final conjuntos = await _listarConjuntos(planoId);
@@ -131,6 +133,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
     required String nombre,
     required String proposito,
     String? descripcion,
+    required String bandaObjetivo,
     required List<String> bssids,
   }) async {
     final actual = state;
@@ -146,6 +149,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
         nombre: nombre,
         proposito: proposito,
         descripcion: descripcion,
+        bandaObjetivo: bandaObjetivo,
         bssids: bssids,
       );
       final conjuntos = await _listarConjuntos(planoId);
@@ -428,5 +432,4 @@ class HeatmapCubit extends Cubit<HeatmapState> {
     if (seleccionados == totalConjunto) return 'CONJUNTO_COMPLETO';
     return 'SUBCONJUNTO';
   }
-
 }

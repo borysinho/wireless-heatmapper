@@ -296,9 +296,9 @@ function _modoLegible(modo: string): string {
 function colorRssi(rssi: number): string {
   if (rssi >= -60) return "#0B7A3B";
   if (rssi >= -67) return "#57B65A";
-  if (rssi >= -70) return "#A7C957";
-  if (rssi >= -75) return "#F4D35E";
-  if (rssi >= -80) return "#F08A24";
-  if (rssi >= -90) return "#D95D39";
+  if (rssi >= -70) return "#F4D35E";
+  if (rssi >= -75) return "#F08A24";
+  if (rssi >= -80) return "#D95D39";
+  if (rssi >= -90) return "#B91C1C";
   return "#D7263D";
 }

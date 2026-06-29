@@ -13,18 +13,22 @@ from app.api.v1.heatmaps import (
     crear_conjunto_ap,
     generar_heatmap,
     generar_heatmap_conjunto,
+    generar_heatmaps_faltantes_conjunto,
     listar_aps_disponibles,
     listar_conjuntos_ap,
 )
 from app.core.config import settings
+from app.models.heatmap import ConjuntoAP, ConjuntoAPItem, MapaCalor
+from app.models.medicion import LecturaRSSI
 from app.models.plano import Plano
 from app.models.proyecto import Proyecto
-from app.repositories.medicion_repository import MedicionRepository
+from app.repositories.medicion_repository import ORIGEN_IA_ESTIMADA, MedicionRepository
 from app.schemas.heatmap import (
     ActualizarUbicacionAPConjuntoIn,
     ConjuntoAPActualizarIn,
     ConjuntoAPCrearIn,
     GenerarHeatmapConjuntoIn,
+    GenerarHeatmapsFaltantesIn,
 )
 from app.schemas.medicion import MedicionItemIn
 from app.services.interpolacion_service import (
@@ -172,6 +176,7 @@ def test_crear_conjunto_ap_acepta_proposito_vacio(db_session, tecnico_usuario):
         body=ConjuntoAPCrearIn(
             nombre="Red corporativa",
             proposito="",
+            banda_objetivo="2.4",
             bssids=["aa:bb:cc:dd:ee:01"],
         ),
         db=db_session,
@@ -180,7 +185,29 @@ def test_crear_conjunto_ap_acepta_proposito_vacio(db_session, tecnico_usuario):
 
     assert conjunto.nombre == "Red corporativa"
     assert conjunto.proposito == ""
+    assert conjunto.banda_objetivo == "2.4"
     assert conjunto.cantidad_aps == 1
+
+
+def test_crear_conjunto_ap_rechaza_aps_fuera_de_banda(db_session, tecnico_usuario):
+    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
+    _insertar_puntos_sinteticos(db_session, plano_id, cantidad=5)
+
+    with pytest.raises(HTTPException) as exc:
+        crear_conjunto_ap(
+            plano_id=plano_id,
+            body=ConjuntoAPCrearIn(
+                nombre="Red corporativa",
+                proposito="Validar banda objetivo.",
+                banda_objetivo="5",
+                bssids=["aa:bb:cc:dd:ee:01"],
+            ),
+            db=db_session,
+            current_user=tecnico_usuario,
+        )
+
+    assert exc.value.status_code == 422
+    assert "no pertenecen a la banda 5 GHz" in exc.value.detail
 
 
 def test_crear_conjunto_ap_y_generar_heatmaps_por_modo(
@@ -196,6 +223,7 @@ def test_crear_conjunto_ap_y_generar_heatmaps_por_modo(
         body=ConjuntoAPCrearIn(
             nombre="Red corporativa",
             proposito="Evaluar cobertura principal de Bulldog Tech.",
+            banda_objetivo="2.4",
             bssids=["aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"],
         ),
         db=db_session,
@@ -204,6 +232,7 @@ def test_crear_conjunto_ap_y_generar_heatmaps_por_modo(
 
     assert conjunto.nombre == "Red corporativa"
     assert conjunto.origen == "manual_movil"
+    assert conjunto.banda_objetivo == "2.4"
     assert conjunto.creado_por_id == tecnico_usuario.id
     assert conjunto.cantidad_aps == 2
     assert [item.bssid for item in conjunto.items] == [
@@ -269,6 +298,342 @@ def test_crear_conjunto_ap_y_generar_heatmaps_por_modo(
     assert mapa_subconjunto.bssids_generacion == ["aa:bb:cc:dd:ee:02"]
 
 
+def test_generar_heatmaps_faltantes_actualiza_idw(
+    db_session,
+    tecnico_usuario,
+):
+    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
+    _insertar_puntos_sinteticos(db_session, plano_id, cantidad=5)
+    conjunto = crear_conjunto_ap(
+        plano_id=plano_id,
+        body=ConjuntoAPCrearIn(
+            nombre="Cobertura campo",
+            proposito="Validar actualización de mapas globales e individuales.",
+            banda_objetivo="2.4",
+            bssids=[
+                "aa:bb:cc:dd:ee:01",
+                "aa:bb:cc:dd:ee:02",
+                "aa:bb:cc:dd:ee:03",
+            ],
+        ),
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    mapa_previo = generar_heatmap_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapConjuntoIn(
+            modo="CONJUNTO_COMPLETO",
+            algoritmo="IDW",
+            resolucion=64,
+        ),
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    generados = generar_heatmaps_faltantes_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapsFaltantesIn(
+            algoritmo="IDW",
+            resolucion=64,
+            actualizar_existentes=True,
+        ),
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    mapas = (
+        db_session.query(MapaCalor)
+        .filter(MapaCalor.conjunto_ap_id == conjunto.id)
+        .all()
+    )
+    claves_esperadas = {
+        ("aa:bb:cc:dd:ee:01",),
+        ("aa:bb:cc:dd:ee:02",),
+        ("aa:bb:cc:dd:ee:03",),
+        (
+            "aa:bb:cc:dd:ee:01",
+            "aa:bb:cc:dd:ee:02",
+            "aa:bb:cc:dd:ee:03",
+        ),
+    }
+    assert len(generados) == 4
+    assert len(mapas) == 4
+    assert mapa_previo.id not in {mapa.id for mapa in mapas}
+    assert {mapa.algoritmo for mapa in mapas} == {"IDW"}
+    assert {mapa.modo_generacion for mapa in mapas} == {
+        "CONJUNTO_COMPLETO",
+        "INDIVIDUAL",
+    }
+    claves_algoritmo = {tuple(sorted(mapa.bssids_generacion)) for mapa in mapas}
+    assert claves_algoritmo == claves_esperadas
+
+
+def test_generar_heatmaps_faltantes_reemplaza_todos_los_previos_del_conjunto(
+    db_session,
+    tecnico_usuario,
+):
+    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
+    _insertar_puntos_sinteticos(db_session, plano_id, cantidad=5)
+    conjunto = crear_conjunto_ap(
+        plano_id=plano_id,
+        body=ConjuntoAPCrearIn(
+            nombre="Cobertura cliente",
+            proposito="Validar reemplazo total desde previsualización.",
+            banda_objetivo="2.4",
+            bssids=[
+                "aa:bb:cc:dd:ee:01",
+                "aa:bb:cc:dd:ee:02",
+            ],
+        ),
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    mapa_64 = generar_heatmap_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapConjuntoIn(
+            modo="CONJUNTO_COMPLETO",
+            algoritmo="IDW",
+            resolucion=64,
+        ),
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    mapa_128 = generar_heatmap_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapConjuntoIn(
+            modo="INDIVIDUAL",
+            bssids=["aa:bb:cc:dd:ee:01"],
+            algoritmo="IDW",
+            resolucion=128,
+        ),
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    generados = generar_heatmaps_faltantes_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapsFaltantesIn(
+            algoritmo="IDW",
+            resolucion=64,
+            actualizar_existentes=True,
+            reemplazar_existentes=True,
+        ),
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    mapas = (
+        db_session.query(MapaCalor)
+        .filter(MapaCalor.conjunto_ap_id == conjunto.id)
+        .all()
+    )
+
+    assert len(generados) == 3
+    assert len(mapas) == 3
+    assert {mapa_64.id, mapa_128.id}.isdisjoint({mapa.id for mapa in mapas})
+    assert {mapa.resolucion for mapa in mapas} == {64}
+    assert {mapa.modo_generacion for mapa in mapas} == {
+        "CONJUNTO_COMPLETO",
+        "INDIVIDUAL",
+    }
+
+
+def test_generar_heatmaps_faltantes_ia_reconstruye_lecturas_para_idw(
+    db_session,
+    tecnico_usuario,
+    admin_usuario,
+):
+    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
+    _insertar_puntos_sinteticos(db_session, plano_id, cantidad=5)
+    conjunto = ConjuntoAP(
+        plano_id=plano_id,
+        nombre="Propuesta IA heredada",
+        proposito="Validar mapas IDW de recomendaciones IA.",
+        banda_objetivo="2.4",
+        origen="ia",
+        creado_por_id=admin_usuario.id,
+    )
+    conjunto.items.extend(
+        [
+            ConjuntoAPItem(
+                bssid="sp5:01:01:00:00",
+                ssid_snapshot="AP recomendado 1",
+                canal_snapshot=6,
+                rssi_promedio_snapshot=-62,
+                pos_x=120,
+                pos_y=90,
+                banda="2.4",
+                radios=[{"potencia_dbm": 14, "ganancia_dbi": 3}],
+            ),
+            ConjuntoAPItem(
+                bssid="sp5:01:02:00:00",
+                ssid_snapshot="AP recomendado 2",
+                canal_snapshot=11,
+                rssi_promedio_snapshot=-64,
+                pos_x=300,
+                pos_y=210,
+                banda="2.4",
+                radios=[{"potencia_dbm": 14, "ganancia_dbi": 3}],
+            ),
+        ]
+    )
+    db_session.add(conjunto)
+    db_session.commit()
+
+    assert (
+        db_session.query(LecturaRSSI)
+        .filter(
+            LecturaRSSI.origen == ORIGEN_IA_ESTIMADA,
+            LecturaRSSI.conjunto_ap_id == conjunto.id,
+        )
+        .count()
+        == 0
+    )
+
+    generados = generar_heatmaps_faltantes_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapsFaltantesIn(
+            algoritmo="IDW",
+            resolucion=64,
+            actualizar_existentes=True,
+        ),
+        request=None,
+        db=db_session,
+        current_user=admin_usuario,
+    )
+
+    assert len(generados) == 3
+    assert {mapa.algoritmo for mapa in generados} == {"IDW"}
+    assert {mapa.modo_generacion for mapa in generados} == {
+        "PROYECTADO",
+        "INDIVIDUAL",
+    }
+    assert (
+        db_session.query(LecturaRSSI)
+        .filter(
+            LecturaRSSI.origen == ORIGEN_IA_ESTIMADA,
+            LecturaRSSI.conjunto_ap_id == conjunto.id,
+        )
+        .count()
+        == 10
+    )
+
+
+def test_generar_heatmaps_faltantes_ia_desde_un_solo_mapa_existente(
+    db_session,
+    tecnico_usuario,
+    admin_usuario,
+):
+    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
+    _insertar_puntos_sinteticos(db_session, plano_id, cantidad=5)
+    conjunto = ConjuntoAP(
+        plano_id=plano_id,
+        nombre="Propuesta IA con mapa único",
+        proposito="Completar mapa global e individuales desde el mapa inicial.",
+        banda_objetivo="2.4",
+        origen="ia",
+        creado_por_id=admin_usuario.id,
+    )
+    conjunto.items.extend(
+        [
+            ConjuntoAPItem(
+                bssid="sp5:02:01:00:00",
+                ssid_snapshot="AP recomendado 1",
+                canal_snapshot=1,
+                rssi_promedio_snapshot=-62,
+                pos_x=120,
+                pos_y=90,
+                banda="2.4",
+                radios=[{"potencia_dbm": 14, "ganancia_dbi": 3}],
+            ),
+            ConjuntoAPItem(
+                bssid="sp5:02:02:00:00",
+                ssid_snapshot="AP recomendado 2",
+                canal_snapshot=6,
+                rssi_promedio_snapshot=-64,
+                pos_x=260,
+                pos_y=160,
+                banda="2.4",
+                radios=[{"potencia_dbm": 14, "ganancia_dbi": 3}],
+            ),
+            ConjuntoAPItem(
+                bssid="sp5:02:03:00:00",
+                ssid_snapshot="AP recomendado 3",
+                canal_snapshot=11,
+                rssi_promedio_snapshot=-65,
+                pos_x=340,
+                pos_y=230,
+                banda="2.4",
+                radios=[{"potencia_dbm": 14, "ganancia_dbi": 3}],
+            ),
+        ]
+    )
+    db_session.add(conjunto)
+    db_session.commit()
+
+    mapa_inicial = generar_heatmap_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapConjuntoIn(
+            modo="CONJUNTO_COMPLETO",
+            algoritmo="IDW",
+            resolucion=64,
+        ),
+        request=None,
+        db=db_session,
+        current_user=admin_usuario,
+    )
+
+    assert (
+        db_session.query(MapaCalor)
+        .filter(MapaCalor.conjunto_ap_id == conjunto.id)
+        .count()
+        == 1
+    )
+
+    generados = generar_heatmaps_faltantes_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapsFaltantesIn(
+            algoritmo="IDW",
+            resolucion=64,
+            actualizar_existentes=True,
+        ),
+        request=None,
+        db=db_session,
+        current_user=admin_usuario,
+    )
+
+    mapas = (
+        db_session.query(MapaCalor)
+        .filter(MapaCalor.conjunto_ap_id == conjunto.id)
+        .all()
+    )
+    assert len(generados) == 4
+    assert len(mapas) == 4
+    assert mapa_inicial.id not in {mapa.id for mapa in mapas}
+    assert {mapa.algoritmo for mapa in mapas} == {"IDW"}
+    assert {mapa.modo_generacion for mapa in mapas} == {
+        "PROYECTADO",
+        "INDIVIDUAL",
+    }
+    assert {
+        (mapa.algoritmo, tuple(sorted(mapa.bssids_generacion))) for mapa in mapas
+    } == {
+        (algoritmo, combo)
+        for algoritmo in ("IDW",)
+        for combo in {
+            ("sp5:02:01:00:00",),
+            ("sp5:02:02:00:00",),
+            ("sp5:02:03:00:00",),
+            ("sp5:02:01:00:00", "sp5:02:02:00:00", "sp5:02:03:00:00"),
+        }
+    }
+
+
 def test_ubicacion_ap_conjunto_persiste_y_se_usa_en_heatmap(
     db_session,
     tecnico_usuario,
@@ -280,6 +645,7 @@ def test_ubicacion_ap_conjunto_persiste_y_se_usa_en_heatmap(
         body=ConjuntoAPCrearIn(
             nombre="AP puntual",
             proposito="Validar persistencia de ubicación.",
+            banda_objetivo="2.4",
             bssids=["aa:bb:cc:dd:ee:01"],
         ),
         db=db_session,
@@ -431,8 +797,8 @@ def test_escala_heatmap_prioriza_umbral_operativo():
     assert etiquetas == [
         "Excelente",
         "Muy buena",
-        "Buena",
-        "Advertencia",
+        "Objetivo mínimo",
+        "Inestable",
         "Débil",
         "Muy débil",
         "Zona muerta",
@@ -444,9 +810,9 @@ def test_escala_heatmap_prioriza_umbral_operativo():
 def test_render_heatmap_muestra_advertencia_en_menos_72_dbm():
     service = HeatmapImageService()
 
-    assert service._color_para_rssi(-72) == (244, 211, 94)
-    assert service._color_para_rssi(-78) == (228, 116, 46)
-    assert service._color_para_rssi(-85) == (217, 93, 57)
+    assert service._color_para_rssi(-72) == (240, 138, 36)
+    assert service._color_para_rssi(-78) == (217, 93, 57)
+    assert service._color_para_rssi(-85) == (185, 28, 28)
     assert service._color_para_rssi(-91) == (215, 38, 61)
 
 
@@ -654,7 +1020,7 @@ def test_interpolacion_200_puntos_resolucion_128_p95_menor_3s():
     assert p95_aproximado <= 3.0
 
 
-def test_interpolacion_kriging_es_distinta_de_idw_y_refleja_gradiente():
+def test_interpolacion_rechaza_algoritmo_no_oficial():
     puntos = [
         PuntoRSSI(punto_id=1, x=40, y=40, rssi=-52),
         PuntoRSSI(punto_id=2, x=360, y=40, rssi=-82),
@@ -664,23 +1030,11 @@ def test_interpolacion_kriging_es_distinta_de_idw_y_refleja_gradiente():
     ]
     service = InterpolacionService()
 
-    idw = service.interpolar(
-        puntos=puntos,
-        ancho_px=400,
-        alto_px=300,
-        resolucion=32,
-        algoritmo="IDW",
-    )
-    kriging = service.interpolar(
-        puntos=puntos,
-        ancho_px=400,
-        alto_px=300,
-        resolucion=32,
-        algoritmo="KRIGING",
-    )
-
-    assert len(kriging) == 32
-    assert len(kriging[0]) == 32
-    assert kriging != idw
-    assert kriging[4][4] > kriging[4][28]
-    assert kriging[28][28] > kriging[28][4]
+    with pytest.raises(ValueError, match="Algoritmo no soportado"):
+        service.interpolar(
+            puntos=puntos,
+            ancho_px=400,
+            alto_px=300,
+            resolucion=32,
+            algoritmo="KRIGING",
+        )

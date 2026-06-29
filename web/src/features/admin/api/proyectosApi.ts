@@ -10,6 +10,7 @@ import type {
   EnlaceClienteEnviarCorreoOut,
   EnlaceClienteOut,
   MapaCalorOut,
+  MapaCalorResumenOut,
   PlanoOut,
   ProyectoListOut,
   ProyectoAdminCreate,
@@ -119,6 +120,7 @@ export async function crearConjuntoAP(
     proposito: string;
     descripcion?: string | null;
     es_principal?: boolean;
+    banda_objetivo: "2.4" | "5";
     bssids: string[];
   },
 ): Promise<ConjuntoAPOut> {
@@ -136,6 +138,7 @@ export async function actualizarConjuntoAP(
     proposito: string;
     descripcion: string | null;
     es_principal: boolean;
+    banda_objetivo: "2.4" | "5";
     bssids: string[];
   }>,
 ): Promise<ConjuntoAPOut> {
@@ -146,17 +149,42 @@ export async function actualizarConjuntoAP(
   return data;
 }
 
+export async function eliminarConjuntoAP(conjuntoId: number): Promise<void> {
+  await apiClient.delete(`/conjuntos-ap/${conjuntoId}`);
+}
+
+export async function eliminarMapaCalor(mapaId: number): Promise<void> {
+  await apiClient.delete(`/mapas/${mapaId}`);
+}
+
 export async function generarHeatmapConjunto(
   conjuntoId: number,
   body: {
     modo: "INDIVIDUAL" | "SUBCONJUNTO" | "CONJUNTO_COMPLETO";
     bssids?: string[];
-    algoritmo: "IDW" | "KRIGING";
+    algoritmo: "IDW";
     resolucion: 64 | 128 | 256;
   },
 ): Promise<MapaCalorOut> {
   const { data } = await apiClient.post<MapaCalorOut>(
     `/conjuntos-ap/${conjuntoId}/heatmaps`,
+    body,
+  );
+  return data;
+}
+
+export async function generarHeatmapsFaltantesConjunto(
+  conjuntoId: number,
+  body: {
+    algoritmo?: "IDW";
+    algoritmos?: Array<"IDW">;
+    resolucion: 64 | 128 | 256;
+    actualizar_existentes?: boolean;
+    reemplazar_existentes?: boolean;
+  },
+): Promise<MapaCalorResumenOut[]> {
+  const { data } = await apiClient.post<MapaCalorResumenOut[]>(
+    `/conjuntos-ap/${conjuntoId}/heatmaps/combinaciones-faltantes`,
     body,
   );
   return data;

@@ -33,7 +33,7 @@ from app.core.config import settings  # noqa: E402
 from app.core.database import SessionLocal  # noqa: E402
 from app.models.cliente import Cliente  # noqa: E402
 from app.models.medicion import (  # noqa: E402
-    MedicionWifi,
+    LecturaRSSI,
     PuntoMedicion,
     clasificar_nivel,
 )
@@ -194,6 +194,7 @@ def _seed_campo_villamontes(db, tecnico: Usuario) -> None:
         else:
             for punto in list(plano.puntos_medicion):
                 db.delete(punto)
+            db.flush()
             print(f"[seed_dev] Plano real actualizado: {plano.nombre}")
 
         plano.descripcion = plano_data.get("descripcion")
@@ -224,7 +225,7 @@ def _seed_campo_villamontes(db, tecnico: Usuario) -> None:
             db.flush()
             for medicion_data in mediciones:
                 db.add(
-                    MedicionWifi(
+                    LecturaRSSI(
                         punto_id=punto.id,
                         ssid=medicion_data["ssid"],
                         bssid=medicion_data["bssid"].lower(),
@@ -236,6 +237,7 @@ def _seed_campo_villamontes(db, tecnico: Usuario) -> None:
                             or clasificar_nivel(int(medicion_data["rssi"]))
                         ),
                         numero_lectura=medicion_data.get("numero_lectura", 1),
+                        origen="CAMPO",
                         created_at=_parse_fecha(medicion_data.get("created_at")),
                     )
                 )

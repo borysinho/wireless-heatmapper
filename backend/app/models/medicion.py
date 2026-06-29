@@ -1,10 +1,10 @@
-"""Modelos ORM para mediciones WiFi.
+"""Modelos ORM para puntos de medición y lecturas RSSI.
 
 Sprint 3 — PB-03 (Captura WiFi en línea), PB-04 (Marcar puntos de medición).
 
 Tablas:
   - ``punto_medicion``: posición (píxeles del plano) con nivel agregado.
-  - ``medicion_wifi``: una fila por BSSID detectado en el escaneo.
+  - ``lectura_rssi``: una lectura RSSI real o estimada para un BSSID.
 
 Clasificación CWNA-107 por RSSI (campo ``nivel``):
   verde    ≥ −70 dBm  → cobertura óptima
@@ -66,23 +66,27 @@ class PuntoMedicion(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     plano = relationship("Plano", back_populates="puntos_medicion")
-    mediciones = relationship(
-        "MedicionWifi",
+    lecturas = relationship(
+        "LecturaRSSI",
         back_populates="punto",
         cascade="all, delete-orphan",
-        order_by="[MedicionWifi.numero_lectura.asc(), MedicionWifi.rssi.desc()]",
+        order_by="[LecturaRSSI.numero_lectura.asc(), LecturaRSSI.rssi.desc()]",
     )
 
+    @property
+    def mediciones(self):
+        """Compatibilidad de API: expone solo lecturas reales como ``mediciones``."""
+        return [lectura for lectura in self.lecturas if lectura.origen == "CAMPO"]
 
-class MedicionWifi(Base):
-    """Una red WiFi detectada en un escaneo asociado a un punto.
+
+class LecturaRSSI(Base):
+    """Lectura RSSI real o estimada asociada a un punto del plano.
 
     ``bssid`` almacena la MAC normalizada en minúsculas (``aa:bb:cc:dd:ee:ff``).
-    ``nivel`` se clasifica de forma individual; el peor nivel del lote
-    determina el ``nivel`` del ``PuntoMedicion`` padre.
+    ``origen`` separa la evidencia de campo de valores estimados por IA.
     """
 
-    __tablename__ = "medicion_wifi"
+    __tablename__ = "lectura_rssi"
 
     id = Column(Integer, primary_key=True, index=True)
     punto_id = Column(
@@ -98,6 +102,21 @@ class MedicionWifi(Base):
     frecuencia_mhz = Column(Integer, nullable=True)
     nivel = Column(nivel_senal_enum, nullable=False)
     numero_lectura = Column(Integer, nullable=False, default=1)
+    origen = Column(String(20), nullable=False, default="CAMPO", index=True)
+    conjunto_ap_id = Column(
+        Integer,
+        ForeignKey("conjunto_ap.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    mapa_calor_id = Column(
+        Integer,
+        ForeignKey("mapa_calor.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    modelo_origen = Column(String(60), nullable=True)
+    incertidumbre_db = Column(Float, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    punto = relationship("PuntoMedicion", back_populates="mediciones")
+    punto = relationship("PuntoMedicion", back_populates="lecturas")

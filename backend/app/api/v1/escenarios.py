@@ -6,19 +6,19 @@ import hashlib
 import json
 import math
 import secrets
+from itertools import combinations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.ai.modelo_propagacion import ModeloPropagacion, MuestraCalibracionRF
 from app.ai.optimizador_ap_service import OptimizadorAPService
-from app.api.v1.heatmaps import _conjunto_out, _mapa_out
+from app.api.v1.heatmaps import _conjunto_out, _mapa_resumen_out
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import require_admin
 from app.models.heatmap import ConjuntoAP, MapaCalor
-from app.models.inventario_rf import APFisico, BSSIDRadio, RadioAP
-from app.models.medicion import MedicionWifi, PuntoMedicion
+from app.models.medicion import LecturaRSSI, PuntoMedicion
 from app.models.plano import Plano
 from app.models.proyecto import Proyecto
 from app.models.usuario import Usuario
@@ -26,7 +26,11 @@ from app.repositories.heatmap_repository import (
     ConjuntoAPRepository,
     MapaCalorRepository,
 )
-from app.repositories.medicion_repository import MedicionRepository
+from app.repositories.medicion_repository import (
+    ORIGEN_CAMPO,
+    ORIGEN_IA_ESTIMADA,
+    MedicionRepository,
+)
 from app.repositories.proyecto_repository import ProyectoRepository
 from app.schemas.ia import ConjuntosIAGeneradosOut, RestriccionesIAIn
 from app.services.geometria_service import mascara_poligono
@@ -200,7 +204,7 @@ def _mapa_actual(
     poligono_interes = _requerir_poligono_interes(plano)
     firma = hashlib.sha1(
         (
-            f"ia-actual:{plano.id}:conjunto:{conjunto_ap_id}:"
+            f"ia-actual-v2-no-deteccion:{plano.id}:conjunto:{conjunto_ap_id}:"
             f"bssids:{','.join(sorted(set(bssids_seleccionados)))}:"
             f"area:{json.dumps(poligono_interes, sort_keys=True)}:"
             f"{med_repo.firma_mediciones_plano(plano_id=plano.id)}"
@@ -260,64 +264,53 @@ def _modelo_calibrado_para_plano(
     *,
     plano: Plano,
     db: Session,
+    conjunto: ConjuntoAP,
     bssids_seleccionados: list[str],
 ) -> ModeloPropagacion:
+    items_por_bssid = {item.bssid.lower(): item for item in conjunto.items}
     query = (
-        db.query(MedicionWifi, PuntoMedicion, RadioAP, APFisico)
-        .join(PuntoMedicion, MedicionWifi.punto_id == PuntoMedicion.id)
-        .join(BSSIDRadio, MedicionWifi.bssid == BSSIDRadio.bssid)
-        .join(RadioAP, BSSIDRadio.radio_id == RadioAP.id)
-        .join(APFisico, RadioAP.ap_fisico_id == APFisico.id)
+        db.query(LecturaRSSI, PuntoMedicion)
+        .join(PuntoMedicion, LecturaRSSI.punto_id == PuntoMedicion.id)
         .filter(PuntoMedicion.plano_id == plano.id)
-        .filter(APFisico.plano_id == plano.id)
-        .filter(RadioAP.habilitada.is_(True))
-        .filter(MedicionWifi.bssid.in_(bssids_seleccionados))
+        .filter(LecturaRSSI.origen == ORIGEN_CAMPO)
+        .filter(LecturaRSSI.bssid.in_(bssids_seleccionados))
     )
     muestras: list[MuestraCalibracionRF] = []
     metros_por_pixel = plano.escala_m_por_px or 1.0
-    for medicion, punto, radio, ap in query.all():
-        distancia_px = math.hypot(punto.pos_x - ap.coord_x, punto.pos_y - ap.coord_y)
+    for lectura, punto in query.all():
+        item = items_por_bssid.get(lectura.bssid.lower())
+        if item is None or item.pos_x is None or item.pos_y is None:
+            continue
+        distancia_px = math.hypot(punto.pos_x - item.pos_x, punto.pos_y - item.pos_y)
         muestras.append(
             MuestraCalibracionRF(
                 distancia_m=max(1.0, distancia_px * metros_por_pixel),
-                banda=radio.banda,
-                rssi_dbm=float(medicion.rssi),
-                potencia_dbm=radio.potencia_dbm,
-                ganancia_dbi=radio.ganancia_dbi,
-                perdida_cable_db=radio.perdida_cable_db,
+                banda=item.banda or _banda_lectura(lectura),
+                rssi_dbm=float(lectura.rssi),
             )
         )
     return ModeloPropagacion.calibrar_desde_muestras(muestras)
 
 
-def _aps_existentes_para_ia(
-    *,
-    plano_id: int,
-    conjunto: ConjuntoAP,
-    db: Session,
-) -> list[dict]:
-    bssids = _bssids_conjunto(conjunto)
-    aps = (
-        db.query(APFisico)
-        .join(RadioAP, RadioAP.ap_fisico_id == APFisico.id)
-        .join(BSSIDRadio, BSSIDRadio.radio_id == RadioAP.id)
-        .filter(APFisico.plano_id == plano_id)
-        .filter(BSSIDRadio.bssid.in_(bssids))
-        .distinct()
-        .order_by(APFisico.id.asc())
-        .all()
-    )
+def _banda_lectura(lectura: LecturaRSSI) -> str:
+    if lectura.frecuencia_mhz is not None:
+        return "2.4" if lectura.frecuencia_mhz < 3000 else "5"
+    return "2.4" if lectura.canal is not None and lectura.canal <= 14 else "5"
+
+
+def _aps_fuente_para_ia(*, conjunto: ConjuntoAP) -> list[dict]:
     return [
         {
-            "id": ap.id,
-            "coord_x": ap.coord_x,
-            "coord_y": ap.coord_y,
-            "altura_m": ap.altura_m,
-            "tipo_montaje": ap.tipo_montaje,
-            "restriccion_movimiento": ap.restriccion_movimiento,
-            "verificado": ap.verificado,
+            "id": item.id,
+            "coord_x": item.pos_x,
+            "coord_y": item.pos_y,
+            "altura_m": item.altura_m or 2.5,
+            "tipo_montaje": item.tipo_montaje or "TECHO",
+            "restriccion_movimiento": "MOVIBLE",
+            "verificado": item.pos_x is not None and item.pos_y is not None,
         }
-        for ap in aps
+        for item in conjunto.items
+        if item.pos_x is not None and item.pos_y is not None
     ]
 
 
@@ -362,6 +355,92 @@ def _items_conjunto_ia(*, indice: int, recomendaciones: list[dict]) -> list[dict
     return items
 
 
+def _combinaciones_items(items: list[dict]) -> list[list[dict]]:
+    combinaciones_items: list[list[dict]] = []
+    for tamano in range(1, len(items) + 1):
+        combinaciones_items.extend(list(combinations(items, tamano)))
+    return [list(item) for item in combinaciones_items]
+
+
+def _matriz_proyectada_desde_items(
+    *,
+    items: list[dict],
+    modelo: ModeloPropagacion,
+    ancho_px: int,
+    alto_px: int,
+    metros_por_pixel: float,
+    banda: str,
+    resolucion: int,
+) -> list[list[float]]:
+    coordenadas = [
+        (float(item["pos_x"]), float(item["pos_y"]))
+        for item in items
+        if item.get("pos_x") is not None and item.get("pos_y") is not None
+    ]
+    matriz: list[list[float]] = []
+    for fila in range(resolucion):
+        y = ((fila + 0.5) / resolucion) * alto_px
+        valores_fila: list[float] = []
+        for col in range(resolucion):
+            x = ((col + 0.5) / resolucion) * ancho_px
+            mejor = max(
+                modelo.predecir_rssi(
+                    distancia_px=math.hypot(x - ap_x, y - ap_y),
+                    metros_por_pixel=metros_por_pixel,
+                    banda=banda,
+                )
+                for ap_x, ap_y in coordenadas
+            )
+            valores_fila.append(mejor)
+        matriz.append(valores_fila)
+    return matriz
+
+
+def _lecturas_estimadas_desde_items(
+    *,
+    puntos: list[PuntoRSSI],
+    items: list[dict],
+    modelo: ModeloPropagacion,
+    metros_por_pixel: float,
+    banda: str,
+) -> list[dict]:
+    lecturas: list[dict] = []
+    for item in items:
+        radio_principal = next(iter(item.get("radios") or []), {})
+        for punto in puntos:
+            rssi = modelo.predecir_rssi(
+                distancia_px=math.hypot(
+                    punto.x - float(item["pos_x"]),
+                    punto.y - float(item["pos_y"]),
+                ),
+                metros_por_pixel=metros_por_pixel,
+                banda=banda,
+                potencia_dbm=radio_principal.get("potencia_dbm"),
+                ganancia_dbi=radio_principal.get("ganancia_dbi", 2.14),
+            )
+            lecturas.append(
+                {
+                    "punto_id": punto.punto_id,
+                    "ssid": item["ssid_snapshot"],
+                    "bssid": item["bssid"],
+                    "rssi": rssi,
+                    "canal": item.get("canal_snapshot"),
+                    "frecuencia_mhz": 2412 if banda == "2.4" else 5180,
+                    "modelo_origen": "rf-hibrido-1.1",
+                    "incertidumbre_db": 6.0,
+                }
+            )
+    return lecturas
+
+
+def _modo_mapa_ia(*, cantidad_items: int, total_items: int) -> str:
+    if cantidad_items == 1:
+        return "INDIVIDUAL"
+    if cantidad_items == total_items:
+        return "PROYECTADO"
+    return "SUBCONJUNTO"
+
+
 @router_proyectos_escenarios.post(
     "/{proyecto_id}/conjuntos-ap/recomendaciones-ia",
     response_model=ConjuntosIAGeneradosOut,
@@ -395,19 +474,12 @@ def generar_conjuntos_ia(
     modelo_propagacion = _modelo_calibrado_para_plano(
         plano=plano,
         db=db,
-        bssids_seleccionados=bssids_seleccionados,
-    )
-    aps_existentes = _aps_existentes_para_ia(
-        plano_id=plano.id,
         conjunto=conjunto_fuente,
-        db=db,
-    )
-    limite_aps = _limite_aps_derivado(
-        conjunto_fuente=conjunto_fuente,
         bssids_seleccionados=bssids_seleccionados,
-        aps_existentes=aps_existentes,
     )
-    banda_objetivo = "5" if "5" in body.bandas else body.bandas[0]
+    aps_existentes = _aps_fuente_para_ia(conjunto=conjunto_fuente)
+    limite_aps = body.cantidad_aps_propuestos
+    banda_objetivo = conjunto_fuente.banda_objetivo
     poligono_interes = _requerir_poligono_interes(plano)
     alternativas = OptimizadorAPService(modelo=modelo_propagacion).optimizar(
         puntos_actuales=puntos,
@@ -419,20 +491,23 @@ def generar_conjuntos_ia(
         banda=banda_objetivo,
         resolucion=body.resolucion,
         umbral_objetivo_dbm=body.umbral_objetivo_dbm,
-        bandas=body.bandas,
+        bandas=[banda_objetivo],
         aps_existentes=aps_existentes,
         cantidad_recomendaciones=body.cantidad_recomendaciones,
         poligono_interes=poligono_interes,
     )
     conjunto_repo = ConjuntoAPRepository(db)
     mapa_repo = MapaCalorRepository(db)
+    med_repo = MedicionRepository(db)
     conjuntos_ia: list[ConjuntoAP] = []
     mapas_proyectados: list[MapaCalor] = []
+    puntos_por_mapa_id: dict[int, list[PuntoRSSI]] = {}
     restricciones = body.model_dump(exclude_none=True)
     restricciones["fuente_entrada"]["nombre"] = conjunto_fuente.nombre
     restricciones["fuente_entrada"]["proposito"] = conjunto_fuente.proposito
+    restricciones["fuente_entrada"]["banda_objetivo"] = conjunto_fuente.banda_objetivo
     restricciones["fuente_entrada"]["bssids"] = bssids_seleccionados
-    restricciones["limite_aps_derivado"] = limite_aps
+    restricciones["cantidad_aps_propuestos"] = limite_aps
     for idx, alternativa in enumerate(alternativas, start=1):
         items = _items_conjunto_ia(
             indice=idx,
@@ -450,6 +525,7 @@ def generar_conjuntos_ia(
             proposito=conjunto_fuente.proposito,
             descripcion=conjunto_fuente.descripcion,
             es_principal=False,
+            banda_objetivo=conjunto_fuente.banda_objetivo,
             items=items,
             origen="ia",
             creado_por_id=current_user.id,
@@ -460,66 +536,119 @@ def generar_conjuntos_ia(
                 "confianza": alternativa.confianza,
                 "supuestos": alternativa.supuestos,
                 "mapas_por_banda": alternativa.mapas_por_banda,
+                "banda_objetivo": alternativa.banda,
+                "cantidad_aps_solicitada": limite_aps,
+                "lecturas_simuladas": alternativa.valores_proyectados,
+                "cantidad_lecturas_simuladas": len(alternativa.valores_proyectados),
             },
             restricciones_ia=restricciones,
-            version_motor_ia="rf-hibrido-1.0",
-        )
-        ruta = f"heatmaps/ia_proyectado_{proyecto.id}_{idx}_{secrets.token_hex(8)}.png"
-        _storage().save(
-            HeatmapImageService().render_png(
-                alternativa.matriz,
-                mascara=mascara_poligono(
-                    poligono=poligono_interes,
-                    ancho_px=plano.ancho_px,
-                    alto_px=plano.alto_px,
-                    resolucion=body.resolucion,
-                ),
-            ),
-            ruta,
-        )
-        firma = hashlib.sha1(
-            f"ia-proyectado:{proyecto.id}:{conjunto_ia.id}:{secrets.token_hex(8)}".encode(),
-            usedforsecurity=False,
-        ).hexdigest()
-        aps_interes = [
-            {
-                "bssid": item["bssid"],
-                "ssid": item["ssid_snapshot"],
-                "canal": item["canal_snapshot"],
-                "frecuencia_mhz": None,
-                "rssi_promedio": item["rssi_promedio_snapshot"],
-                "pos_x": item["pos_x"],
-                "pos_y": item["pos_y"],
-                "cantidad_puntos": len(puntos),
-            }
-            for item in items
-        ]
-        mapa_proyectado = mapa_repo.crear(
-            plano_id=plano.id,
-            conjunto_ap_id=conjunto_ia.id,
-            modo_generacion="PROYECTADO",
-            algoritmo="FSPL",
-            resolucion=body.resolucion,
-            bssid=items[0]["bssid"],
-            ssid=conjunto_ia.nombre,
-            ap_pos_x=items[0]["pos_x"],
-            ap_pos_y=items[0]["pos_y"],
-            aps_interes=aps_interes,
-            bssids_generacion=[item["bssid"] for item in items],
-            matriz=alternativa.matriz,
-            escala=ESCALA_CWNA,
-            ruta_imagen=ruta,
-            cantidad_puntos=len(puntos),
-            rssi_min=min(min(fila) for fila in alternativa.matriz),
-            rssi_max=max(max(fila) for fila in alternativa.matriz),
-            firma_mediciones=firma,
+            version_motor_ia="rf-hibrido-1.1",
         )
         conjuntos_ia.append(conjunto_ia)
-        mapas_proyectados.append(mapa_proyectado)
+        lecturas_estimadas = _lecturas_estimadas_desde_items(
+            puntos=puntos,
+            items=items,
+            modelo=modelo_propagacion,
+            metros_por_pixel=plano.escala_m_por_px or 1.0,
+            banda=alternativa.banda,
+        )
+        med_repo.reemplazar_lecturas_estimadas(
+            conjunto_ap_id=conjunto_ia.id,
+            lecturas=lecturas_estimadas,
+        )
+        conjunto_ia.metricas_ia = {
+            **(conjunto_ia.metricas_ia or {}),
+            "lecturas_estimadas": lecturas_estimadas,
+            "cantidad_lecturas_estimadas": len(lecturas_estimadas),
+            "lecturas_simuladas": lecturas_estimadas,
+            "cantidad_lecturas_simuladas": len(lecturas_estimadas),
+        }
+        db.commit()
+        db.refresh(conjunto_ia)
+        mascara_mapa = mascara_poligono(
+            poligono=poligono_interes,
+            ancho_px=plano.ancho_px,
+            alto_px=plano.alto_px,
+            resolucion=body.resolucion,
+        )
+        for combo_idx, items_combo in enumerate([items], start=1):
+            bssids_combo = [item["bssid"] for item in items_combo]
+            puntos_combo = med_repo.listar_puntos_rssi_heatmap(
+                plano_id=plano.id,
+                bssids=bssids_combo,
+                origen=ORIGEN_IA_ESTIMADA,
+                conjunto_ap_id=conjunto_ia.id,
+            )
+            matriz_combo = InterpolacionService().interpolar(
+                puntos=puntos_combo,
+                ancho_px=plano.ancho_px,
+                alto_px=plano.alto_px,
+                resolucion=body.resolucion,
+                algoritmo=body.algoritmo,
+            )
+            ruta = (
+                f"heatmaps/ia_proyectado_{proyecto.id}_{idx}_{combo_idx}_"
+                f"{secrets.token_hex(8)}.png"
+            )
+            _storage().save(
+                HeatmapImageService().render_png(
+                    matriz_combo,
+                    mascara=mascara_mapa,
+                ),
+                ruta,
+            )
+            firma = hashlib.sha1(
+                (
+                    f"ia-proyectado-lectura-rssi:{proyecto.id}:{conjunto_ia.id}:"
+                    f"{combo_idx}:{body.algoritmo}:{secrets.token_hex(8)}"
+                ).encode(),
+                usedforsecurity=False,
+            ).hexdigest()
+            aps_interes = [
+                {
+                    "bssid": item["bssid"],
+                    "ssid": item["ssid_snapshot"],
+                    "canal": item["canal_snapshot"],
+                    "frecuencia_mhz": None,
+                    "rssi_promedio": item["rssi_promedio_snapshot"],
+                    "pos_x": item["pos_x"],
+                    "pos_y": item["pos_y"],
+                    "cantidad_puntos": len(puntos),
+                }
+                for item in items_combo
+            ]
+            mapa_proyectado = mapa_repo.crear(
+                plano_id=plano.id,
+                conjunto_ap_id=conjunto_ia.id,
+                modo_generacion=_modo_mapa_ia(
+                    cantidad_items=len(items_combo),
+                    total_items=len(items),
+                ),
+                algoritmo=body.algoritmo,
+                resolucion=body.resolucion,
+                bssid=items_combo[0]["bssid"],
+                ssid=conjunto_ia.nombre,
+                ap_pos_x=items_combo[0]["pos_x"],
+                ap_pos_y=items_combo[0]["pos_y"],
+                aps_interes=aps_interes,
+                bssids_generacion=bssids_combo,
+                matriz=matriz_combo,
+                escala=ESCALA_CWNA,
+                ruta_imagen=ruta,
+                cantidad_puntos=len(puntos_combo),
+                rssi_min=min(punto.rssi for punto in puntos_combo),
+                rssi_max=max(punto.rssi for punto in puntos_combo),
+                firma_mediciones=firma,
+            )
+            mapas_proyectados.append(mapa_proyectado)
+            puntos_por_mapa_id[mapa_proyectado.id] = puntos_combo
 
     return ConjuntosIAGeneradosOut(
         conjunto_base_id=conjunto_fuente.id,
-        mapa_actual=_mapa_out(mapa_actual, request),
+        mapa_actual=_mapa_resumen_out(mapa_actual, request),
         conjuntos=[_conjunto_out(conjunto) for conjunto in conjuntos_ia],
-        mapas_proyectados=[_mapa_out(mapa, request) for mapa in mapas_proyectados],
+        mapas_proyectados=[
+            _mapa_resumen_out(mapa, request, puntos=puntos_por_mapa_id.get(mapa.id))
+            for mapa in mapas_proyectados
+        ],
     )

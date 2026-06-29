@@ -24,7 +24,7 @@ from app.schemas.medicion import (
     AgregarMedicionesIn,
     LoteMedicionIn,
     LoteMedicionOut,
-    MedicionWifiOut,
+    LecturaRSSIOut,
     PuntoMedicionDetalleOut,
     PuntoMedicionOut,
     PuntoMedicionUpdateIn,
@@ -132,7 +132,7 @@ def ingresar_lote_medicion(
     return LoteMedicionOut(
         punto_id=punto.id,
         nivel=punto.nivel,
-        mediciones=[MedicionWifiOut.model_validate(m) for m in punto.mediciones],
+        mediciones=[LecturaRSSIOut.model_validate(m) for m in punto.mediciones],
     )
 
 

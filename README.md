@@ -21,7 +21,7 @@ Sistema integrado de relevamiento y análisis de cobertura WiFi.
 cp .env.example .env
 # Editar .env con valores reales (al menos SECRET_KEY y POSTGRES_PASSWORD)
 
-# 2. Levantar servicios de desarrollo (db + backend + web)
+# 2. Levantar servicios de desarrollo (db + pgAdmin + backend + web)
 docker compose up --build
 
 # 3. Verificar que el backend está operativo
@@ -36,6 +36,19 @@ Servicios disponibles tras `docker compose up`:
 | Panel web (React)     | http://localhost:5173          |
 | API REST (FastAPI)    | http://localhost:8000          |
 | Documentación OpenAPI | http://localhost:8000/api/docs |
+| pgAdmin               | http://localhost:5050          |
+
+Acceso por defecto a pgAdmin en desarrollo:
+
+| Dato              | Valor por defecto                         |
+| ----------------- | ----------------------------------------- |
+| Email             | `admin@bulldogtech.bo`                    |
+| Contraseña        | `admin_dev_2026`                          |
+| Host PostgreSQL   | `db`                                      |
+| Puerto PostgreSQL | `5432`                                    |
+| Base de datos     | valor de `POSTGRES_DB` (`heatmapper`)     |
+| Usuario           | valor de `POSTGRES_USER`                  |
+| Contraseña BD     | valor de `POSTGRES_PASSWORD`              |
 
 > En desarrollo local el reverse proxy Nginx no se levanta por defecto, porque la configuración productiva usa certificados TLS reales de la VM. Vite enruta `/api` hacia el backend mediante `VITE_PROXY_TARGET=http://backend:8000`.
 

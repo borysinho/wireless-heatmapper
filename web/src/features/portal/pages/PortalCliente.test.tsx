@@ -25,6 +25,7 @@ const portal: PortalClienteOut = {
       proposito: "Validar cobertura del área administrativa",
       descripcion: "Selección compartida por Bulldog Tech.",
       es_principal: true,
+      banda_objetivo: "5",
       origen: "manual_web",
       creado_por_id: 3,
       resumen_ia: null,

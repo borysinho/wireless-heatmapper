@@ -1,4 +1,4 @@
-"""DTOs de mediciones WiFi.
+"""DTOs de puntos de medición y lecturas RSSI.
 
 Sprint 3 — PB-03 (Captura WiFi en línea), PB-04 (Marcar puntos de medición).
 """
@@ -29,7 +29,7 @@ _BSSID_RE = re.compile(
 
 
 class MedicionItemIn(BaseModel):
-    """Un resultado de escaneo WiFi (un BSSID)."""
+    """Un resultado de escaneo WiFi real capturado por el técnico."""
 
     ssid: str = Field(..., max_length=255)
     bssid: str = Field(..., description="MAC AA:BB:CC:DD:EE:FF")
@@ -64,8 +64,8 @@ class LoteMedicionIn(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class MedicionWifiOut(BaseModel):
-    """DTO de salida para una medición WiFi individual."""
+class LecturaRSSIOut(BaseModel):
+    """DTO de salida para una lectura RSSI individual."""
 
     id: int
     punto_id: int
@@ -76,6 +76,11 @@ class MedicionWifiOut(BaseModel):
     frecuencia_mhz: int | None
     nivel: NivelSenal
     numero_lectura: int
+    origen: str = "CAMPO"
+    conjunto_ap_id: int | None = None
+    mapa_calor_id: int | None = None
+    modelo_origen: str | None = None
+    incertidumbre_db: float | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -95,7 +100,7 @@ class PuntoMedicionOut(BaseModel):
 
 
 class PuntoMedicionDetalleOut(BaseModel):
-    """DTO de salida completo: punto + lista de mediciones ordenadas por RSSI."""
+    """DTO de salida completo: punto + lecturas reales ordenadas por RSSI."""
 
     id: int
     plano_id: int
@@ -103,7 +108,7 @@ class PuntoMedicionDetalleOut(BaseModel):
     pos_y: float
     nivel: NivelSenal
     created_at: datetime
-    mediciones: list[MedicionWifiOut]
+    mediciones: list[LecturaRSSIOut]
 
     model_config = {"from_attributes": True}
 
@@ -120,7 +125,7 @@ class LoteMedicionOut(BaseModel):
 
     punto_id: int
     nivel: NivelSenal
-    mediciones: list[MedicionWifiOut]
+    mediciones: list[LecturaRSSIOut]
 
 
 class AgregarMedicionesIn(BaseModel):

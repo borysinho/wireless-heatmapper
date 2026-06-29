@@ -19,7 +19,7 @@ export async function generarHeatmapPortal(
   body: {
     modo: "INDIVIDUAL" | "SUBCONJUNTO" | "CONJUNTO_COMPLETO";
     bssids?: string[];
-    algoritmo: "IDW" | "KRIGING";
+    algoritmo: "IDW";
     resolucion: 64 | 128 | 256;
   },
 ): Promise<MapaCalorPortalOut> {

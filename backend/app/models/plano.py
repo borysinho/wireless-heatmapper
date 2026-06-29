@@ -84,12 +84,6 @@ class Plano(Base):
         back_populates="plano",
         cascade="all, delete-orphan",
     )
-    aps_fisicos = relationship(
-        "APFisico",
-        back_populates="plano",
-        cascade="all, delete-orphan",
-    )
-
     @property
     def calibrado(self) -> bool:
         return self.escala_m_por_px is not None

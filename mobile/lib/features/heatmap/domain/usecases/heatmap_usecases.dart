@@ -16,8 +16,11 @@ class ListarConjuntosAPUseCase {
   final HeatmapRepository _repo;
   const ListarConjuntosAPUseCase(this._repo);
 
-  Future<List<ConjuntoAP>> call(int planoId) {
-    return _repo.listarConjuntosAP(planoId);
+  Future<List<ConjuntoAP>> call(int planoId) async {
+    final conjuntos = await _repo.listarConjuntosAP(planoId);
+    return conjuntos
+        .where((conjunto) => conjunto.origen == 'manual_movil')
+        .toList(growable: false);
   }
 }
 
@@ -30,6 +33,7 @@ class CrearConjuntoAPUseCase {
     required String nombre,
     required String proposito,
     String? descripcion,
+    required String bandaObjetivo,
     required List<String> bssids,
   }) {
     return _repo.crearConjuntoAP(
@@ -37,6 +41,7 @@ class CrearConjuntoAPUseCase {
       nombre: nombre,
       proposito: proposito,
       descripcion: descripcion,
+      bandaObjetivo: bandaObjetivo,
       bssids: bssids,
     );
   }
@@ -51,6 +56,7 @@ class ActualizarConjuntoAPUseCase {
     required String nombre,
     required String proposito,
     String? descripcion,
+    required String bandaObjetivo,
     required List<String> bssids,
   }) {
     return _repo.actualizarConjuntoAP(
@@ -58,6 +64,7 @@ class ActualizarConjuntoAPUseCase {
       nombre: nombre,
       proposito: proposito,
       descripcion: descripcion,
+      bandaObjetivo: bandaObjetivo,
       bssids: bssids,
     );
   }

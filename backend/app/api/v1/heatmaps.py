@@ -5,6 +5,7 @@ Sprint 4 — PB-05 (Generar mapa de calor).
 
 import hashlib
 import json
+import math
 import secrets
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
+from app.ai.modelo_propagacion import ModeloPropagacion
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -21,7 +23,11 @@ from app.repositories.heatmap_repository import (
     ConjuntoAPRepository,
     MapaCalorRepository,
 )
-from app.repositories.medicion_repository import MedicionRepository
+from app.repositories.medicion_repository import (
+    ORIGEN_CAMPO,
+    ORIGEN_IA_ESTIMADA,
+    MedicionRepository,
+)
 from app.repositories.plano_repository import PlanoRepository
 from app.repositories.proyecto_repository import ProyectoRepository
 from app.schemas.heatmap import (
@@ -32,7 +38,9 @@ from app.schemas.heatmap import (
     ConjuntoAPItemOut,
     ConjuntoAPOut,
     GenerarHeatmapConjuntoIn,
+    GenerarHeatmapsFaltantesIn,
     MapaCalorOut,
+    MapaCalorResumenOut,
     PuntoLecturaHeatmapOut,
 )
 from app.services.geometria_service import mascara_poligono
@@ -130,7 +138,7 @@ def _mapa_out(
             "cantidad_puntos": mapa.cantidad_puntos,
         }
     ]
-    puntos_lectura = puntos or []
+    puntos_lectura = puntos or _puntos_simulados_desde_metricas(mapa)
     rssi_promedio = (
         sum(punto.rssi for punto in puntos_lectura) / len(puntos_lectura)
         if puntos_lectura
@@ -175,6 +183,100 @@ def _mapa_out(
         ),
         created_at=mapa.created_at,
     )
+
+
+def _mapa_resumen_out(
+    mapa: MapaCalor,
+    request: Request,
+    *,
+    puntos: list[PuntoRSSI] | None = None,
+) -> MapaCalorResumenOut:
+    aps_interes = mapa.aps_interes or [
+        {
+            "bssid": mapa.bssid,
+            "ssid": mapa.ssid,
+            "canal": None,
+            "frecuencia_mhz": None,
+            "rssi_promedio": 0,
+            "pos_x": mapa.ap_pos_x,
+            "pos_y": mapa.ap_pos_y,
+            "cantidad_puntos": mapa.cantidad_puntos,
+        }
+    ]
+    puntos_lectura = puntos or _puntos_simulados_desde_metricas(mapa)
+    rssi_promedio = (
+        sum(punto.rssi for punto in puntos_lectura) / len(puntos_lectura)
+        if puntos_lectura
+        else (mapa.rssi_min + mapa.rssi_max) / 2
+    )
+    return MapaCalorResumenOut(
+        id=mapa.id,
+        plano_id=mapa.plano_id,
+        conjunto_ap_id=mapa.conjunto_ap_id,
+        modo_generacion=mapa.modo_generacion,
+        algoritmo=mapa.algoritmo,
+        resolucion=mapa.resolucion,
+        bssid=mapa.bssid,
+        ssid=mapa.ssid,
+        aps_interes=aps_interes,
+        bssids_generacion=mapa.bssids_generacion or [ap["bssid"] for ap in aps_interes],
+        url_imagen=_firmar(mapa.ruta_imagen, request),
+        cantidad_puntos=mapa.cantidad_puntos,
+        rssi_min=mapa.rssi_min,
+        rssi_max=mapa.rssi_max,
+        rssi_promedio=round(rssi_promedio, 2),
+        created_at=mapa.created_at,
+    )
+
+
+def _mapa_resumen_desde_out(mapa: MapaCalorOut) -> MapaCalorResumenOut:
+    return MapaCalorResumenOut(
+        id=mapa.id,
+        plano_id=mapa.plano_id,
+        conjunto_ap_id=mapa.conjunto_ap_id,
+        modo_generacion=mapa.modo_generacion,
+        algoritmo=mapa.algoritmo,
+        resolucion=mapa.resolucion,
+        bssid=mapa.bssid,
+        ssid=mapa.ssid,
+        aps_interes=mapa.aps_interes,
+        bssids_generacion=mapa.bssids_generacion,
+        url_imagen=mapa.url_imagen,
+        cantidad_puntos=mapa.cantidad_puntos,
+        rssi_min=mapa.rssi_min,
+        rssi_max=mapa.rssi_max,
+        rssi_promedio=mapa.rssi_promedio,
+        created_at=mapa.created_at,
+    )
+
+
+def _puntos_simulados_desde_metricas(mapa: MapaCalor) -> list[PuntoRSSI]:
+    if mapa.modo_generacion != "PROYECTADO" or mapa.conjunto_ap is None:
+        return []
+    metricas = mapa.conjunto_ap.metricas_ia or {}
+    lecturas = metricas.get("lecturas_simuladas") or []
+    if not isinstance(lecturas, list):
+        return []
+    banda_objetivo = metricas.get("banda_objetivo")
+    puntos_por_id: dict[int, PuntoRSSI] = {}
+    for lectura in lecturas:
+        if not isinstance(lectura, dict):
+            continue
+        if banda_objetivo and lectura.get("banda") != banda_objetivo:
+            continue
+        punto_id = lectura.get("punto_id") or lectura.get("punto_medicion_id")
+        pos_x = lectura.get("pos_x")
+        pos_y = lectura.get("pos_y")
+        rssi = lectura.get("rssi") or lectura.get("rssi_proyectado_dbm")
+        if punto_id is None or pos_x is None or pos_y is None or rssi is None:
+            continue
+        puntos_por_id[int(punto_id)] = PuntoRSSI(
+            punto_id=int(punto_id),
+            x=float(pos_x),
+            y=float(pos_y),
+            rssi=float(rssi),
+        )
+    return list(puntos_por_id.values())
 
 
 def _advertencias_heatmap(
@@ -298,9 +400,195 @@ def _resolver_items_conjunto(*, aps: list[dict], bssids: list[str]) -> list[dict
             "rssi_promedio_snapshot": por_bssid[bssid]["rssi_promedio"],
             "pos_x": por_bssid[bssid]["pos_x"],
             "pos_y": por_bssid[bssid]["pos_y"],
+            "banda": _banda_ap(por_bssid[bssid]),
         }
         for bssid in bssids_norm
     ]
+
+
+def _banda_ap(ap: dict) -> str | None:
+    frecuencia = ap.get("frecuencia_mhz")
+    if frecuencia is None:
+        return None
+    return "2.4" if int(frecuencia) < 3000 else "5"
+
+
+def _validar_banda_items(*, items: list[dict], banda_objetivo: str) -> None:
+    fuera_de_banda = [
+        item["bssid"]
+        for item in items
+        if item.get("banda") is not None and item["banda"] != banda_objetivo
+    ]
+    if fuera_de_banda:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "El conjunto contiene APs que no pertenecen a la banda "
+                f"{banda_objetivo} GHz."
+            ),
+        )
+
+
+def _clave_bssids(bssids: list[str]) -> tuple[str, ...]:
+    return tuple(sorted(bssid.lower() for bssid in bssids))
+
+
+def _mapas_objetivo_conjunto(
+    *,
+    bssids: list[str],
+    origen_conjunto: str,
+) -> list[tuple[list[str], str]]:
+    modo_global = "PROYECTADO" if origen_conjunto == "ia" else "CONJUNTO_COMPLETO"
+    if len(bssids) == 1:
+        return [(bssids, modo_global)]
+    return [(bssids, modo_global)] + [([bssid], "INDIVIDUAL") for bssid in bssids]
+
+
+def _algoritmos_faltantes(body: GenerarHeatmapsFaltantesIn) -> list[str]:
+    solicitados = body.algoritmos
+    if solicitados is None:
+        solicitados = [body.algoritmo] if body.algoritmo is not None else ["IDW"]
+    return list(dict.fromkeys(algoritmo.upper() for algoritmo in solicitados))
+
+
+def _lecturas_metricas_ia(conjunto, bssids_requeridos: set[str]) -> list[dict]:
+    metricas = conjunto.metricas_ia or {}
+    lecturas_base = (
+        metricas.get("lecturas_estimadas") or metricas.get("lecturas_simuladas") or []
+    )
+    if not isinstance(lecturas_base, list):
+        return []
+
+    lecturas: list[dict] = []
+    bssids_presentes: set[str] = set()
+    for lectura in lecturas_base:
+        if not isinstance(lectura, dict):
+            continue
+        bssid = str(lectura.get("bssid") or "").lower()
+        punto_id = lectura.get("punto_id") or lectura.get("punto_medicion_id")
+        rssi = lectura.get("rssi") or lectura.get("rssi_proyectado_dbm")
+        if bssid not in bssids_requeridos or punto_id is None or rssi is None:
+            continue
+        bssids_presentes.add(bssid)
+        lecturas.append(
+            {
+                "punto_id": punto_id,
+                "ssid": lectura.get("ssid") or conjunto.nombre,
+                "bssid": bssid,
+                "rssi": rssi,
+                "canal": lectura.get("canal"),
+                "frecuencia_mhz": lectura.get("frecuencia_mhz"),
+                "modelo_origen": lectura.get("modelo_origen") or "rf-hibrido-1.1",
+                "incertidumbre_db": lectura.get("incertidumbre_db") or 6.0,
+            }
+        )
+    return lecturas if bssids_requeridos.issubset(bssids_presentes) else []
+
+
+def _radio_principal(radios) -> dict:
+    if isinstance(radios, dict):
+        return radios
+    if isinstance(radios, list):
+        return next((radio for radio in radios if isinstance(radio, dict)), {})
+    return {}
+
+
+def _lecturas_proyectadas_ia_desde_items(conjunto, db: Session) -> list[dict]:
+    puntos = MedicionRepository(db).listar_puntos_por_plano(plano_id=conjunto.plano_id)
+    modelo = ModeloPropagacion()
+    metros_por_pixel = conjunto.plano.escala_m_por_px or 1.0
+    lecturas: list[dict] = []
+    for item in conjunto.items:
+        if item.pos_x is None or item.pos_y is None:
+            continue
+        radio_principal = _radio_principal(item.radios)
+        banda = item.banda or conjunto.banda_objetivo or "5"
+        for punto in puntos:
+            rssi = modelo.predecir_rssi(
+                distancia_px=math.hypot(
+                    punto.pos_x - item.pos_x,
+                    punto.pos_y - item.pos_y,
+                ),
+                metros_por_pixel=metros_por_pixel,
+                banda=banda,
+                potencia_dbm=radio_principal.get("potencia_dbm"),
+                ganancia_dbi=radio_principal.get("ganancia_dbi", 2.14),
+            )
+            lecturas.append(
+                {
+                    "punto_id": punto.id,
+                    "ssid": item.ssid_snapshot or conjunto.nombre,
+                    "bssid": item.bssid,
+                    "rssi": rssi,
+                    "canal": item.canal_snapshot,
+                    "frecuencia_mhz": 2412 if banda == "2.4" else 5180,
+                    "modelo_origen": "rf-hibrido-1.1",
+                    "incertidumbre_db": 6.0,
+                }
+            )
+    return lecturas
+
+
+def _asegurar_lecturas_estimadas_ia(conjunto, db: Session) -> None:
+    if conjunto.origen != "ia":
+        return
+
+    bssids_requeridos = {item.bssid.lower() for item in conjunto.items}
+    med_repo = MedicionRepository(db)
+    bssids_existentes = {
+        ap["bssid"]
+        for ap in med_repo.listar_aps_por_plano(
+            plano_id=conjunto.plano_id,
+            origen=ORIGEN_IA_ESTIMADA,
+            conjunto_ap_id=conjunto.id,
+        )
+    }
+    if bssids_requeridos.issubset(bssids_existentes):
+        return
+
+    lecturas = _lecturas_metricas_ia(conjunto, bssids_requeridos)
+    if not lecturas:
+        lecturas = _lecturas_proyectadas_ia_desde_items(conjunto, db)
+
+    bssids_generados = {str(lectura["bssid"]).lower() for lectura in lecturas}
+    if not bssids_requeridos.issubset(bssids_generados):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "No se pudieron reconstruir las lecturas estimadas de todos los APs "
+                "recomendados por IA."
+            ),
+        )
+
+    med_repo.reemplazar_lecturas_estimadas(
+        conjunto_ap_id=conjunto.id,
+        lecturas=lecturas,
+    )
+    conjunto.metricas_ia = {
+        **(conjunto.metricas_ia or {}),
+        "lecturas_estimadas": lecturas,
+        "cantidad_lecturas_estimadas": len(lecturas),
+        "lecturas_simuladas": lecturas,
+        "cantidad_lecturas_simuladas": len(lecturas),
+    }
+    db.commit()
+    db.refresh(conjunto)
+
+
+def _metricas_ia_livianas(metricas: dict | None) -> dict | None:
+    if not metricas:
+        return metricas
+    claves_pesadas = {
+        "mapas_por_banda",
+        "lecturas_estimadas",
+        "lecturas_simuladas",
+        "valores_proyectados",
+    }
+    return {
+        clave: valor
+        for clave, valor in metricas.items()
+        if clave not in claves_pesadas
+    }
 
 
 def _conjunto_out(conjunto) -> ConjuntoAPOut:
@@ -331,10 +619,11 @@ def _conjunto_out(conjunto) -> ConjuntoAPOut:
         proposito=conjunto.proposito,
         descripcion=conjunto.descripcion,
         es_principal=conjunto.es_principal,
+        banda_objetivo=conjunto.banda_objetivo,
         origen=conjunto.origen,
         creado_por_id=conjunto.creado_por_id,
         resumen_ia=conjunto.resumen_ia,
-        metricas_ia=conjunto.metricas_ia,
+        metricas_ia=_metricas_ia_livianas(conjunto.metricas_ia),
         restricciones_ia=conjunto.restricciones_ia,
         version_motor_ia=conjunto.version_motor_ia,
         cantidad_aps=len(items),
@@ -373,7 +662,7 @@ def _firma_aps_interes(
     modo_generacion: str = "SUBCONJUNTO",
 ) -> str:
     payload = {
-        "modelo": "aps-interes-mediciones-v8",
+        "modelo": "aps-interes-mediciones-v9-no-deteccion",
         "firma_base": firma_base,
         "conjunto_ap_id": conjunto_ap_id,
         "modo_generacion": modo_generacion,
@@ -457,6 +746,8 @@ def _generar_heatmap_core(
     current_user: Usuario,
     conjunto_ap_id: int | None = None,
     modo_generacion: str | None = None,
+    origen_lecturas: str = ORIGEN_CAMPO,
+    conjunto_lecturas_id: int | None = None,
 ) -> MapaCalorOut:
     plano = _verificar_ownership_plano(
         plano_id=plano_id,
@@ -477,7 +768,11 @@ def _generar_heatmap_core(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Debe seleccionar al menos un AP de interés.",
         )
-    aps_disponibles = med_repo.listar_aps_por_plano(plano_id=plano_id)
+    aps_disponibles = med_repo.listar_aps_por_plano(
+        plano_id=plano_id,
+        origen=origen_lecturas,
+        conjunto_ap_id=conjunto_lecturas_id,
+    )
     aps_interes = _resolver_aps_interes(
         aps=aps_disponibles,
         bssids=bssids_norm,
@@ -488,6 +783,8 @@ def _generar_heatmap_core(
     puntos = med_repo.listar_puntos_rssi_heatmap(
         plano_id=plano_id,
         bssids=bssids_norm,
+        origen=origen_lecturas,
+        conjunto_ap_id=conjunto_lecturas_id,
     )
     if len(puntos) < 5:
         raise HTTPException(
@@ -502,6 +799,8 @@ def _generar_heatmap_core(
     firma_base = med_repo.firma_mediciones_plano(
         plano_id=plano_id,
         bssids=bssids_norm,
+        origen=origen_lecturas,
+        conjunto_ap_id=conjunto_lecturas_id,
     )
     firma = _firma_aps_interes(
         firma_base=firma_base,
@@ -585,7 +884,7 @@ def generar_heatmap(
         default=None,
         description="Ubicación Y confirmada de cada AP sobre el plano",
     ),
-    algoritmo: str = Query(default="IDW", pattern="^(IDW|KRIGING|idw|kriging)$"),
+    algoritmo: str = Query(default="IDW", pattern="^(IDW|idw)$"),
     resolucion: int = Query(default=128, enum=[64, 128, 256]),
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_user),
@@ -665,12 +964,14 @@ def crear_conjunto_ap(
         )
     aps = MedicionRepository(db).listar_aps_por_plano(plano_id=plano_id)
     items = _resolver_items_conjunto(aps=aps, bssids=body.bssids)
+    _validar_banda_items(items=items, banda_objetivo=body.banda_objetivo)
     conjunto = repo.crear(
         plano_id=plano_id,
         nombre=nombre,
         proposito=proposito,
         descripcion=body.descripcion,
         es_principal=body.es_principal,
+        banda_objetivo=body.banda_objetivo,
         items=items,
         origen="manual_web" if current_user.rol == "admin" else "manual_movil",
         creado_por_id=current_user.id,
@@ -727,6 +1028,11 @@ def actualizar_conjunto_ap(
     if body.bssids is not None:
         aps = MedicionRepository(db).listar_aps_por_plano(plano_id=conjunto.plano_id)
         items = _resolver_items_conjunto(aps=aps, bssids=body.bssids)
+    banda_objetivo = body.banda_objetivo or conjunto.banda_objetivo
+    items_validacion = items or [
+        {"bssid": item.bssid, "banda": item.banda} for item in conjunto.items
+    ]
+    _validar_banda_items(items=items_validacion, banda_objetivo=banda_objetivo)
     descripcion = (
         body.descripcion
         if "descripcion" in body.model_fields_set
@@ -738,6 +1044,7 @@ def actualizar_conjunto_ap(
         proposito=body.proposito.strip() if body.proposito is not None else None,
         descripcion=descripcion,
         es_principal=body.es_principal,
+        banda_objetivo=body.banda_objetivo,
         items=items,
     )
     return _conjunto_out(actualizado)
@@ -758,7 +1065,11 @@ def eliminar_conjunto_ap(
         current_user=current_user,
         db=db,
     )
+    rutas_mapas = [mapa.ruta_imagen for mapa in conjunto.mapas_calor]
     ConjuntoAPRepository(db).eliminar(conjunto=conjunto)
+    storage = _storage()
+    for ruta in rutas_mapas:
+        storage.delete(ruta)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -810,6 +1121,7 @@ def generar_heatmap_conjunto(
         current_user=current_user,
         db=db,
     )
+    _asegurar_lecturas_estimadas_ia(conjunto, db)
     bssids_conjunto = [item.bssid for item in conjunto.items]
     bssids_solicitados = _normalizar_bssids(body.bssids or [])
     if body.modo == "CONJUNTO_COMPLETO":
@@ -873,6 +1185,9 @@ def generar_heatmap_conjunto(
         ap_pos_y
     ) == len(bssids_generacion)
 
+    origen_lecturas = ORIGEN_IA_ESTIMADA if conjunto.origen == "ia" else ORIGEN_CAMPO
+    conjunto_lecturas_id = conjunto.id if conjunto.origen == "ia" else None
+
     return _generar_heatmap_core(
         plano_id=conjunto.plano_id,
         request=request,
@@ -885,7 +1200,121 @@ def generar_heatmap_conjunto(
         current_user=current_user,
         conjunto_ap_id=conjunto.id,
         modo_generacion=body.modo,
+        origen_lecturas=origen_lecturas,
+        conjunto_lecturas_id=conjunto_lecturas_id,
     )
+
+
+@router_conjuntos_ap.post(
+    "/{conjunto_id}/heatmaps/combinaciones-faltantes",
+    response_model=list[MapaCalorResumenOut],
+    summary="Generar o actualizar heatmaps objetivo del conjunto",
+)
+def generar_heatmaps_faltantes_conjunto(
+    conjunto_id: int,
+    body: GenerarHeatmapsFaltantesIn,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> list[MapaCalorResumenOut]:
+    conjunto = _verificar_ownership_conjunto(
+        conjunto_id=conjunto_id,
+        current_user=current_user,
+        db=db,
+    )
+    _asegurar_lecturas_estimadas_ia(conjunto, db)
+    bssids_conjunto = [item.bssid for item in conjunto.items]
+    if not bssids_conjunto:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El conjunto no tiene APs para generar mapas de calor.",
+        )
+
+    algoritmos = _algoritmos_faltantes(body)
+    mapas_objetivo = _mapas_objetivo_conjunto(
+        bssids=bssids_conjunto,
+        origen_conjunto=conjunto.origen,
+    )
+    if not mapas_objetivo:
+        return []
+
+    items_por_bssid = {item.bssid: item for item in conjunto.items}
+    origen_lecturas = ORIGEN_IA_ESTIMADA if conjunto.origen == "ia" else ORIGEN_CAMPO
+    conjunto_lecturas_id = conjunto.id if conjunto.origen == "ia" else None
+    mapas_generados: list[MapaCalorResumenOut] = []
+    mapas_existentes = MapaCalorRepository(db).listar_recientes_por_plano(
+        plano_id=conjunto.plano_id,
+    )
+    if body.reemplazar_existentes:
+        for mapa_existente in [
+            mapa for mapa in mapas_existentes if mapa.conjunto_ap_id == conjunto.id
+        ]:
+            db.delete(mapa_existente)
+        db.commit()
+        mapas_existentes = [
+            mapa for mapa in mapas_existentes if mapa.conjunto_ap_id != conjunto.id
+        ]
+    for algoritmo_norm in algoritmos:
+        existentes = {
+            _clave_bssids(mapa.bssids_generacion or [mapa.bssid]): mapa
+            for mapa in mapas_existentes
+            if mapa.conjunto_ap_id == conjunto.id
+            and mapa.algoritmo.upper() == algoritmo_norm
+            and mapa.resolucion == body.resolucion
+        }
+        mapas_a_generar = (
+            mapas_objetivo
+            if body.actualizar_existentes or body.reemplazar_existentes
+            else [
+                (bssids_mapa, modo_mapa)
+                for bssids_mapa, modo_mapa in mapas_objetivo
+                if _clave_bssids(bssids_mapa) not in existentes
+            ]
+        )
+        for bssids_mapa, modo_mapa in mapas_a_generar:
+            clave_mapa = _clave_bssids(bssids_mapa)
+            if body.actualizar_existentes and not body.reemplazar_existentes:
+                for mapa_existente in [
+                    mapa
+                    for mapa in mapas_existentes
+                    if mapa.conjunto_ap_id == conjunto.id
+                    and mapa.algoritmo.upper() == algoritmo_norm
+                    and mapa.resolucion == body.resolucion
+                    and _clave_bssids(mapa.bssids_generacion or [mapa.bssid])
+                    == clave_mapa
+                ]:
+                    db.delete(mapa_existente)
+                db.commit()
+            ap_pos_x = [
+                float(items_por_bssid[bssid].pos_x)
+                for bssid in bssids_mapa
+                if items_por_bssid[bssid].pos_x is not None
+            ]
+            ap_pos_y = [
+                float(items_por_bssid[bssid].pos_y)
+                for bssid in bssids_mapa
+                if items_por_bssid[bssid].pos_y is not None
+            ]
+            posiciones_completas = len(ap_pos_x) == len(bssids_mapa) and len(
+                ap_pos_y
+            ) == len(bssids_mapa)
+            mapa = _generar_heatmap_core(
+                plano_id=conjunto.plano_id,
+                request=request,
+                bssid=bssids_mapa,
+                ap_pos_x=ap_pos_x if posiciones_completas else None,
+                ap_pos_y=ap_pos_y if posiciones_completas else None,
+                algoritmo=algoritmo_norm,
+                resolucion=body.resolucion,
+                db=db,
+                current_user=current_user,
+                conjunto_ap_id=conjunto.id,
+                modo_generacion=modo_mapa,
+                origen_lecturas=origen_lecturas,
+                conjunto_lecturas_id=conjunto_lecturas_id,
+            )
+            mapas_generados.append(_mapa_resumen_desde_out(mapa))
+    return mapas_generados
 
 
 @router_mapas.get(
@@ -927,3 +1356,24 @@ def descargar_imagen_heatmap(
         else "application/octet-stream"
     )
     return Response(content=storage.read(ruta), media_type=media_type)
+
+
+@router_mapas.delete(
+    "/{mapa_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar mapa de calor",
+)
+def eliminar_mapa_calor(
+    mapa_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> Response:
+    mapa = _verificar_ownership_mapa(
+        mapa_id=mapa_id,
+        current_user=current_user,
+        db=db,
+    )
+    ruta_imagen = mapa.ruta_imagen
+    MapaCalorRepository(db).eliminar(mapa=mapa)
+    _storage().delete(ruta_imagen)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-import 'medicion_wifi.dart';
+import 'lectura_rssi.dart';
 import 'nivel_senal.dart';
 
 /// Punto de medición sobre el plano.
@@ -12,7 +12,7 @@ class PuntoMedicion extends Equatable {
   final double posX;
   final double posY;
   final NivelSenal nivel;
-  final List<MedicionWifi> mediciones;
+  final List<LecturaRSSI> mediciones;
 
   const PuntoMedicion({
     required this.id,

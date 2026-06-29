@@ -152,6 +152,7 @@ export interface ConjuntoAPOut {
   proposito: string;
   descripcion: string | null;
   es_principal: boolean;
+  banda_objetivo: "2.4" | "5" | string;
   origen: "manual_movil" | "manual_web" | "ia" | string;
   creado_por_id: number | null;
   resumen_ia: string | null;
@@ -164,6 +165,21 @@ export interface ConjuntoAPOut {
   updated_at: string;
 }
 
+export interface LecturaSimuladaIA {
+  punto_medicion_id: number;
+  pos_x: number;
+  pos_y: number;
+  banda: "2.4" | "5" | string;
+  rssi_observado_dbm: number | null;
+  rssi_proyectado_dbm: number;
+  diferencia_db: number | null;
+  radio_primaria: string;
+  radio_secundaria: string | null;
+  rssi_secundario_dbm: number | null;
+  snr_proyectado_db: number | null;
+  incertidumbre_db: number;
+}
+
 export interface FuenteEntradaIAIn {
   tipo: "CONJUNTO_EXISTENTE";
   conjunto_id: number;
@@ -172,17 +188,17 @@ export interface FuenteEntradaIAIn {
 export interface RestriccionesIAIn {
   plano_id?: number;
   fuente_entrada: FuenteEntradaIAIn;
-  bandas: Array<"2.4" | "5">;
   umbral_objetivo_dbm: number;
   resolucion: number;
+  cantidad_aps_propuestos: number;
   cantidad_recomendaciones: number;
 }
 
 export interface ConjuntosIAGeneradosOut {
   conjunto_base_id: number;
-  mapa_actual: MapaCalorOut;
+  mapa_actual: MapaCalorResumenOut;
   conjuntos: ConjuntoAPOut[];
-  mapas_proyectados: MapaCalorOut[];
+  mapas_proyectados: MapaCalorResumenOut[];
 }
 
 export interface ContenidoEnlaceIn {
@@ -247,11 +263,31 @@ export interface MapaCalorPortalOut {
   rssi_max: number;
   rssi_promedio: number;
   puntos_lectura: Array<{ punto_id: number; pos_x: number; pos_y: number; rssi: number }>;
+  poligono_interes: Array<{ x: number; y: number }>;
   advertencias: string[];
   created_at: string;
 }
 
 export type MapaCalorOut = MapaCalorPortalOut;
+
+export interface MapaCalorResumenOut {
+  id: number;
+  plano_id: number;
+  conjunto_ap_id: number | null;
+  modo_generacion: string;
+  algoritmo: string;
+  resolucion: number;
+  bssid: string;
+  ssid: string;
+  aps_interes: APDisponibleOut[];
+  bssids_generacion: string[];
+  url_imagen: string;
+  cantidad_puntos: number;
+  rssi_min: number;
+  rssi_max: number;
+  rssi_promedio: number;
+  created_at: string;
+}
 
 export interface PortalClienteOut {
   proyecto: PortalProyectoOut;

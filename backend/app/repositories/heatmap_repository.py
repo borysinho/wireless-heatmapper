@@ -6,6 +6,7 @@ Sprint 4 — PB-05.
 from sqlalchemy.orm import Session
 
 from app.models.heatmap import ConjuntoAP, ConjuntoAPItem, MapaCalor
+from app.models.medicion import LecturaRSSI
 
 
 class MapaCalorRepository:
@@ -105,6 +106,10 @@ class MapaCalorRepository:
             .delete(synchronize_session=False)
         )
 
+    def eliminar(self, *, mapa: MapaCalor) -> None:
+        self._db.delete(mapa)
+        self._db.commit()
+
 
 class ConjuntoAPRepository:
     def __init__(self, db: Session) -> None:
@@ -144,6 +149,7 @@ class ConjuntoAPRepository:
         proposito: str,
         descripcion: str | None,
         es_principal: bool,
+        banda_objetivo: str = "5",
         items: list[dict],
         origen: str = "manual_movil",
         creado_por_id: int | None = None,
@@ -160,6 +166,7 @@ class ConjuntoAPRepository:
             proposito=proposito,
             descripcion=descripcion,
             es_principal=es_principal,
+            banda_objetivo=banda_objetivo,
             origen=origen,
             creado_por_id=creado_por_id,
             resumen_ia=resumen_ia,
@@ -182,6 +189,7 @@ class ConjuntoAPRepository:
         proposito: str | None = None,
         descripcion: str | None = None,
         es_principal: bool | None = None,
+        banda_objetivo: str | None = None,
         items: list[dict] | None = None,
     ) -> ConjuntoAP:
         if nombre is not None:
@@ -192,6 +200,8 @@ class ConjuntoAPRepository:
             conjunto.descripcion = descripcion
         if es_principal is not None:
             conjunto.es_principal = es_principal
+        if banda_objetivo is not None:
+            conjunto.banda_objetivo = banda_objetivo
         if items is not None:
             self._reemplazar_items(conjunto=conjunto, items=items)
         self._db.commit()
@@ -199,6 +209,13 @@ class ConjuntoAPRepository:
         return conjunto
 
     def eliminar(self, *, conjunto: ConjuntoAP) -> None:
+        (
+            self._db.query(LecturaRSSI)
+            .filter(LecturaRSSI.conjunto_ap_id == conjunto.id)
+            .delete(synchronize_session=False)
+        )
+        for mapa in list(conjunto.mapas_calor):
+            self._db.delete(mapa)
         self._db.delete(conjunto)
         self._db.commit()
 
