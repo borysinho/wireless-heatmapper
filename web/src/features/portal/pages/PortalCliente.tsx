@@ -287,13 +287,13 @@ function CarruselMapasPortal({
   onCambiarIndice: (indice: number) => void;
   planos: PlanoOut[];
 }) {
-  const mapa = mapas[indiceActivo];
-  if (!mapa) return null;
-  const plano = planos.find((item) => item.id === mapa.plano_id) ?? null;
   const [verHeatmap, setVerHeatmap] = useState(true);
   const [verAps, setVerAps] = useState(true);
   const [verPuntos, setVerPuntos] = useState(true);
   const [exportando, setExportando] = useState<string | null>(null);
+  const mapa = mapas[indiceActivo];
+  if (!mapa) return null;
+  const plano = planos.find((item) => item.id === mapa.plano_id) ?? null;
   const irAnterior = () => {
     if (mapas.length <= 1) return;
     onCambiarIndice(indiceActivo === 0 ? mapas.length - 1 : indiceActivo - 1);
