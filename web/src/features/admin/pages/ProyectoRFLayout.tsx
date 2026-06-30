@@ -1,13 +1,13 @@
-import { ArrowLeft, BrainCircuit, Link2, Network } from "lucide-react";
+import { ArrowLeft, BrainCircuit, Link2, RadioTower } from "lucide-react";
 import { NavLink, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import styles from "./ProyectoRFLayout.module.css";
 
 const PESTANAS = [
   {
-    path: "conjuntos-ap",
-    etiqueta: "Conjuntos AP",
-    descripcion: "Selección de datos relevados para revisión y publicación",
-    Icono: Network,
+    path: "datos-campo",
+    etiqueta: "Datos de campo",
+    descripcion: "Lecturas reales obtenidas por el técnico",
+    Icono: RadioTower,
   },
   {
     path: "escenarios-ia",

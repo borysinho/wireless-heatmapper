@@ -36,6 +36,15 @@ export async function listarProyectosOrg(
   return data;
 }
 
+export async function obtenerProyectoAdmin(
+  id: number,
+): Promise<ProyectoListOut> {
+  const { data } = await apiClient.get<ProyectoListOut>(
+    `/admin/proyectos/${id}`,
+  );
+  return data;
+}
+
 export async function crearProyectoAdmin(
   body: ProyectoAdminCreate,
 ): Promise<ProyectoListOut> {
@@ -230,6 +239,16 @@ export async function actualizarEnlaceCliente(
     { revocado },
   );
   return data;
+}
+
+export async function eliminarEnlaceCliente(enlaceId: number): Promise<void> {
+  await apiClient.delete(`/share/enlaces/${enlaceId}`);
+}
+
+export async function eliminarEnlacesClienteProyecto(
+  proyectoId: number,
+): Promise<void> {
+  await apiClient.delete(`/share/proyectos/${proyectoId}/enlaces`);
 }
 
 export async function enviarCorreoEnlaceCliente(

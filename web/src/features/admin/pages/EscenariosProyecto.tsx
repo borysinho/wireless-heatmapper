@@ -1,9 +1,11 @@
 /**
- * Generación de conjuntos AP propuestos por IA.
- * Una propuesta IA nace siempre desde un único conjunto AP relevado en campo.
+ * Generación de escenarios propuestos por IA.
+ * Una propuesta IA nace siempre desde datos relevados en campo.
  */
 
 import { useMemo, useState } from "react";
+import type { QueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   BrainCircuit,
   Eye,
@@ -20,6 +22,7 @@ import {
   useToast,
 } from "@/shared/components";
 import { ConjuntoAPPreviewModal } from "../components/ConjuntoAPPreviewModal";
+import { listarConjuntosPlano, listarMapasPlano } from "../api/proyectosApi";
 import {
   useConjuntosPorPlanos,
   useEliminarConjuntoAP,
@@ -45,13 +48,18 @@ const DEFAULT_FORM: Omit<RestriccionesIAIn, "fuente_entrada"> = {
 export default function EscenariosProyecto() {
   const params = useParams();
   const toast = useToast();
+  const queryClient = useQueryClient();
   const proyectoId = Number(params.id ?? 0);
 
   const [form, setForm] = useState(DEFAULT_FORM);
   const [planoId, setPlanoId] = useState<number | null>(null);
   const [conjuntoFuenteId, setConjuntoFuenteId] = useState<number | null>(null);
   const [confirmarEliminacion, setConfirmarEliminacion] = useState(false);
+  const [propuestaEliminar, setPropuestaEliminar] = useState<ConjuntoAPOut | null>(
+    null,
+  );
   const [vistaPrevia, setVistaPrevia] = useState<ConjuntoAPOut | null>(null);
+  const [verificandoGeneracion, setVerificandoGeneracion] = useState(false);
 
   const {
     data: planos,
@@ -134,7 +142,10 @@ export default function EscenariosProyecto() {
   const { mutateAsync: eliminarConjunto, isPending: eliminandoPropuestas } =
     useEliminarConjuntoAP();
   const puedeGenerar =
-    Boolean(planoSeleccionado?.calibrado) && conjuntoFuente !== null && !generando;
+    Boolean(planoSeleccionado?.calibrado) &&
+    conjuntoFuente !== null &&
+    !generando &&
+    !verificandoGeneracion;
 
   const handleGenerar = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -143,9 +154,10 @@ export default function EscenariosProyecto() {
       return;
     }
     if (!conjuntoFuente) {
-      toast.error("Seleccione un conjunto AP relevado por el técnico.");
+      toast.error("Seleccione datos de campo relevados por el técnico.");
       return;
     }
+    const idsIAAntes = new Set(conjuntosIA.map((conjunto) => conjunto.id));
     try {
       const respuesta = await generar({
         ...form,
@@ -155,8 +167,34 @@ export default function EscenariosProyecto() {
           conjunto_id: conjuntoFuente.id,
         },
       });
-      toast.exito(`${respuesta.conjuntos.length} conjunto(s) IA generado(s).`);
+      toast.exito(`${respuesta.conjuntos.length} propuesta(s) IA generada(s).`);
     } catch (error) {
+      if (_esErrorGeneracionDiferida(error)) {
+        setVerificandoGeneracion(true);
+        toast.info("La generación IA sigue procesándose. Verificando resultados...");
+        try {
+          const propuestasNuevas = await _esperarPropuestasIA({
+            planoId: planoSeleccionado.id,
+            idsIAAntes,
+            cantidadEsperada: form.cantidad_recomendaciones,
+          });
+          await _refrescarDatosRF({
+            queryClient,
+            proyectoId,
+            planoId: planoSeleccionado.id,
+          });
+          if (propuestasNuevas.length > 0) {
+            toast.exito(`${propuestasNuevas.length} propuesta(s) IA generada(s).`);
+          } else {
+            toast.info(
+              "La solicitud tardó más de lo esperado. Actualice en unos segundos para verificar el resultado.",
+            );
+          }
+        } finally {
+          setVerificandoGeneracion(false);
+        }
+        return;
+      }
       toast.error(_detalleError(error, "No se pudieron generar las propuestas IA."));
     }
   };
@@ -169,6 +207,20 @@ export default function EscenariosProyecto() {
       setConfirmarEliminacion(false);
     } catch {
       toast.error("No se pudieron eliminar las propuestas IA.");
+    }
+  };
+
+  const handleEliminarPropuesta = async () => {
+    if (!propuestaEliminar) return;
+    try {
+      await eliminarConjunto(propuestaEliminar.id);
+      toast.exito("Propuesta IA eliminada.");
+      setPropuestaEliminar(null);
+      if (vistaPrevia?.id === propuestaEliminar.id) {
+        setVistaPrevia(null);
+      }
+    } catch {
+      toast.error("No se pudo eliminar la propuesta IA.");
     }
   };
 
@@ -185,9 +237,9 @@ export default function EscenariosProyecto() {
   return (
     <section>
       <header className={styles.encabezado}>
-        <h1 className={styles.titulo}>Conjuntos AP propuestos por IA</h1>
+        <h1 className={styles.titulo}>Escenarios generados por IA</h1>
         <p className={styles.subtitulo}>
-          Genere alternativas IA derivadas desde un único conjunto AP relevado por
+          Genere alternativas IA derivadas desde datos reales relevados por
           el técnico de campo.
         </p>
       </header>
@@ -196,11 +248,15 @@ export default function EscenariosProyecto() {
         <div className={styles.panelHeader}>
           <div>
             <h3>Fuente de generación</h3>
-            <p>La IA reutiliza conjuntos AP existentes y crea nuevos conjuntos derivados.</p>
+            <p>La IA reutiliza datos de campo existentes y crea propuestas derivadas.</p>
           </div>
-          <Button type="submit" disabled={!puedeGenerar} isLoading={generando}>
+          <Button
+            type="submit"
+            disabled={!puedeGenerar}
+            isLoading={generando || verificandoGeneracion}
+          >
             <Sparkles size={16} aria-hidden="true" />
-            Generar propuestas
+            {verificandoGeneracion ? "Verificando propuestas" : "Generar propuestas"}
           </Button>
         </div>
 
@@ -237,11 +293,11 @@ export default function EscenariosProyecto() {
             <section className={styles.banda}>
               <div className={styles.seccionHeader}>
                 <RadioTower size={16} aria-hidden="true" />
-                <h2>Conjunto técnico fuente</h2>
+                <h2>Datos de campo fuente</h2>
               </div>
               {conjuntosFuente.length === 0 ? (
                 <p className={styles.subtitulo}>
-                  No hay conjuntos relevados por el técnico en este plano.
+                  No hay datos relevados por el técnico en este plano.
                 </p>
               ) : (
                 <div className={styles.conjuntosGrid}>
@@ -274,7 +330,7 @@ export default function EscenariosProyecto() {
             </div>
             <div className={styles.formularioConjunto}>
               <div className={styles.parametroLectura}>
-                <span>Banda del conjunto fuente</span>
+                <span>Banda de la fuente</span>
                 <strong>{conjuntoFuente?.banda_objetivo ?? "5"} GHz</strong>
               </div>
               <label>
@@ -347,7 +403,7 @@ export default function EscenariosProyecto() {
           <div>
             <h2>Propuestas IA del plano</h2>
             <p>
-              {conjuntosIA.length} conjunto(s) IA asociado(s) al plano seleccionado.
+              {conjuntosIA.length} propuesta(s) IA asociada(s) al plano seleccionado.
             </p>
           </div>
           <Button
@@ -360,18 +416,19 @@ export default function EscenariosProyecto() {
           </Button>
         </div>
         {conjuntosIA.length === 0 ? (
-          <EmptyState mensaje="Todavía no hay conjuntos IA generados para este plano." />
+          <EmptyState mensaje="Todavía no hay propuestas IA generadas para este plano." />
         ) : (
           <div className={conjuntosStyles.tablaWrapper}>
             <table className={conjuntosStyles.tabla}>
               <thead>
                 <tr>
-                  <th>Conjunto</th>
+                  <th>Propuesta</th>
                   <th>Plano</th>
                   <th>Vista</th>
                   <th>Origen</th>
                   <th>Banda</th>
                   <th>APs</th>
+                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -402,6 +459,17 @@ export default function EscenariosProyecto() {
                       </span>
                     </td>
                     <td>{conjunto.cantidad_aps}</td>
+                    <td>
+                      <Button
+                        variante="danger"
+                        tamano="sm"
+                        disabled={eliminandoPropuestas}
+                        onClick={() => setPropuestaEliminar(conjunto)}
+                      >
+                        <Trash2 size={14} aria-hidden="true" />
+                        Eliminar
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -422,11 +490,22 @@ export default function EscenariosProyecto() {
       {confirmarEliminacion && (
         <ConfirmDialog
           titulo="¿Eliminar propuestas IA del plano?"
-          descripcion="Se eliminarán los conjuntos AP generados por IA del plano seleccionado. Los conjuntos técnicos usados como fuente no serán modificados."
+          descripcion="Se eliminarán las propuestas IA del plano seleccionado. Los datos de campo usados como fuente no serán modificados."
           textoConfirmar="Eliminar propuestas"
           cargando={eliminandoPropuestas}
           onCancelar={() => setConfirmarEliminacion(false)}
           onConfirmar={handleEliminarPropuestas}
+        />
+      )}
+
+      {propuestaEliminar && (
+        <ConfirmDialog
+          titulo={`¿Eliminar "${propuestaEliminar.nombre}"?`}
+          descripcion="Se eliminará únicamente esta propuesta IA. Los datos de campo usados como fuente no serán modificados."
+          textoConfirmar="Eliminar"
+          cargando={eliminandoPropuestas}
+          onCancelar={() => setPropuestaEliminar(null)}
+          onConfirmar={handleEliminarPropuesta}
         />
       )}
     </section>
@@ -463,4 +542,89 @@ function _detalleError(error: unknown, alternativo: string): string {
     (error as { response?: { data?: { detail?: string } } })?.response?.data
       ?.detail ?? alternativo
   );
+}
+
+function _esErrorGeneracionDiferida(error: unknown): boolean {
+  const errorHttp = error as {
+    code?: string;
+    message?: string;
+    response?: { status?: number };
+  };
+  const status = errorHttp.response?.status;
+  if (status === 502 || status === 503 || status === 504) return true;
+  if (typeof status === "number" && status >= 500) return true;
+  if (!errorHttp.response) return true;
+
+  const code = errorHttp.code ?? "";
+  const message = (errorHttp.message ?? "").toLowerCase();
+  return (
+    code === "ECONNABORTED" ||
+    code === "ERR_NETWORK" ||
+    message.includes("timeout") ||
+    message.includes("network")
+  );
+}
+
+async function _esperarPropuestasIA({
+  planoId,
+  idsIAAntes,
+  cantidadEsperada,
+}: {
+  planoId: number;
+  idsIAAntes: Set<number>;
+  cantidadEsperada: number;
+}): Promise<ConjuntoAPOut[]> {
+  const intentos = 18;
+  const esperaMs = 5000;
+  let ultimasCompletas: ConjuntoAPOut[] = [];
+  for (let intento = 0; intento < intentos; intento += 1) {
+    if (intento > 0) await _esperar(esperaMs);
+    try {
+      const [conjuntos, mapas] = await Promise.all([
+        listarConjuntosPlano(planoId),
+        listarMapasPlano(planoId),
+      ]);
+      const nuevas = conjuntos.filter(
+        (conjunto) => conjunto.origen === "ia" && !idsIAAntes.has(conjunto.id),
+      );
+      const idsConMapa = new Set(
+        mapas
+          .map((mapa) => mapa.conjunto_ap_id)
+          .filter((id): id is number => typeof id === "number"),
+      );
+      ultimasCompletas = nuevas.filter((conjunto) => idsConMapa.has(conjunto.id));
+      if (
+        ultimasCompletas.length > 0 &&
+        ultimasCompletas.length >= cantidadEsperada
+      ) {
+        return ultimasCompletas;
+      }
+    } catch {
+      // El backend puede seguir procesando mientras el proxy corta consultas
+      // intermedias; se reintenta sin mostrar error falso al usuario.
+    }
+  }
+  return ultimasCompletas;
+}
+
+async function _refrescarDatosRF({
+  queryClient,
+  proyectoId,
+  planoId,
+}: {
+  queryClient: QueryClient;
+  proyectoId: number;
+  planoId: number;
+}) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["admin", "planos", planoId] }),
+    queryClient.invalidateQueries({ queryKey: ["admin", "planos"] }),
+    queryClient.invalidateQueries({
+      queryKey: ["admin", "proyectos", proyectoId, "enlaces-cliente"],
+    }),
+  ]);
+}
+
+function _esperar(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }

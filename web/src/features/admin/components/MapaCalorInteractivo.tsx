@@ -290,15 +290,13 @@ function Metrica({ etiqueta, valor }: { etiqueta: string; valor: string }) {
 }
 
 function _modoLegible(modo: string): string {
-  return ({ INDIVIDUAL: "AP individual", SUBCONJUNTO: "Subconjunto", CONJUNTO_COMPLETO: "Conjunto completo" } as Record<string, string>)[modo] ?? modo;
+  return ({ INDIVIDUAL: "AP individual", SUBCONJUNTO: "Selección parcial", CONJUNTO_COMPLETO: "Mapa completo" } as Record<string, string>)[modo] ?? modo;
 }
 
 function colorRssi(rssi: number): string {
-  if (rssi >= -60) return "#0B7A3B";
-  if (rssi >= -67) return "#57B65A";
-  if (rssi >= -70) return "#F4D35E";
-  if (rssi >= -75) return "#F08A24";
-  if (rssi >= -80) return "#D95D39";
-  if (rssi >= -90) return "#B91C1C";
-  return "#D7263D";
+  if (rssi >= -70) return "#A7E84A";
+  if (rssi >= -80) return "#F1E64A";
+  if (rssi >= -85) return "#C7B84B";
+  if (rssi >= -90) return "#7E8173";
+  return "#1C1C1C";
 }

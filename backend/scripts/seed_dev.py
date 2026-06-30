@@ -40,6 +40,7 @@ from app.models.medicion import (  # noqa: E402
 from app.models.plano import Plano  # noqa: E402
 from app.models.proyecto import Proyecto  # noqa: E402
 from app.models.usuario import Usuario  # noqa: E402
+from app.repositories.heatmap_repository import MapaCalorRepository  # noqa: E402
 from app.storage import LocalFilesystemStorage  # noqa: E402
 
 USUARIOS_PRUEBA = [
@@ -116,6 +117,10 @@ def _seed_campo_villamontes(db, tecnico: Usuario) -> None:
     proyecto_data = data["proyecto"]
     planos_data = data["planos"]
     cantidad_puntos = sum(len(plano["puntos"]) for plano in planos_data)
+    rutas_storage_seed = [
+        f"seed/campo_villamontes/{plano_data['archivo_seed']}"
+        for plano_data in planos_data
+    ]
 
     cliente = db.query(Cliente).filter_by(nombre=cliente_data["nombre"]).first()
     if not cliente:
@@ -133,9 +138,16 @@ def _seed_campo_villamontes(db, tecnico: Usuario) -> None:
 
     proyecto = (
         db.query(Proyecto)
-        .filter_by(nombre=proyecto_data["nombre"], cliente_id=cliente.id)
+        .join(Plano, Plano.proyecto_id == Proyecto.id)
+        .filter(Plano.ruta_storage.in_(rutas_storage_seed))
         .first()
     )
+    if proyecto is None:
+        proyecto = (
+            db.query(Proyecto)
+            .filter_by(nombre=proyecto_data["nombre"], cliente_id=cliente.id)
+            .first()
+        )
     estado = _normalizar_estado_proyecto(
         proyecto_data.get("estado", "en_progreso"),
         cantidad_puntos,
@@ -182,16 +194,20 @@ def _seed_campo_villamontes(db, tecnico: Usuario) -> None:
         ruta_storage = f"seed/campo_villamontes/{archivo_seed.name}"
         storage.save(archivo_seed.read_bytes(), ruta_storage)
 
-        plano = (
-            db.query(Plano)
-            .filter_by(proyecto_id=proyecto.id, nombre=plano_data["nombre"])
-            .first()
-        )
+        plano = db.query(Plano).filter_by(ruta_storage=ruta_storage).first()
+        if plano is None:
+            plano = (
+                db.query(Plano)
+                .filter_by(proyecto_id=proyecto.id, nombre=plano_data["nombre"])
+                .first()
+            )
         if not plano:
             plano = Plano(proyecto_id=proyecto.id, nombre=plano_data["nombre"])
             db.add(plano)
             print(f"[seed_dev] Plano real creado: {plano.nombre}")
         else:
+            plano.proyecto_id = proyecto.id
+            MapaCalorRepository(db).invalidar_plano(plano_id=plano.id)
             for punto in list(plano.puntos_medicion):
                 db.delete(punto)
             db.flush()

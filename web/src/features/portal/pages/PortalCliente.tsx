@@ -1,31 +1,38 @@
-import { useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
+import {
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type Dispatch,
+  type PointerEvent,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 import {
   BarChart3,
   BrainCircuit,
   Building2,
+  ChevronLeft,
+  ChevronRight,
   Eye,
   EyeOff,
-  Layers3,
-  Loader2,
+  FileImage,
   MapPinned,
   Minus,
   Plus,
   RadioTower,
-  Sparkles,
   TrendingUp,
 } from "lucide-react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { resolverUrlApi } from "@/shared/api/urlApi";
-import { generarHeatmapPortal, obtenerPortalCliente } from "../api/shareClient";
+import { obtenerPortalCliente } from "../api/shareClient";
 import type {
   MapaCalorPortalOut,
   PlanoOut,
-  PortalClienteOut,
 } from "@/features/admin/types";
 import styles from "./PortalCliente.module.css";
 
-type ModoGeneracion = "INDIVIDUAL" | "SUBCONJUNTO" | "CONJUNTO_COMPLETO";
 type PartePortal = "RELEVAMIENTO" | "IA";
 
 export default function PortalCliente() {
@@ -37,11 +44,7 @@ export default function PortalCliente() {
     retry: false,
   });
   const [conjuntoActivoId, setConjuntoActivoId] = useState<number | null>(null);
-  const [modo, setModo] = useState<ModoGeneracion>("CONJUNTO_COMPLETO");
-  const [bssidsSeleccionados, setBssidsSeleccionados] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [mapaActivo, setMapaActivo] = useState<MapaCalorPortalOut | null>(null);
+  const [mapaActivoIndice, setMapaActivoIndice] = useState(0);
   const [parteActiva, setParteActiva] = useState<PartePortal>("RELEVAMIENTO");
 
   const conjuntosRelevados = useMemo(
@@ -67,58 +70,34 @@ export default function PortalCliente() {
     [conjuntoActivoId, conjuntosParte],
   );
 
-  const mapaConjuntoActivo = useMemo(
+  const mapasConjuntoActivo = useMemo(
     () =>
       conjuntoActivo
-        ? data?.heatmaps.find((mapa) => mapa.conjunto_ap_id === conjuntoActivo.id) ??
-          null
-        : null,
+        ? (data?.heatmaps ?? [])
+            .filter((mapa) => mapa.conjunto_ap_id === conjuntoActivo.id)
+            .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+        : [],
     [conjuntoActivo, data?.heatmaps],
   );
-  const mapaMostrado = mapaActivo ?? mapaConjuntoActivo;
-
-  const bssidsEfectivos = useMemo(() => {
-    if (!conjuntoActivo) return new Set<string>();
-    const bssids = conjuntoActivo.items.map((ap) => ap.bssid);
-    if (modo === "CONJUNTO_COMPLETO") {
-      return new Set(bssids);
-    }
-    const seleccionDisponibles = Array.from(bssidsSeleccionados).filter((bssid) =>
-      bssids.includes(bssid),
-    );
-    if (modo === "INDIVIDUAL") {
-      return new Set(
-        seleccionDisponibles.length > 0
-          ? seleccionDisponibles.slice(0, 1)
-          : bssids.slice(0, 1),
-      );
-    }
-    return new Set(
-      seleccionDisponibles.length > 0
-        ? seleccionDisponibles
-        : bssids.slice(0, Math.min(2, bssids.length)),
-    );
-  }, [bssidsSeleccionados, conjuntoActivo, modo]);
-
-  const generarHeatmap = useMutation({
-    mutationFn: () => {
-      if (!conjuntoActivo) throw new Error("Conjunto requerido.");
-      const bssids = Array.from(bssidsEfectivos);
-      return generarHeatmapPortal(token, conjuntoActivo.id, {
-        modo,
-        bssids: modo === "CONJUNTO_COMPLETO" ? undefined : bssids,
-        algoritmo: "IDW",
-        resolucion: 128,
-      });
-    },
-    onSuccess: (mapa) => setMapaActivo(mapa),
-  });
-
-  const seleccionValida =
-    !!conjuntoActivo &&
-    (modo === "CONJUNTO_COMPLETO" ||
-      (modo === "INDIVIDUAL" && bssidsEfectivos.size === 1) ||
-      (modo === "SUBCONJUNTO" && bssidsEfectivos.size > 0));
+  const gruposParte = useMemo(
+    () =>
+      _agruparConjuntosPorPlano(
+        data?.planos ?? [],
+        conjuntosParte,
+        data?.heatmaps ?? [],
+      ),
+    [conjuntosParte, data?.heatmaps, data?.planos],
+  );
+  const indiceMapaSeguro =
+    mapasConjuntoActivo.length === 0
+      ? 0
+      : Math.min(mapaActivoIndice, mapasConjuntoActivo.length - 1);
+  const mapaMostrado = mapasConjuntoActivo[indiceMapaSeguro] ?? null;
+  const planoActivo = mapaMostrado
+    ? data?.planos.find((plano) => plano.id === mapaMostrado.plano_id) ?? null
+    : conjuntoActivo
+      ? data?.planos.find((plano) => plano.id === conjuntoActivo.plano_id) ?? null
+      : null;
 
   if (isLoading) {
     return <div className={styles.estado}>Cargando publicación...</div>;
@@ -147,12 +126,12 @@ export default function PortalCliente() {
         <Indicador icono={<Building2 size={18} />} etiqueta="Planos" valor={data.planos.length} />
         <Indicador
           icono={<RadioTower size={18} />}
-          etiqueta="Conjuntos reales"
+          etiqueta="Datos de campo"
           valor={conjuntosRelevados.length}
         />
         <Indicador
           icono={<BrainCircuit size={18} />}
-          etiqueta="Subconjuntos IA"
+          etiqueta="Propuestas IA"
           valor={conjuntosIA.length}
         />
         <Indicador
@@ -170,34 +149,25 @@ export default function PortalCliente() {
               <h2>{parteVisible === "IA" ? "Vista del modelo IA" : "Vista del relevamiento en sitio"}</h2>
               <p>
                 {conjuntoActivo
-                  ? `${conjuntoActivo.nombre} · ${_labelModo(modo)}`
-                  : "Seleccione un conjunto publicado para explorar el mapa."}
+                  ? `${planoActivo?.nombre ?? "Plano"} · ${conjuntoActivo.nombre} · ${mapasConjuntoActivo.length} mapa(s) compartido(s)`
+                  : "Seleccione contenido publicado para explorar el mapa."}
               </p>
             </div>
           </div>
 
-          {mapaMostrado ? (
-            <>
-              <div className={styles.mapaResumen}>
-                <strong>{_labelModo(mapaMostrado.modo_generacion)}</strong>
-                <span>
-                  {mapaMostrado.cantidad_puntos} puntos ·{" "}
-                  RSSI prom. {mapaMostrado.rssi_promedio.toFixed(1)} dBm
-                </span>
-              </div>
-              <HeatmapCanvas
-                mapa={mapaMostrado}
-                plano={
-                  data.planos.find((plano) => plano.id === mapaMostrado.plano_id) ??
-                  null
-                }
-              />
-            </>
+          {conjuntoActivo && mapaMostrado ? (
+            <CarruselMapasPortal
+              conjuntoNombre={conjuntoActivo.nombre}
+              indiceActivo={indiceMapaSeguro}
+              mapas={mapasConjuntoActivo}
+              onCambiarIndice={setMapaActivoIndice}
+              planos={data.planos}
+            />
           ) : (
             <div className={styles.vacio}>
-              {parteVisible === "IA"
-                ? "Seleccione una propuesta IA y genere o revise su heatmap proyectado."
-                : "Seleccione una parte, elija un conjunto y genere el heatmap interactivo."}
+              {conjuntoActivo
+                ? "No hay mapas de calor compartidos para este contenido."
+                : "Seleccione contenido publicado para revisar sus mapas compartidos."}
             </div>
           )}
         </div>
@@ -212,14 +182,13 @@ export default function PortalCliente() {
                 onClick={() => {
                   setParteActiva("RELEVAMIENTO");
                   setConjuntoActivoId(conjuntosRelevados[0]?.id ?? null);
-                  setBssidsSeleccionados(new Set());
-                  setMapaActivo(null);
+                  setMapaActivoIndice(0);
                 }}
               >
                 <BarChart3 size={16} aria-hidden="true" />
                 <span>
                   <strong>Datos relevados</strong>
-                  <small>{conjuntosRelevados.length} conjunto(s) de campo</small>
+                  <small>{conjuntosRelevados.length} registro(s) de campo</small>
                 </span>
               </button>
               <button
@@ -228,8 +197,7 @@ export default function PortalCliente() {
                 onClick={() => {
                   setParteActiva("IA");
                   setConjuntoActivoId(conjuntosIA[0]?.id ?? null);
-                  setBssidsSeleccionados(new Set());
-                  setMapaActivo(null);
+                  setMapaActivoIndice(0);
                 }}
               >
                 <BrainCircuit size={16} aria-hidden="true" />
@@ -241,165 +209,234 @@ export default function PortalCliente() {
             </div>
           </section>
           <section className={styles.resumen}>
-            <h2>{parteVisible === "IA" ? "Propuestas IA" : "Generación"}</h2>
+            <h2>{parteVisible === "IA" ? "Propuestas IA" : "Contenido publicado"}</h2>
             {conjuntosParte.length === 0 ? (
               <p>
                 {parteVisible === "IA"
                   ? "No hay propuestas IA publicadas para este enlace."
-                  : "No hay conjuntos relevados publicados para este enlace."}
+                  : "No hay datos relevados publicados para este enlace."}
               </p>
             ) : (
               <div className={styles.formGenerador}>
-                <label>
-                  Conjunto
-                  <select
-                    value={conjuntoActivo?.id ?? ""}
-                    onChange={(event) => {
-                      setConjuntoActivoId(Number(event.target.value));
-                      setBssidsSeleccionados(new Set());
-                      setMapaActivo(null);
-                    }}
-                  >
-                    {conjuntosParte.map((conjunto) => (
-                      <option key={conjunto.id} value={conjunto.id}>
-                        {conjunto.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <div className={styles.modosHeatmap}>
-                  {(["CONJUNTO_COMPLETO", "SUBCONJUNTO", "INDIVIDUAL"] as ModoGeneracion[]).map(
-                    (modoItem) => (
-                      <button
-                        key={modoItem}
-                        type="button"
-                        className={modo === modoItem ? styles.modoActivo : ""}
-                        onClick={() => {
-                          setModo(modoItem);
-                          setBssidsSeleccionados(new Set());
-                          setMapaActivo(null);
-                        }}
-                      >
-                        {_labelModo(modoItem)}
-                      </button>
-                    ),
-                  )}
+                <div className={styles.gruposPlanoPortal}>
+                  {gruposParte.map((grupo) => (
+                    <section key={grupo.planoId}>
+                      <header>
+                        <strong>{grupo.nombre}</strong>
+                        <small>
+                          {grupo.conjuntos.length} contenido(s) · {grupo.mapas.length} mapa(s)
+                        </small>
+                      </header>
+                      <div>
+                        {grupo.conjuntos.map((conjunto) => (
+                          <button
+                            key={conjunto.id}
+                            type="button"
+                            className={
+                              conjuntoActivo?.id === conjunto.id
+                                ? styles.contenidoActivo
+                                : ""
+                            }
+                            onClick={() => {
+                              setConjuntoActivoId(conjunto.id);
+                              setMapaActivoIndice(0);
+                            }}
+                          >
+                            <span>{conjunto.nombre}</span>
+                            <small>
+                              {conjunto.cantidad_aps} APs ·{" "}
+                              {grupo.mapasPorConjunto.get(conjunto.id)?.length ?? 0} mapa(s)
+                            </small>
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
                 </div>
 
-                {conjuntoActivo && (
-                  <div className={styles.apSelectorPortal}>
-                    {conjuntoActivo.items.map((ap) => (
-                      <label key={ap.bssid}>
-                        <input
-                          type={modo === "INDIVIDUAL" ? "radio" : "checkbox"}
-                          name="ap-portal"
-                          checked={bssidsEfectivos.has(ap.bssid)}
-                          disabled={modo === "CONJUNTO_COMPLETO"}
-                          onChange={() =>
-                            setBssidsSeleccionados(
-                              _toggleBssid(new Set(bssidsEfectivos), ap.bssid, modo),
-                            )
-                          }
-                        />
-                        <span>
-                          <strong>{ap.ssid || "SSID oculto"}</strong>
-                          <small>{ap.bssid}</small>
-                        </span>
-                      </label>
-                    ))}
+                <dl>
+                  <div>
+                    <dt>Mapas compartidos</dt>
+                    <dd>{mapasConjuntoActivo.length}</dd>
                   </div>
-                )}
+                  <div>
+                    <dt>APs del contenido</dt>
+                    <dd>{conjuntoActivo?.cantidad_aps ?? 0}</dd>
+                  </div>
+                </dl>
 
-                <button
-                  type="button"
-                  className={styles.botonGenerar}
-                  disabled={!seleccionValida || generarHeatmap.isPending}
-                  onClick={() => generarHeatmap.mutate()}
-                >
-                  {generarHeatmap.isPending ? (
-                    <Loader2 size={16} aria-hidden="true" />
-                  ) : (
-                    <RadioTower size={16} aria-hidden="true" />
-                  )}
-                  Generar heatmap
-                </button>
-                {generarHeatmap.isError && (
-                  <p className={styles.errorGeneracion}>
-                    No se pudo generar el heatmap con la selección actual.
-                  </p>
-                )}
               </div>
             )}
           </section>
         </aside>
       </section>
-
-      <section className={styles.partes}>
-        <BloqueConjuntos
-          titulo="Datos reales relevados en sitio"
-          descripcion="Subconjuntos publicados desde las mediciones capturadas por el equipo técnico."
-          icono={<Layers3 size={18} aria-hidden="true" />}
-          conjuntos={conjuntosRelevados}
-          conjuntoActivoId={conjuntoActivo?.id ?? null}
-          onSeleccionar={(id) => {
-            setParteActiva("RELEVAMIENTO");
-            setConjuntoActivoId(id);
-            setBssidsSeleccionados(new Set());
-            setMapaActivo(null);
-          }}
-        />
-
-        <section className={styles.bloque}>
-          <div className={styles.panelHeader}>
-            <BrainCircuit size={18} aria-hidden="true" />
-            <div>
-                  <h2>Conjuntos propuestos por IA</h2>
-              <p>Conjuntos propuestos por IA a partir de un conjunto relevado en campo.</p>
-            </div>
-          </div>
-
-          {conjuntosIA.length === 0 ? (
-            <div className={styles.vacio}>No hay resultados IA publicados en este enlace.</div>
-          ) : (
-            <div className={styles.iaGrid}>
-              {conjuntosIA.map((conjunto) => (
-                <button
-                  key={conjunto.id}
-                  type="button"
-                  className={`${styles.conjunto} ${
-                    conjunto.id === conjuntoActivo?.id ? styles.conjuntoActivo : ""
-                  }`}
-                  onClick={() => {
-                    setParteActiva("IA");
-                    setConjuntoActivoId(conjunto.id);
-                    setBssidsSeleccionados(new Set());
-                    setMapaActivo(null);
-                  }}
-                >
-                  <span className={styles.etiquetaIA}>
-                    <Sparkles size={14} aria-hidden="true" />
-                    Subconjunto IA
-                  </span>
-                  <span>
-                    <h3>{conjunto.nombre}</h3>
-                    <small>{conjunto.resumen_ia ?? conjunto.proposito}</small>
-                    {conjunto.descripcion && <small>{conjunto.descripcion}</small>}
-                  </span>
-                  <span className={styles.apsConjunto}>
-                    {conjunto.items.map((ap) => (
-                      <i key={ap.bssid}>
-                        {ap.ssid || "SSID oculto"} · {ap.bssid}
-                      </i>
-                    ))}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
-      </section>
     </main>
+  );
+}
+
+function CarruselMapasPortal({
+  conjuntoNombre,
+  indiceActivo,
+  mapas,
+  onCambiarIndice,
+  planos,
+}: {
+  conjuntoNombre: string;
+  indiceActivo: number;
+  mapas: MapaCalorPortalOut[];
+  onCambiarIndice: (indice: number) => void;
+  planos: PlanoOut[];
+}) {
+  const mapa = mapas[indiceActivo];
+  if (!mapa) return null;
+  const plano = planos.find((item) => item.id === mapa.plano_id) ?? null;
+  const [verHeatmap, setVerHeatmap] = useState(true);
+  const [verAps, setVerAps] = useState(true);
+  const [verPuntos, setVerPuntos] = useState(true);
+  const [exportando, setExportando] = useState<string | null>(null);
+  const irAnterior = () => {
+    if (mapas.length <= 1) return;
+    onCambiarIndice(indiceActivo === 0 ? mapas.length - 1 : indiceActivo - 1);
+  };
+  const irSiguiente = () => {
+    if (mapas.length <= 1) return;
+    onCambiarIndice((indiceActivo + 1) % mapas.length);
+  };
+  const capasExportacion = { heatmap: verHeatmap, aps: verAps, puntos: verPuntos };
+  const exportarMapaActual = async () => {
+    const clave = "mapa-png";
+    try {
+      setExportando(clave);
+      const canvas = await componerMapaCanvas({
+        mapa,
+        plano,
+        capas: capasExportacion,
+      });
+      const nombre = nombreExportacionMapa({ conjuntoNombre, mapa, plano });
+      await descargarCanvasPng(canvas, `${nombre}.png`);
+    } catch (error) {
+      console.error(error);
+      window.alert("No se pudo exportar el mapa de calor.");
+    } finally {
+      setExportando(null);
+    }
+  };
+  const exportarConjunto = async () => {
+    const clave = "conjunto-png";
+    try {
+      setExportando(clave);
+      const canvases = await Promise.all(
+        mapas.map((mapaItem) =>
+          componerMapaCanvas({
+            mapa: mapaItem,
+            plano: planos.find((item) => item.id === mapaItem.plano_id) ?? null,
+            capas: capasExportacion,
+          }),
+        ),
+      );
+      const nombreBase = nombreArchivo(`contenido-${conjuntoNombre}`);
+      await Promise.all(
+        canvases.map((canvas, indice) => {
+          const mapaItem = mapas[indice];
+          const planoItem =
+            planos.find((item) => item.id === mapaItem.plano_id) ?? null;
+          return descargarCanvasPng(
+            canvas,
+            `${nombreBase}-${nombreExportacionMapa({
+              conjuntoNombre,
+              mapa: mapaItem,
+              plano: planoItem,
+            })}.png`,
+          );
+        }),
+      );
+    } catch (error) {
+      console.error(error);
+      window.alert("No se pudo exportar el contenido.");
+    } finally {
+      setExportando(null);
+    }
+  };
+
+  return (
+    <div className={styles.carruselHeatmaps}>
+      <div className={styles.controlesCarrusel}>
+        <button
+          type="button"
+          onClick={irAnterior}
+          disabled={mapas.length <= 1}
+          aria-label="Ver mapa anterior"
+        >
+          <ChevronLeft size={18} aria-hidden="true" />
+        </button>
+        <span>{indiceActivo + 1} / {mapas.length}</span>
+        <button
+          type="button"
+          onClick={irSiguiente}
+          disabled={mapas.length <= 1}
+          aria-label="Ver mapa siguiente"
+        >
+          <ChevronRight size={18} aria-hidden="true" />
+        </button>
+      </div>
+
+      <article className={styles.heatmapCard}>
+        <header className={styles.heatmapCardHeader}>
+          <div>
+            <strong>{_labelModo(mapa.modo_generacion)}</strong>
+            <span>{_formatearFechaMapa(mapa.created_at)}</span>
+          </div>
+          <div className={styles.exportarMapa} aria-label="Exportar vista">
+            <button
+              type="button"
+              disabled={exportando !== null}
+              onClick={exportarMapaActual}
+              title="Descargar mapa visible como imagen"
+            >
+              <FileImage size={15} aria-hidden="true" />
+              Mapa
+            </button>
+            <button
+              type="button"
+              disabled={exportando !== null || mapas.length === 0}
+              onClick={exportarConjunto}
+              title="Descargar contenido visible como imagen"
+            >
+              <FileImage size={15} aria-hidden="true" />
+              Contenido
+            </button>
+          </div>
+        </header>
+        <HeatmapCanvas
+          mapa={mapa}
+          plano={plano}
+          setVerAps={setVerAps}
+          setVerHeatmap={setVerHeatmap}
+          setVerPuntos={setVerPuntos}
+          verAps={verAps}
+          verHeatmap={verHeatmap}
+          verPuntos={verPuntos}
+        />
+        <div className={styles.metricasMapa}>
+          <span>{mapa.resolucion}px</span>
+          <span>{mapa.cantidad_puntos} lectura(s)</span>
+        </div>
+      </article>
+
+      {mapas.length > 1 && (
+        <div className={styles.indicadoresCarrusel} aria-label="Seleccionar mapa">
+          {mapas.map((mapaItem, indice) => (
+            <button
+              key={mapaItem.id}
+              type="button"
+              className={indice === indiceActivo ? styles.indicadorActivo : ""}
+              onClick={() => onCambiarIndice(indice)}
+              aria-label={`Ver mapa ${indice + 1}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -421,76 +458,28 @@ function Indicador({
   );
 }
 
-function BloqueConjuntos({
-  titulo,
-  descripcion,
-  icono,
-  conjuntos,
-  conjuntoActivoId,
-  onSeleccionar,
-}: {
-  titulo: string;
-  descripcion: string;
-  icono: ReactNode;
-  conjuntos: PortalClienteOut["conjuntos"];
-  conjuntoActivoId: number | null;
-  onSeleccionar: (id: number) => void;
-}) {
-  return (
-    <section className={styles.bloque}>
-      <div className={styles.panelHeader}>
-        {icono}
-        <div>
-          <h2>{titulo}</h2>
-          <p>{descripcion}</p>
-        </div>
-      </div>
-      {conjuntos.length === 0 ? (
-        <div className={styles.vacio}>No hay conjuntos publicados en esta parte.</div>
-      ) : (
-        <div className={styles.conjuntos}>
-          {conjuntos.map((conjunto) => (
-            <button
-              key={conjunto.id}
-              type="button"
-              className={`${styles.conjunto} ${
-                conjunto.id === conjuntoActivoId ? styles.conjuntoActivo : ""
-              }`}
-              onClick={() => onSeleccionar(conjunto.id)}
-            >
-              <span>
-                <h3>{conjunto.nombre}</h3>
-                <small>{conjunto.proposito}</small>
-                {conjunto.descripcion && <small>{conjunto.descripcion}</small>}
-              </span>
-              <span className={styles.apsConjunto}>
-                {conjunto.items.map((ap) => (
-                  <i key={ap.bssid}>
-                    {ap.ssid || "SSID oculto"} · {ap.bssid}
-                  </i>
-                ))}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
 function HeatmapCanvas({
   mapa,
   plano,
+  setVerAps,
+  setVerHeatmap,
+  setVerPuntos,
+  verAps,
+  verHeatmap,
+  verPuntos,
 }: {
   mapa: MapaCalorPortalOut;
   plano: PlanoOut | null;
+  setVerAps: Dispatch<SetStateAction<boolean>>;
+  setVerHeatmap: Dispatch<SetStateAction<boolean>>;
+  setVerPuntos: Dispatch<SetStateAction<boolean>>;
+  verAps: boolean;
+  verHeatmap: boolean;
+  verPuntos: boolean;
 }) {
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [verHeatmap, setVerHeatmap] = useState(true);
-  const [verAps, setVerAps] = useState(true);
-  const [verPuntos, setVerPuntos] = useState(true);
   const [hint, setHint] = useState<{
     x: number;
     y: number;
@@ -499,6 +488,11 @@ function HeatmapCanvas({
   } | null>(null);
   const anchoReferencia = plano?.ancho_px ?? mapa.resolucion;
   const altoReferencia = plano?.alto_px ?? mapa.resolucion;
+  const proporcionMapa = anchoReferencia / altoReferencia;
+  const estiloVisor = {
+    aspectRatio: `${anchoReferencia} / ${altoReferencia}`,
+    width: `min(100%, calc(64vh * ${proporcionMapa}))`,
+  } satisfies CSSProperties;
 
   const actualizarTooltip = (event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -542,51 +536,49 @@ function HeatmapCanvas({
 
   return (
     <div className={styles.canvasWrap}>
-      <div className={styles.capasMapa} aria-label="Capas del heatmap">
-        <button
-          type="button"
-          className={verHeatmap ? styles.capaActiva : ""}
-          onClick={() => setVerHeatmap((prev) => !prev)}
-          title={verHeatmap ? "Ocultar heatmap" : "Mostrar heatmap"}
-        >
-          {verHeatmap ? <Eye size={15} aria-hidden="true" /> : <EyeOff size={15} aria-hidden="true" />}
-          Heatmap
-        </button>
-        <button
-          type="button"
-          className={verAps ? styles.capaActiva : ""}
-          onClick={() => setVerAps((prev) => !prev)}
-          title={verAps ? "Ocultar APs" : "Mostrar APs"}
-        >
-          {verAps ? <Eye size={15} aria-hidden="true" /> : <EyeOff size={15} aria-hidden="true" />}
-          APs
-        </button>
-        <button
-          type="button"
-          className={verPuntos ? styles.capaActiva : ""}
-          onClick={() => setVerPuntos((prev) => !prev)}
-          title={verPuntos ? "Ocultar puntos" : "Mostrar puntos"}
-        >
-          {verPuntos ? <Eye size={15} aria-hidden="true" /> : <EyeOff size={15} aria-hidden="true" />}
-          Puntos
-        </button>
-      </div>
-      <div className={styles.toolbarMapa}>
-        <button type="button" onClick={() => setZoom((prev) => Math.max(prev - 0.2, 0.6))}>
-          <Minus size={16} aria-hidden="true" />
-        </button>
-        <span>{Math.round(zoom * 100)}%</span>
-        <button type="button" onClick={() => setZoom((prev) => Math.min(prev + 0.2, 2.6))}>
-          <Plus size={16} aria-hidden="true" />
-        </button>
+      <div className={styles.barraMapa}>
+        <div className={styles.capasMapa} aria-label="Capas del heatmap">
+          <button
+            type="button"
+            className={verHeatmap ? styles.capaActiva : ""}
+            onClick={() => setVerHeatmap((prev) => !prev)}
+            title={verHeatmap ? "Ocultar heatmap" : "Mostrar heatmap"}
+          >
+            {verHeatmap ? <Eye size={15} aria-hidden="true" /> : <EyeOff size={15} aria-hidden="true" />}
+            Heatmap
+          </button>
+          <button
+            type="button"
+            className={verAps ? styles.capaActiva : ""}
+            onClick={() => setVerAps((prev) => !prev)}
+            title={verAps ? "Ocultar APs" : "Mostrar APs"}
+          >
+            {verAps ? <Eye size={15} aria-hidden="true" /> : <EyeOff size={15} aria-hidden="true" />}
+            APs
+          </button>
+          <button
+            type="button"
+            className={verPuntos ? styles.capaActiva : ""}
+            onClick={() => setVerPuntos((prev) => !prev)}
+            title={verPuntos ? "Ocultar puntos" : "Mostrar puntos"}
+          >
+            {verPuntos ? <Eye size={15} aria-hidden="true" /> : <EyeOff size={15} aria-hidden="true" />}
+            Puntos
+          </button>
+        </div>
+        <div className={styles.toolbarMapa}>
+          <button type="button" onClick={() => setZoom((prev) => Math.max(prev - 0.2, 0.6))}>
+            <Minus size={16} aria-hidden="true" />
+          </button>
+          <span>{Math.round(zoom * 100)}%</span>
+          <button type="button" onClick={() => setZoom((prev) => Math.min(prev + 0.2, 2.6))}>
+            <Plus size={16} aria-hidden="true" />
+          </button>
+        </div>
       </div>
       <div
         className={styles.heatmapImagen}
-        style={{
-          aspectRatio: plano
-            ? `${plano.ancho_px} / ${plano.alto_px}`
-            : `${mapa.resolucion} / ${mapa.resolucion}`,
-        }}
+        style={estiloVisor}
         onPointerDown={(event) => {
           dragRef.current = { x: event.clientX, y: event.clientY };
           event.currentTarget.setPointerCapture(event.pointerId);
@@ -652,11 +644,11 @@ function HeatmapCanvas({
                 onPointerDown={(event) => event.stopPropagation()}
                 onPointerMove={(event) => {
                   event.stopPropagation();
-                  mostrarHint(event, `Punto #${punto.punto_id}`, [
-                    `${punto.rssi.toFixed(1)} dBm`,
-                    nivelCobertura(punto.rssi),
-                    `Posición ${punto.pos_x.toFixed(0)}, ${punto.pos_y.toFixed(0)} px`,
-                  ]);
+                  mostrarHint(
+                    event,
+                    "Punto de lectura de datos",
+                    lineasHintPunto(punto, mapa),
+                  );
                 }}
                 onPointerLeave={() => setHint(null)}
               />
@@ -679,18 +671,15 @@ function HeatmapCanvas({
                   left: `${(limitar(ap.pos_x, 0, anchoReferencia) / anchoReferencia) * 100}%`,
                   top: `${(limitar(ap.pos_y, 0, altoReferencia) / altoReferencia) * 100}%`,
                 }}
-                title={`${indice + 1}. ${ap.ssid || "SSID oculto"} · ${ap.bssid}`}
                 aria-label={`AP ${indice + 1}: ${ap.ssid || "SSID oculto"}`}
                 onPointerDown={(event) => event.stopPropagation()}
                 onPointerMove={(event) => {
                   event.stopPropagation();
-                  mostrarHint(event, ap.ssid || "SSID oculto", [
-                    ap.bssid,
-                    `${ap.rssi_promedio.toFixed(1)} dBm promedio`,
-                    nivelCobertura(ap.rssi_promedio),
-                    ap.canal ? `Canal ${ap.canal}` : "Canal s/d",
-                    ap.frecuencia_mhz ? `${ap.frecuencia_mhz} MHz` : "Frecuencia s/d",
-                    `${ap.cantidad_puntos} punto(s) asociados`,
+                  mostrarHint(event, `AP ${indice + 1} · ${ap.ssid || "SSID oculto"}`, [
+                    `BSSID: ${ap.bssid}`,
+                    `Señal promedio: ${ap.rssi_promedio.toFixed(1)} dBm · ${nivelCobertura(ap.rssi_promedio)}`,
+                    `Lecturas asociadas: ${ap.cantidad_puntos}`,
+                    _canalFrecuencia(ap),
                   ]);
                 }}
                 onPointerLeave={() => setHint(null)}
@@ -700,71 +689,304 @@ function HeatmapCanvas({
             ))}
           </div>
         )}
+        {hint && (
+          <div className={styles.tooltip} style={{ left: hint.x + 12, top: hint.y + 12 }}>
+            <strong>{hint.titulo}</strong>
+            {hint.lineas.map((linea) => (
+              <span key={linea}>{linea}</span>
+            ))}
+          </div>
+        )}
       </div>
-      {hint && (
-        <div className={styles.tooltip} style={{ left: hint.x + 12, top: hint.y + 12 }}>
-          <strong>{hint.titulo}</strong>
-          {hint.lineas.map((linea) => (
-            <span key={linea}>{linea}</span>
+      <div className={styles.mapaInferior}>
+        <div className={styles.leyenda}>
+          {mapa.escala.map((item) => (
+            <span key={`${item.desde}-${item.hasta}`}>
+              <i style={{ background: item.color }} />
+              {item.etiqueta}
+            </span>
           ))}
         </div>
-      )}
-      <div className={styles.leyenda}>
-        {mapa.escala.map((item) => (
-          <span key={`${item.desde}-${item.hasta}`}>
-            <i style={{ background: item.color }} />
-            {item.etiqueta}
-          </span>
-        ))}
       </div>
     </div>
   );
 }
 
-function _toggleBssid(
-  previo: Set<string>,
-  bssid: string,
-  modo: ModoGeneracion,
-): Set<string> {
-  if (modo === "INDIVIDUAL") return new Set([bssid]);
-  if (modo === "CONJUNTO_COMPLETO") return new Set(previo);
-  const siguiente = new Set(previo);
-  if (siguiente.has(bssid)) {
-    siguiente.delete(bssid);
-  } else {
-    siguiente.add(bssid);
-  }
-  return siguiente;
-}
-
 function _labelModo(modo: string): string {
   const labels: Record<string, string> = {
     INDIVIDUAL: "Un AP",
-    SUBCONJUNTO: "Subconjunto",
+    SUBCONJUNTO: "Selección",
     CONJUNTO_COMPLETO: "Todos",
   };
   return labels[modo] ?? modo;
 }
 
+type CapasExportacion = {
+  heatmap: boolean;
+  aps: boolean;
+  puntos: boolean;
+};
+
+async function componerMapaCanvas({
+  mapa,
+  plano,
+  capas,
+}: {
+  mapa: MapaCalorPortalOut;
+  plano: PlanoOut | null;
+  capas: CapasExportacion;
+}): Promise<HTMLCanvasElement> {
+  const ancho = plano?.ancho_px ?? mapa.resolucion;
+  const alto = plano?.alto_px ?? mapa.resolucion;
+  const canvas = document.createElement("canvas");
+  canvas.width = ancho;
+  canvas.height = alto;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("No se pudo crear el canvas de exportación.");
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, ancho, alto);
+  if (plano) {
+    const imgPlano = await cargarImagen(resolverUrlApi(plano.url_firmada));
+    ctx.drawImage(imgPlano, 0, 0, ancho, alto);
+  }
+  if (capas.heatmap) {
+    const imgHeatmap = await cargarImagen(resolverUrlApi(mapa.url_imagen));
+    ctx.drawImage(imgHeatmap, 0, 0, ancho, alto);
+  }
+  if (capas.puntos) {
+    dibujarPuntosLectura(ctx, mapa, ancho, alto);
+  }
+  if (capas.aps) {
+    dibujarAps(ctx, mapa, ancho, alto);
+  }
+  return canvas;
+}
+
+function dibujarPuntosLectura(
+  ctx: CanvasRenderingContext2D,
+  mapa: MapaCalorPortalOut,
+  ancho: number,
+  alto: number,
+) {
+  const radio = Math.max(4, Math.min(9, Math.max(ancho, alto) * 0.006));
+  for (const punto of mapa.puntos_lectura) {
+    ctx.beginPath();
+    ctx.arc(
+      limitar(punto.pos_x, 0, ancho),
+      limitar(punto.pos_y, 0, alto),
+      radio,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fillStyle = colorRssi(punto.rssi);
+    ctx.globalAlpha = 0.78;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#ffffff";
+    ctx.stroke();
+  }
+}
+
+function dibujarAps(
+  ctx: CanvasRenderingContext2D,
+  mapa: MapaCalorPortalOut,
+  ancho: number,
+  alto: number,
+) {
+  const radio = Math.max(14, Math.min(24, Math.max(ancho, alto) * 0.018));
+  mapa.aps_interes.forEach((ap, indice) => {
+    const x = limitar(ap.pos_x, 0, ancho);
+    const y = limitar(ap.pos_y, 0, alto);
+    ctx.beginPath();
+    ctx.arc(x, y, radio + 4, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(15, 23, 42, 0.86)";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y, radio, 0, Math.PI * 2);
+    ctx.fillStyle = "#176b9f";
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#ffffff";
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `700 ${Math.max(12, radio)}px Arial`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(indice + 1), x, y + 0.5);
+  });
+}
+
+function cargarImagen(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`No se pudo cargar la imagen ${src}`));
+    img.src = src;
+  });
+}
+
+function descargarCanvasPng(canvas: HTMLCanvasElement, archivo: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("No se pudo generar la imagen."));
+        return;
+      }
+      descargarBlob(blob, archivo);
+      resolve();
+    }, "image/png");
+  });
+}
+
+function descargarBlob(blob: Blob, archivo: string) {
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = archivo;
+  enlace.click();
+  URL.revokeObjectURL(url);
+}
+
+function nombreArchivo(valor: string): string {
+  return valor
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function nombreExportacionMapa({
+  conjuntoNombre,
+  mapa,
+  plano,
+}: {
+  conjuntoNombre: string;
+  mapa: MapaCalorPortalOut;
+  plano: PlanoOut | null;
+}): string {
+  const planoNombre = plano?.nombre.replace(/\.[^.]+$/, "") ?? `plano-${mapa.plano_id}`;
+  const aps = mapa.aps_interes.length > 0
+    ? mapa.aps_interes
+        .map((ap, indice) => `ap-${indice + 1}-${ap.bssid.slice(-5)}`)
+        .join("-")
+    : (mapa.bssids_generacion.length > 0 ? mapa.bssids_generacion : [mapa.bssid])
+        .map((bssid, indice) => `ap-${indice + 1}-${bssid.slice(-5)}`)
+        .join("-");
+  return nombreArchivo(`${planoNombre}-${conjuntoNombre}-${aps}`);
+}
+
+function _formatearFechaMapa(valor: string): string {
+  return new Intl.DateTimeFormat("es-BO", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(valor));
+}
+
 
 function nivelCobertura(rssi: number): string {
-  if (rssi >= -60) return "Excelente";
-  if (rssi >= -67) return "Muy buena";
-  if (rssi >= -70) return "Objetivo mínimo CWNA-107";
-  if (rssi >= -75) return "Inestable";
-  if (rssi >= -80) return "Débil";
-  if (rssi >= -90) return "Muy débil";
+  if (rssi >= -70) return "Óptimo";
+  if (rssi >= -80) return "Aceptable";
+  if (rssi >= -85) return "Pobre";
+  if (rssi >= -90) return "Muy pobre";
   return "Zona muerta CWNA-107";
 }
 
 function colorRssi(rssi: number): string {
-  if (rssi >= -60) return "#0B7A3B";
-  if (rssi >= -67) return "#57B65A";
-  if (rssi >= -70) return "#F4D35E";
-  if (rssi >= -75) return "#F08A24";
-  if (rssi >= -80) return "#D95D39";
-  if (rssi >= -90) return "#B91C1C";
-  return "#D7263D";
+  if (rssi >= -70) return "#A7E84A";
+  if (rssi >= -80) return "#F1E64A";
+  if (rssi >= -85) return "#C7B84B";
+  if (rssi >= -90) return "#7E8173";
+  return "#1C1C1C";
+}
+
+function _canalFrecuencia(ap: MapaCalorPortalOut["aps_interes"][number]): string {
+  const canal = ap.canal ? `Canal ${ap.canal}` : "Canal s/d";
+  const frecuencia = ap.frecuencia_mhz ? `${ap.frecuencia_mhz} MHz` : "Frecuencia s/d";
+  return `${canal} · ${frecuencia}`;
+}
+
+function _agruparConjuntosPorPlano(
+  planos: PlanoOut[],
+  conjuntos: Array<{ id: number; plano_id: number; nombre: string; cantidad_aps: number }>,
+  mapas: MapaCalorPortalOut[],
+) {
+  const planosPorId = new Map(planos.map((plano) => [plano.id, plano]));
+  const mapasPorPlano = new Map<number, MapaCalorPortalOut[]>();
+  const mapasPorConjunto = new Map<number, MapaCalorPortalOut[]>();
+  for (const mapa of mapas) {
+    mapasPorPlano.set(mapa.plano_id, [...(mapasPorPlano.get(mapa.plano_id) ?? []), mapa]);
+    if (typeof mapa.conjunto_ap_id === "number") {
+      mapasPorConjunto.set(
+        mapa.conjunto_ap_id,
+        [...(mapasPorConjunto.get(mapa.conjunto_ap_id) ?? []), mapa],
+      );
+    }
+  }
+  const grupos = new Map<
+    number,
+    {
+      planoId: number;
+      nombre: string;
+      conjuntos: typeof conjuntos;
+      mapas: MapaCalorPortalOut[];
+      mapasPorConjunto: Map<number, MapaCalorPortalOut[]>;
+    }
+  >();
+  for (const conjunto of conjuntos) {
+    const grupo = grupos.get(conjunto.plano_id) ?? {
+      planoId: conjunto.plano_id,
+      nombre: planosPorId.get(conjunto.plano_id)?.nombre ?? `Plano ${conjunto.plano_id}`,
+      conjuntos: [],
+      mapas: mapasPorPlano.get(conjunto.plano_id) ?? [],
+      mapasPorConjunto,
+    };
+    grupo.conjuntos.push(conjunto);
+    grupos.set(conjunto.plano_id, grupo);
+  }
+  return Array.from(grupos.values()).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+}
+
+function lineasHintPunto(
+  punto: MapaCalorPortalOut["puntos_lectura"][number],
+  mapa: MapaCalorPortalOut,
+): string[] {
+  const detalle = punto.detalle_aps ?? [];
+  if (detalle.length === 0) {
+    return [
+      `Total lecturas: ${punto.total_lecturas ?? 0}`,
+      `RSSI ref.: ${punto.rssi.toFixed(1)} dBm`,
+    ];
+  }
+  const apsPorBssid = new Map(
+    mapa.aps_interes.map((ap, indice) => [
+      ap.bssid.toLowerCase(),
+      {
+        etiqueta: `AP ${indice + 1}`,
+        bssidCorto: ap.bssid.slice(-5).toUpperCase(),
+      },
+    ]),
+  );
+  return [
+    `Total lecturas: ${punto.total_lecturas ?? 0}`,
+    ...detalle.map((ap, indice) => {
+      const meta = apsPorBssid.get(ap.bssid.toLowerCase());
+      const etiqueta = meta
+        ? `${meta.etiqueta} (${meta.bssidCorto})`
+        : `AP ${indice + 1} (${ap.bssid.slice(-5).toUpperCase()})`;
+      const rssi =
+        typeof ap.rssi_promedio === "number"
+          ? `${ap.rssi_promedio.toFixed(1)} dBm`
+          : "sin RSSI";
+      return `${etiqueta}: ${porcentajeLecturas(ap.total_lecturas, punto.total_lecturas)} leídas · ${porcentajeLecturas(ap.lecturas_perdidas, punto.total_lecturas)} perdidas · ${rssi}`;
+    }),
+  ];
+}
+
+function porcentajeLecturas(cantidad: number, total?: number): string {
+  if (!total || total <= 0) return "0%";
+  return `${Math.round((cantidad / total) * 100)}%`;
 }
 
 function limitar(valor: number, minimo: number, maximo: number): number {

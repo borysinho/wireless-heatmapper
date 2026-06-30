@@ -50,8 +50,12 @@ function AppRoutes() {
           element={<Navigate to="../rf/escenarios-ia" replace />}
         />
         <Route path="proyectos/:id/rf" element={<ProyectoRFLayout />}>
-          <Route index element={<Navigate to="conjuntos-ap" replace />} />
-          <Route path="conjuntos-ap" element={<ConjuntosAPProyecto />} />
+          <Route index element={<Navigate to="datos-campo" replace />} />
+          <Route path="datos-campo" element={<ConjuntosAPProyecto />} />
+          <Route
+            path="conjuntos-ap"
+            element={<Navigate to="../datos-campo" replace />}
+          />
           <Route path="escenarios-ia" element={<EscenariosProyecto />} />
           <Route path="publicacion" element={<PublicacionClienteProyecto />} />
         </Route>

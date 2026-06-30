@@ -9,11 +9,21 @@ import secrets
 from itertools import combinations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.ai.modelo_propagacion import ModeloPropagacion, MuestraCalibracionRF
+from app.ai.modelo_propagacion import (
+    CorreccionEspacialRF,
+    ModeloPropagacion,
+    MuestraCalibracionRF,
+)
 from app.ai.optimizador_ap_service import OptimizadorAPService
-from app.api.v1.heatmaps import _conjunto_out, _mapa_resumen_out
+from app.api.v1.heatmaps import (
+    _conjunto_out,
+    _mapa_resumen_out,
+    _radio_principal,
+    _radio_tx_principal,
+)
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import require_admin
@@ -43,10 +53,185 @@ from app.services.interpolacion_service import (
 from app.storage import LocalFilesystemStorage
 
 router_proyectos_escenarios = APIRouter(prefix="/proyectos", tags=["ia"])
+VERSION_MOTOR_IA = "rf-hibrido-1.2"
 
 
 def _storage() -> LocalFilesystemStorage:
     return LocalFilesystemStorage(root=settings.storage_root)
+
+
+def _payload_solicitud_ia(
+    *,
+    plano: Plano,
+    conjunto: ConjuntoAP,
+    body: RestriccionesIAIn,
+    bssids_seleccionados: list[str],
+) -> dict:
+    return {
+        "version_motor_ia": VERSION_MOTOR_IA,
+        "plano_id": plano.id,
+        "conjunto_fuente_id": conjunto.id,
+        "banda_objetivo": conjunto.banda_objetivo,
+        "bssids": sorted(bssids_seleccionados),
+        "algoritmo": str(body.algoritmo),
+        "resolucion": body.resolucion,
+        "umbral_objetivo_dbm": body.umbral_objetivo_dbm,
+        "cantidad_aps_propuestos": body.cantidad_aps_propuestos,
+        "cantidad_recomendaciones": body.cantidad_recomendaciones,
+    }
+
+
+def _firma_solicitud_ia(payload: dict) -> str:
+    serializado = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha1(serializado.encode(), usedforsecurity=False).hexdigest()
+
+
+def _clave_bloqueo_ia(*, plano_id: int, conjunto_id: int) -> int:
+    firma = hashlib.sha1(
+        f"ia:{plano_id}:{conjunto_id}".encode(),
+        usedforsecurity=False,
+    ).hexdigest()
+    return int(firma[:15], 16)
+
+
+def _bloquear_generacion_ia(
+    *,
+    db: Session,
+    plano_id: int,
+    conjunto_id: int,
+) -> int | None:
+    if db.get_bind().dialect.name != "postgresql":
+        return None
+    clave = _clave_bloqueo_ia(plano_id=plano_id, conjunto_id=conjunto_id)
+    db.execute(text("SELECT pg_advisory_lock(:clave)"), {"clave": clave})
+    return clave
+
+
+def _liberar_generacion_ia(*, db: Session, clave: int | None) -> None:
+    if clave is None:
+        return
+    db.execute(text("SELECT pg_advisory_unlock(:clave)"), {"clave": clave})
+
+
+def _restricciones_coinciden_con_solicitud(
+    *,
+    restricciones: dict | None,
+    payload: dict,
+    firma: str,
+) -> bool:
+    if not isinstance(restricciones, dict):
+        return False
+    if restricciones.get("firma_solicitud") == firma:
+        return True
+    fuente = restricciones.get("fuente_entrada") or {}
+    legado = {
+        "version_motor_ia": restricciones.get("version_motor_ia", VERSION_MOTOR_IA),
+        "plano_id": restricciones.get("plano_id"),
+        "conjunto_fuente_id": fuente.get("conjunto_id"),
+        "banda_objetivo": fuente.get("banda_objetivo"),
+        "bssids": sorted(fuente.get("bssids") or []),
+        "algoritmo": str(restricciones.get("algoritmo", "IDW")),
+        "resolucion": restricciones.get("resolucion"),
+        "umbral_objetivo_dbm": restricciones.get("umbral_objetivo_dbm"),
+        "cantidad_aps_propuestos": restricciones.get("cantidad_aps_propuestos"),
+        "cantidad_recomendaciones": restricciones.get("cantidad_recomendaciones"),
+    }
+    return legado == payload
+
+
+def _conjuntos_ia_por_solicitud(
+    *,
+    db: Session,
+    plano_id: int,
+    conjunto_fuente_id: int,
+    payload: dict,
+    firma: str,
+) -> list[ConjuntoAP]:
+    candidatos = (
+        db.query(ConjuntoAP)
+        .filter(
+            ConjuntoAP.plano_id == plano_id,
+            ConjuntoAP.origen == "ia",
+            ConjuntoAP.conjunto_origen_id == conjunto_fuente_id,
+        )
+        .order_by(ConjuntoAP.created_at.asc(), ConjuntoAP.id.asc())
+        .all()
+    )
+    return [
+        conjunto
+        for conjunto in candidatos
+        if _restricciones_coinciden_con_solicitud(
+            restricciones=conjunto.restricciones_ia,
+            payload=payload,
+            firma=firma,
+        )
+    ]
+
+
+def _eliminar_conjuntos_ia_duplicados(
+    *,
+    db: Session,
+    conjuntos: list[ConjuntoAP],
+    conservar: int,
+) -> list[ConjuntoAP]:
+    conservados = conjuntos[:conservar]
+    duplicados = conjuntos[conservar:]
+    if not duplicados:
+        return conservados
+    for conjunto in duplicados:
+        (
+            db.query(LecturaRSSI)
+            .filter(LecturaRSSI.conjunto_ap_id == conjunto.id)
+            .delete(synchronize_session=False)
+        )
+        (
+            db.query(MapaCalor)
+            .filter(MapaCalor.conjunto_ap_id == conjunto.id)
+            .delete(synchronize_session=False)
+        )
+        db.delete(conjunto)
+    db.commit()
+    for conjunto in conservados:
+        db.refresh(conjunto)
+    return conservados
+
+
+def _respuesta_ia_existente(
+    *,
+    db: Session,
+    request: Request,
+    conjunto_fuente: ConjuntoAP,
+    mapa_actual: MapaCalor,
+    payload: dict,
+    firma: str,
+) -> ConjuntosIAGeneradosOut | None:
+    cantidad = int(payload["cantidad_recomendaciones"])
+    conjuntos = _conjuntos_ia_por_solicitud(
+        db=db,
+        plano_id=int(payload["plano_id"]),
+        conjunto_fuente_id=int(payload["conjunto_fuente_id"]),
+        payload=payload,
+        firma=firma,
+    )
+    if len(conjuntos) < cantidad:
+        return None
+    conjuntos = _eliminar_conjuntos_ia_duplicados(
+        db=db,
+        conjuntos=conjuntos,
+        conservar=cantidad,
+    )
+    mapas = (
+        db.query(MapaCalor)
+        .filter(MapaCalor.conjunto_ap_id.in_([conjunto.id for conjunto in conjuntos]))
+        .order_by(MapaCalor.created_at.asc(), MapaCalor.id.asc())
+        .all()
+    )
+    return ConjuntosIAGeneradosOut(
+        conjunto_base_id=conjunto_fuente.id,
+        mapa_actual=_mapa_resumen_out(mapa_actual, request),
+        conjuntos=[_conjunto_out(conjunto) for conjunto in conjuntos],
+        mapas_proyectados=[_mapa_resumen_out(mapa, request) for mapa in mapas],
+    )
 
 
 def _proyecto_admin(
@@ -276,20 +461,55 @@ def _modelo_calibrado_para_plano(
         .filter(LecturaRSSI.bssid.in_(bssids_seleccionados))
     )
     muestras: list[MuestraCalibracionRF] = []
+    muestras_espaciales: list[dict] = []
     metros_por_pixel = plano.escala_m_por_px or 1.0
     for lectura, punto in query.all():
         item = items_por_bssid.get(lectura.bssid.lower())
         if item is None or item.pos_x is None or item.pos_y is None:
             continue
+        if lectura.rssi <= -120 or lectura.rssi >= 0:
+            continue
         distancia_px = math.hypot(punto.pos_x - item.pos_x, punto.pos_y - item.pos_y)
+        banda = item.banda or _banda_lectura(lectura)
+        radio_tx = _radio_tx_principal(item.radios)
         muestras.append(
+            # Solo se usa TX Power cuando fue declarado con fuente y confianza
+            # suficientes; RSSI sigue siendo la evidencia central del survey.
             MuestraCalibracionRF(
                 distancia_m=max(1.0, distancia_px * metros_por_pixel),
-                banda=item.banda or _banda_lectura(lectura),
+                banda=banda,
                 rssi_dbm=float(lectura.rssi),
+                potencia_dbm=radio_tx.get("potencia_dbm"),
+                ganancia_dbi=radio_tx.get("ganancia_dbi", 2.14),
+                perdida_cable_db=radio_tx.get("perdida_cable_db", 0.0),
             )
         )
-    return ModeloPropagacion.calibrar_desde_muestras(muestras)
+        muestras_espaciales.append(
+            {
+                "x_px": float(punto.pos_x),
+                "y_px": float(punto.pos_y),
+                "distancia_px": distancia_px,
+                "banda": banda,
+                "rssi_dbm": float(lectura.rssi),
+            }
+        )
+    modelo = ModeloPropagacion.calibrar_desde_muestras(muestras)
+    correcciones = [
+        CorreccionEspacialRF(
+            x_px=muestra["x_px"],
+            y_px=muestra["y_px"],
+            banda=muestra["banda"],
+            error_db=muestra["rssi_dbm"]
+            - modelo.predecir_rssi(
+                distancia_px=muestra["distancia_px"],
+                metros_por_pixel=metros_por_pixel,
+                banda=muestra["banda"],
+                aplicar_correccion_espacial=False,
+            ),
+        )
+        for muestra in muestras_espaciales
+    ]
+    return modelo.con_correccion_espacial(correcciones)
 
 
 def _banda_lectura(lectura: LecturaRSSI) -> str:
@@ -388,6 +608,8 @@ def _matriz_proyectada_desde_items(
                     distancia_px=math.hypot(x - ap_x, y - ap_y),
                     metros_por_pixel=metros_por_pixel,
                     banda=banda,
+                    punto_x=x,
+                    punto_y=y,
                 )
                 for ap_x, ap_y in coordenadas
             )
@@ -406,7 +628,7 @@ def _lecturas_estimadas_desde_items(
 ) -> list[dict]:
     lecturas: list[dict] = []
     for item in items:
-        radio_principal = next(iter(item.get("radios") or []), {})
+        radio_principal = _radio_principal(item.get("radios"))
         for punto in puntos:
             rssi = modelo.predecir_rssi(
                 distancia_px=math.hypot(
@@ -415,8 +637,11 @@ def _lecturas_estimadas_desde_items(
                 ),
                 metros_por_pixel=metros_por_pixel,
                 banda=banda,
+                punto_x=punto.x,
+                punto_y=punto.y,
                 potencia_dbm=radio_principal.get("potencia_dbm"),
                 ganancia_dbi=radio_principal.get("ganancia_dbi", 2.14),
+                perdida_cable_db=radio_principal.get("perdida_cable_db", 0.0),
             )
             lecturas.append(
                 {
@@ -426,7 +651,7 @@ def _lecturas_estimadas_desde_items(
                     "rssi": rssi,
                     "canal": item.get("canal_snapshot"),
                     "frecuencia_mhz": 2412 if banda == "2.4" else 5180,
-                    "modelo_origen": "rf-hibrido-1.1",
+                    "modelo_origen": VERSION_MOTOR_IA,
                     "incertidumbre_db": 6.0,
                 }
             )
@@ -465,12 +690,65 @@ def generar_conjuntos_ia(
         conjunto=conjunto_fuente,
         db=db,
     )
+    payload_solicitud = _payload_solicitud_ia(
+        plano=plano,
+        conjunto=conjunto_fuente,
+        body=body,
+        bssids_seleccionados=bssids_seleccionados,
+    )
+    firma_solicitud = _firma_solicitud_ia(payload_solicitud)
+    clave_bloqueo = _bloquear_generacion_ia(
+        db=db,
+        plano_id=plano.id,
+        conjunto_id=conjunto_fuente.id,
+    )
+    try:
+        return _generar_conjuntos_ia_bloqueado(
+            proyecto=proyecto,
+            plano=plano,
+            conjunto_fuente=conjunto_fuente,
+            bssids_seleccionados=bssids_seleccionados,
+            payload_solicitud=payload_solicitud,
+            firma_solicitud=firma_solicitud,
+            body=body,
+            request=request,
+            db=db,
+            current_user=current_user,
+        )
+    finally:
+        _liberar_generacion_ia(db=db, clave=clave_bloqueo)
+
+
+def _generar_conjuntos_ia_bloqueado(
+    *,
+    proyecto: Proyecto,
+    plano: Plano,
+    conjunto_fuente: ConjuntoAP,
+    bssids_seleccionados: list[str],
+    payload_solicitud: dict,
+    firma_solicitud: str,
+    body: RestriccionesIAIn,
+    request: Request,
+    db: Session,
+    current_user: Usuario,
+) -> ConjuntosIAGeneradosOut:
     mapa_actual, puntos = _mapa_actual(
         plano=plano,
         db=db,
         bssids_seleccionados=bssids_seleccionados,
         conjunto_ap_id=conjunto_fuente.id,
     )
+    respuesta_existente = _respuesta_ia_existente(
+        db=db,
+        request=request,
+        conjunto_fuente=conjunto_fuente,
+        mapa_actual=mapa_actual,
+        payload=payload_solicitud,
+        firma=firma_solicitud,
+    )
+    if respuesta_existente is not None:
+        return respuesta_existente
+
     modelo_propagacion = _modelo_calibrado_para_plano(
         plano=plano,
         db=db,
@@ -508,6 +786,8 @@ def generar_conjuntos_ia(
     restricciones["fuente_entrada"]["banda_objetivo"] = conjunto_fuente.banda_objetivo
     restricciones["fuente_entrada"]["bssids"] = bssids_seleccionados
     restricciones["cantidad_aps_propuestos"] = limite_aps
+    restricciones["firma_solicitud"] = firma_solicitud
+    restricciones["version_motor_ia"] = VERSION_MOTOR_IA
     for idx, alternativa in enumerate(alternativas, start=1):
         items = _items_conjunto_ia(
             indice=idx,
@@ -542,7 +822,7 @@ def generar_conjuntos_ia(
                 "cantidad_lecturas_simuladas": len(alternativa.valores_proyectados),
             },
             restricciones_ia=restricciones,
-            version_motor_ia="rf-hibrido-1.1",
+            version_motor_ia=VERSION_MOTOR_IA,
         )
         conjuntos_ia.append(conjunto_ia)
         lecturas_estimadas = _lecturas_estimadas_desde_items(

@@ -73,10 +73,10 @@ export function ConjuntoAPPreviewModal({
       toast.exito(
         generados.length === 0
           ? "No se generaron cambios en los mapas."
-          : `${generados.length} mapa(s) del conjunto actualizado(s).`,
+          : `${generados.length} mapa(s) actualizado(s).`,
       );
     } catch (error) {
-      toast.error(_detalleError(error, "No se pudieron generar los mapas del conjunto."));
+      toast.error(_detalleError(error, "No se pudieron generar los mapas."));
     }
   };
 
@@ -179,8 +179,6 @@ export function ConjuntoAPPreviewModal({
                   {typeof ap.rssi_promedio === "number" ? `${ap.rssi_promedio.toFixed(1)} dBm` : "RSSI s/d"}
                   {" · "}
                   {ap.canal ? `canal ${ap.canal}` : "canal s/d"}
-                  {" · "}
-                  {ap.cantidad_puntos ?? 0} punto(s)
                 </small>
               </article>
             ))}
@@ -190,7 +188,7 @@ export function ConjuntoAPPreviewModal({
       {mapaAEliminar && (
         <ConfirmDialog
           titulo="¿Eliminar este mapa de calor?"
-          descripcion={`Se eliminará el mapa ${_labelModo(mapaAEliminar.modo_generacion)} generado con algoritmo ${_labelAlgoritmo(mapaAEliminar.algoritmo)}. El conjunto AP no será eliminado.`}
+          descripcion={`Se eliminará el mapa ${_labelModo(mapaAEliminar.modo_generacion)} generado con algoritmo ${_labelAlgoritmo(mapaAEliminar.algoritmo)}. El registro fuente no será eliminado.`}
           textoConfirmar="Eliminar mapa"
           cargando={eliminandoMapa}
           onCancelar={() => setMapaAEliminar(null)}
@@ -210,7 +208,7 @@ function VistaUbicacionesAP({
 }) {
   return (
     <div className={styles.sinMapasWrapper}>
-      <p className={styles.sinUbicaciones}>Este conjunto todavía no tiene mapas de calor generados.</p>
+      <p className={styles.sinUbicaciones}>Este registro todavía no tiene mapas de calor generados.</p>
       {aps.length > 0 && (
         <div className={styles.mapaPreview}>
           <div
@@ -221,7 +219,7 @@ function VistaUbicacionesAP({
             }}
           >
             <img className={styles.planoBase} src={resolverUrlApi(plano.url_firmada)} alt={`Plano ${plano.nombre}`} />
-            <div className={styles.capaMarcadores} aria-label="Ubicación de APs del conjunto">
+            <div className={styles.capaMarcadores} aria-label="Ubicación de APs del registro">
               {aps.map((ap, indice) => (
                 <span
                   key={`${ap.bssid}-${indice}`}
@@ -279,11 +277,11 @@ function HeatmapCarruselItem({
             className={styles.generarFaltantes}
             onClick={onGenerarFaltantes}
             disabled={generandoFaltantes}
-            aria-label="Generar o actualizar mapas del conjunto"
+            aria-label="Generar o actualizar mapas"
             title={
               cantidadFaltante === 0
                 ? "Actualizar mapa global e individuales con IDW"
-                : "Generar faltantes y actualizar mapas del conjunto con IDW"
+                : "Generar faltantes y actualizar mapas con IDW"
             }
           >
             <Layers3 size={15} aria-hidden="true" />
@@ -464,9 +462,9 @@ function _detalleError(error: unknown, alternativo: string): string {
 function _labelModo(modo: string): string {
   return (
     ({
-      CONJUNTO_COMPLETO: "Conjunto completo",
+      CONJUNTO_COMPLETO: "Mapa completo",
       INDIVIDUAL: "AP individual",
-      SUBCONJUNTO: "Subconjunto",
+      SUBCONJUNTO: "Selección parcial",
       PROYECTADO: "Proyección IA",
     } as Record<string, string>)[modo] ?? modo
   );

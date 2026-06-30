@@ -31,6 +31,11 @@ class Usuario(Base):
         back_populates="tecnico",
         lazy="dynamic",
     )
+    proyectos_asignados = relationship(
+        "Proyecto",
+        secondary="proyecto_tecnico_asignacion",
+        back_populates="tecnicos",
+    )
     dispositivos_push = relationship(
         "DispositivoPush",
         back_populates="usuario",

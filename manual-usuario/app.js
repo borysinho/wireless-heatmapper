@@ -2,6 +2,7 @@ const input = document.querySelector("#busqueda");
 const sections = Array.from(document.querySelectorAll(".manual-section"));
 const emptyState = document.querySelector("#sin-resultados");
 const navLinks = Array.from(document.querySelectorAll(".nav-list a"));
+const progress = document.querySelector("#progreso");
 
 function normalizar(texto) {
   return texto
@@ -41,11 +42,27 @@ function marcarSeccionActiva() {
   });
 }
 
+function actualizarProgreso() {
+  if (!progress) return;
+  const altoDocumento = document.documentElement.scrollHeight - window.innerHeight;
+  const avance = altoDocumento <= 0 ? 0 : (window.scrollY / altoDocumento) * 100;
+  progress.style.width = `${Math.min(100, Math.max(0, avance))}%`;
+}
+
 input?.addEventListener("input", (event) => {
   filtrarManual(event.target.value);
   marcarSeccionActiva();
+  actualizarProgreso();
 });
 
-window.addEventListener("scroll", marcarSeccionActiva, { passive: true });
+window.addEventListener(
+  "scroll",
+  () => {
+    marcarSeccionActiva();
+    actualizarProgreso();
+  },
+  { passive: true },
+);
 window.addEventListener("hashchange", marcarSeccionActiva);
 marcarSeccionActiva();
+actualizarProgreso();

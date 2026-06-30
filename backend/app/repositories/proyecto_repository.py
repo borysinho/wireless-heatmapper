@@ -8,10 +8,11 @@ PB-01 — Sprint 1: CRUD completo de proyectos para el técnico autenticado.
 
 from datetime import date
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.proyecto import Proyecto
+from app.models.usuario import Usuario
 
 
 class ProyectoRepository:
@@ -32,8 +33,13 @@ class ProyectoRepository:
         """
         q = (
             self._db.query(Proyecto)
-            .options(joinedload(Proyecto.cliente))
-            .filter(Proyecto.tecnico_id == tecnico_id)
+            .options(joinedload(Proyecto.cliente), joinedload(Proyecto.tecnicos))
+            .filter(
+                or_(
+                    Proyecto.tecnico_id == tecnico_id,
+                    Proyecto.tecnicos.any(Usuario.id == tecnico_id),
+                )
+            )
         )
         if estado is not None:
             q = q.filter(Proyecto.estado == estado.lower())
@@ -53,11 +59,18 @@ class ProyectoRepository:
     ) -> tuple[list[Proyecto], int]:
         """Retorna proyectos con joins a tecnico y cliente para admin."""
         q = self._db.query(Proyecto).options(
-            joinedload(Proyecto.tecnico), joinedload(Proyecto.cliente)
+            joinedload(Proyecto.tecnico),
+            joinedload(Proyecto.tecnicos),
+            joinedload(Proyecto.cliente),
         )
 
         if tecnico_id is not None:
-            q = q.filter(Proyecto.tecnico_id == tecnico_id)
+            q = q.filter(
+                or_(
+                    Proyecto.tecnico_id == tecnico_id,
+                    Proyecto.tecnicos.any(Usuario.id == tecnico_id),
+                )
+            )
         if estado is not None:
             q = q.filter(Proyecto.estado == estado)
         if fecha_desde is not None:
@@ -84,8 +97,14 @@ class ProyectoRepository:
         """Retorna el proyecto si pertenece al técnico."""
         return (
             self._db.query(Proyecto)
-            .options(joinedload(Proyecto.cliente))
-            .filter(Proyecto.id == proyecto_id, Proyecto.tecnico_id == tecnico_id)
+            .options(joinedload(Proyecto.cliente), joinedload(Proyecto.tecnicos))
+            .filter(
+                Proyecto.id == proyecto_id,
+                or_(
+                    Proyecto.tecnico_id == tecnico_id,
+                    Proyecto.tecnicos.any(Usuario.id == tecnico_id),
+                ),
+            )
             .first()
         )
 
@@ -97,8 +116,13 @@ class ProyectoRepository:
         cliente_id: int | None = None,
         descripcion: str | None = None,
         estado: str = "nuevo",
+        tecnico_ids: list[int] | None = None,
     ) -> Proyecto:
         """Crea un nuevo proyecto y lo persiste. PB-01 — CA-1."""
+        ids_asignados = _ids_tecnicos_asignados(
+            tecnico_id=tecnico_id,
+            tecnico_ids=tecnico_ids,
+        )
         proyecto = Proyecto(
             nombre=nombre,
             tecnico_id=tecnico_id,
@@ -106,6 +130,7 @@ class ProyectoRepository:
             descripcion=descripcion,
             estado=estado,
         )
+        proyecto.tecnicos = self._usuarios_tecnicos(ids_asignados)
         self._db.add(proyecto)
         self._db.commit()
         self._db.refresh(proyecto)
@@ -137,7 +162,11 @@ class ProyectoRepository:
         """Retorna el proyecto por id sin restricción de técnico."""
         return (
             self._db.query(Proyecto)
-            .options(joinedload(Proyecto.cliente), joinedload(Proyecto.tecnico))
+            .options(
+                joinedload(Proyecto.cliente),
+                joinedload(Proyecto.tecnico),
+                joinedload(Proyecto.tecnicos),
+            )
             .filter(Proyecto.id == proyecto_id)
             .first()
         )
@@ -154,9 +183,21 @@ class ProyectoRepository:
     ) -> Proyecto:
         """Reasigna el proyecto a otro técnico activo. Solo admin. PB-18."""
         proyecto.tecnico_id = nuevo_tecnico_id
+        proyecto.tecnicos = self._usuarios_tecnicos([nuevo_tecnico_id])
         self._db.commit()
         self._db.refresh(proyecto)
         return self.obtener_por_id_admin(proyecto_id=proyecto.id)  # type: ignore[return-value]
+
+    def asignar_tecnicos(
+        self, *, proyecto: Proyecto, tecnico_ids: list[int] | None
+    ) -> Proyecto:
+        ids_asignados = _ids_tecnicos_asignados(
+            tecnico_id=proyecto.tecnico_id,
+            tecnico_ids=tecnico_ids,
+        )
+        proyecto.tecnicos = self._usuarios_tecnicos(ids_asignados)
+        self._db.flush()
+        return proyecto
 
     def guardar_admin(self, *, proyecto: Proyecto) -> Proyecto:
         """Persiste cambios hechos por el administrador y recarga relaciones."""
@@ -168,3 +209,20 @@ class ProyectoRepository:
         """Elimina el proyecto de la base de datos. PB-01 — CA-4."""
         self._db.delete(proyecto)
         self._db.commit()
+
+    def _usuarios_tecnicos(self, tecnico_ids: list[int]) -> list[Usuario]:
+        if not tecnico_ids:
+            return []
+        return (
+            self._db.query(Usuario)
+            .filter(Usuario.id.in_(tecnico_ids))
+            .order_by(Usuario.nombre.asc(), Usuario.id.asc())
+            .all()
+        )
+
+
+def _ids_tecnicos_asignados(
+    *, tecnico_id: int, tecnico_ids: list[int] | None
+) -> list[int]:
+    ids = [tecnico_id, *(tecnico_ids or [])]
+    return list(dict.fromkeys(ids))

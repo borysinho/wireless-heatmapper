@@ -42,6 +42,12 @@ def _validar_tecnico(db: Session, tecnico_id: int) -> Usuario:
     return tecnico
 
 
+def _validar_tecnicos(db: Session, tecnico_ids: list[int]) -> list[Usuario]:
+    ids_unicos = list(dict.fromkeys(tecnico_ids))
+    tecnicos = [_validar_tecnico(db, tecnico_id) for tecnico_id in ids_unicos]
+    return tecnicos
+
+
 def _validar_cliente(db: Session, cliente_id: int | None) -> None:
     if cliente_id is None:
         return
@@ -76,7 +82,31 @@ def listar_proyectos(
         fecha_desde=fecha_desde,
         fecha_hasta=fecha_hasta,
     )
-    return ProyectosPageOut(items=items, total=total, page=page, page_size=page_size)  # type: ignore[arg-type]
+    return ProyectosPageOut(
+        items=[ProyectoListOut.from_proyecto(proyecto) for proyecto in items],
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get(
+    "/{proyecto_id}",
+    response_model=ProyectoListOut,
+    summary="Obtener proyecto de la organización",
+)
+def obtener_proyecto_admin(
+    proyecto_id: int,
+    db: Session = Depends(get_db),
+    _admin: Usuario = Depends(require_admin),
+) -> ProyectoListOut:
+    proyecto = ProyectoRepository(db).obtener_por_id_admin(proyecto_id=proyecto_id)
+    if proyecto is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Proyecto no encontrado.",
+        )
+    return ProyectoListOut.from_proyecto(proyecto)
 
 
 @router.post(
@@ -91,24 +121,27 @@ def crear_proyecto_admin(
     _admin: Usuario = Depends(require_admin),
     notificador: NotificacionPushService = Depends(get_notificacion_push_service),
 ) -> ProyectoListOut:
-    _validar_tecnico(db, body.tecnico_id)
+    tecnico_ids = list(dict.fromkeys([body.tecnico_id, *body.tecnico_ids]))
+    _validar_tecnicos(db, tecnico_ids)
     _validar_cliente(db, body.cliente_id)
     proyecto = ProyectoRepository(db).crear(
         nombre=body.nombre.strip(),
         tecnico_id=body.tecnico_id,
+        tecnico_ids=tecnico_ids,
         cliente_id=body.cliente_id,
         descripcion=body.descripcion,
         estado=body.estado,
     )
     proyecto = ProyectoRepository(db).obtener_por_id_admin(proyecto_id=proyecto.id)
     assert proyecto is not None
-    notificador.notificar_asignacion(
-        db=db,
-        tecnico_id=body.tecnico_id,
-        proyecto_id=proyecto.id,
-        proyecto_nombre=proyecto.nombre,
-    )
-    return ProyectoListOut.model_validate(proyecto)
+    for tecnico_id in tecnico_ids:
+        notificador.notificar_asignacion(
+            db=db,
+            tecnico_id=tecnico_id,
+            proyecto_id=proyecto.id,
+            proyecto_nombre=proyecto.nombre,
+        )
+    return ProyectoListOut.from_proyecto(proyecto)
 
 
 @router.put("/{proyecto_id}", response_model=ProyectoListOut, summary="Editar proyecto")
@@ -128,7 +161,9 @@ def actualizar_proyecto_admin(
         )
 
     campos = body.model_fields_set
-    tecnico_anterior = proyecto.tecnico_id
+    tecnico_ids_anteriores = {
+        tecnico.id for tecnico in (proyecto.tecnicos or [])
+    } or {proyecto.tecnico_id}
     if "nombre" in campos and body.nombre is not None:
         proyecto.nombre = body.nombre.strip()
     if "cliente_id" in campos:
@@ -141,16 +176,25 @@ def actualizar_proyecto_admin(
     if "tecnico_id" in campos and body.tecnico_id is not None:
         _validar_tecnico(db, body.tecnico_id)
         proyecto.tecnico_id = body.tecnico_id
+    if "tecnico_ids" in campos:
+        tecnico_ids = list(
+            dict.fromkeys([proyecto.tecnico_id, *(body.tecnico_ids or [])])
+        )
+        _validar_tecnicos(db, tecnico_ids)
+        repo.asignar_tecnicos(proyecto=proyecto, tecnico_ids=tecnico_ids)
+    elif "tecnico_id" in campos:
+        repo.asignar_tecnicos(proyecto=proyecto, tecnico_ids=[proyecto.tecnico_id])
 
     proyecto = repo.guardar_admin(proyecto=proyecto)
-    if proyecto.tecnico_id != tecnico_anterior:
+    tecnico_ids_actuales = {tecnico.id for tecnico in proyecto.tecnicos}
+    for tecnico_id in sorted(tecnico_ids_actuales - tecnico_ids_anteriores):
         notificador.notificar_asignacion(
             db=db,
-            tecnico_id=proyecto.tecnico_id,
+            tecnico_id=tecnico_id,
             proyecto_id=proyecto.id,
             proyecto_nombre=proyecto.nombre,
         )
-    return ProyectoListOut.model_validate(proyecto)
+    return ProyectoListOut.from_proyecto(proyecto)
 
 
 @router.patch(
@@ -175,7 +219,7 @@ def archivar_proyecto_admin(
             status_code=status.HTTP_409_CONFLICT,
             detail="El proyecto ya está archivado.",
         )
-    return ProyectoListOut.model_validate(repo.archivar(proyecto=proyecto))
+    return ProyectoListOut.from_proyecto(repo.archivar(proyecto=proyecto))
 
 
 @router.patch(
@@ -213,7 +257,7 @@ def reasignar_tecnico(
         proyecto_id=proyecto.id,
         proyecto_nombre=proyecto.nombre,
     )
-    return ProyectoListOut.model_validate(proyecto)
+    return ProyectoListOut.from_proyecto(proyecto)
 
 
 @router.delete(

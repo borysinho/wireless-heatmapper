@@ -117,6 +117,8 @@ Reglas de negocio:
     enlace (auditoría).
   · El enlace generado tiene formato `https://{host}/portal/{token}`.
   · El contenido publicado queda limitado a `conjunto_ids` y `mapa_ids`.
+  · La selección de contenido en la web admin se agrupa por plano para
+    proyectos con múltiples mapas cargados.
 
 Criterios de aceptación:
   - CA1: Generar enlace → 201 con URL completa visible para el técnico.
@@ -147,6 +149,10 @@ Reglas de negocio:
   · Tooltip al hacer hover/tap muestra RSSI estimado y nivel CWNA-107.
   · Leyenda fija con los 5 niveles.
   · Botón "Cambiar algoritmo" oculto al cliente (solo admin).
+  · El cliente visualiza únicamente mapas incluidos en `mapa_ids`; no genera
+    mapas nuevos desde el portal.
+  · El portal clasifica los contenidos publicados por plano antes de listar
+    datos relevados o propuestas IA.
   · La vista es responsive (móvil + desktop).
   · Performance: First Contentful Paint ≤ 2 s en 3G simulada con plano de
     1 MB; render del heatmap ≤ 2 s adicionales.
@@ -177,6 +183,10 @@ Para     : Tomar decisión informada sobre la inversión
 Reglas de negocio:
   · El panel de métricas se calcula desde los `mapa_ids` incluidos en el enlace.
   · Tabs de conjuntos compartidos con preview del heatmap disponible.
+  · Los previews del portal usan el carrusel de mapas ya cargados; no exponen
+    acciones de generación.
+  · Los conjuntos publicados se agrupan por plano para facilitar la lectura
+    cuando el proyecto contiene más de un mapa.
   · No existe descarga PDF en el alcance vigente.
 
 Criterios de aceptación:

@@ -20,6 +20,8 @@ import {
   eliminarProyectoAdmin,
   enviarCorreoEnlaceCliente,
   eliminarConjuntoAP,
+  eliminarEnlaceCliente,
+  eliminarEnlacesClienteProyecto,
   eliminarMapaCalor,
   generarConjuntosIAProyecto,
   generarHeatmapConjunto,
@@ -27,6 +29,7 @@ import {
   listarConjuntosPlano,
   listarEnlacesCliente,
   listarMapasPlano,
+  obtenerProyectoAdmin,
   listarAPsPlano,
   listarPlanosProyecto,
   listarProyectosOrg,
@@ -50,6 +53,14 @@ export function useProyectosOrg(
     queryKey: ["admin", "proyectos", { page, pageSize, ...filtros }],
     queryFn: () => listarProyectosOrg(page, pageSize, filtros),
     placeholderData: (prev) => prev,
+  });
+}
+
+export function useProyectoAdmin(proyectoId: number) {
+  return useQuery({
+    queryKey: ["admin", "proyectos", proyectoId],
+    queryFn: () => obtenerProyectoAdmin(proyectoId),
+    enabled: proyectoId > 0,
   });
 }
 
@@ -232,6 +243,28 @@ export function useActualizarEnlaceCliente(proyectoId: number) {
       enlaceId: number;
       revocado: boolean;
     }) => actualizarEnlaceCliente(enlaceId, revocado),
+    onSuccess: () =>
+      qc.invalidateQueries({
+        queryKey: ["admin", "proyectos", proyectoId, "enlaces-cliente"],
+      }),
+  });
+}
+
+export function useEliminarEnlaceCliente(proyectoId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (enlaceId: number) => eliminarEnlaceCliente(enlaceId),
+    onSuccess: () =>
+      qc.invalidateQueries({
+        queryKey: ["admin", "proyectos", proyectoId, "enlaces-cliente"],
+      }),
+  });
+}
+
+export function useEliminarEnlacesClienteProyecto(proyectoId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => eliminarEnlacesClienteProyecto(proyectoId),
     onSuccess: () =>
       qc.invalidateQueries({
         queryKey: ["admin", "proyectos", proyectoId, "enlaces-cliente"],

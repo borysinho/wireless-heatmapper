@@ -22,6 +22,24 @@ estado_proyecto_enum = sa.Enum(
     name="estado_proyecto",
 )
 
+proyecto_tecnico_asignacion = sa.Table(
+    "proyecto_tecnico_asignacion",
+    Base.metadata,
+    Column(
+        "proyecto_id",
+        Integer,
+        ForeignKey("proyecto.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "tecnico_id",
+        Integer,
+        ForeignKey("usuario.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+)
+
 
 class Proyecto(Base):
     __tablename__ = "proyecto"
@@ -51,6 +69,11 @@ class Proyecto(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     tecnico = relationship("Usuario", back_populates="proyectos")
+    tecnicos = relationship(
+        "Usuario",
+        secondary=proyecto_tecnico_asignacion,
+        back_populates="proyectos_asignados",
+    )
     cliente = relationship("Cliente", back_populates="proyectos")
     planos = relationship(
         "Plano",

@@ -5,15 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Manual de usuario de Wireless HeatMapper basado en las funcionalidades implementadas."
+      content="Manual de usuario de Wireless HeatMapper para la aplicación web, la aplicación móvil y el portal del cliente."
     />
     <title>Manual de Usuario | Wireless HeatMapper</title>
     <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <div class="progress" aria-hidden="true"><span id="progreso"></span></div>
+
     <div class="app-shell">
-      <aside class="sidebar" aria-label="Indice del manual">
+      <aside class="sidebar" aria-label="Índice del manual">
         <a class="brand" href="#inicio" aria-label="Ir al inicio">
           <span class="brand-mark">WHM</span>
           <span>
@@ -24,47 +26,94 @@
 
         <label class="search-box">
           <span>Buscar en el manual</span>
-          <input id="busqueda" type="search" placeholder="Ej. heatmap, cliente, IA" />
+          <input id="busqueda" type="search" placeholder="Ej. proyecto, plano, enlace" />
         </label>
 
         <nav class="nav-list" aria-label="Secciones">
-          <a href="#inicio">Inicio</a>
+          <a href="#inicio">Vista general</a>
           <a href="#roles">Roles y acceso</a>
-          <a href="#admin">Panel administrador</a>
-          <a href="#movil">App movil tecnica</a>
-          <a href="#rf">Heatmaps e IA</a>
+          <a href="#web">Aplicación web</a>
+          <a href="#movil">Aplicación móvil</a>
+          <a href="#rf">Datos y mapas</a>
           <a href="#portal">Portal cliente</a>
-          <a href="#limites">Condiciones de uso</a>
+          <a href="#mensajes">Mensajes comunes</a>
         </nav>
+
+        <div class="sidebar-note">
+          <span>Versión</span>
+          <strong>30-jun-2026</strong>
+          <small>Actualizado contra las pantallas implementadas.</small>
+        </div>
       </aside>
 
       <main>
-        <section id="inicio" class="hero manual-section" data-search="inicio resumen funcionalidades implementadas">
+        <section id="inicio" class="hero manual-section" data-search="inicio resumen vista general bulldog tech administrador tecnico cliente">
           <div class="hero-copy">
-            <p class="eyebrow">Bulldog Tech. · Modalidad en linea</p>
-            <h1>Manual de usuario del sistema implementado</h1>
+            <p class="eyebrow">Bulldog Tech. · Guía operativa</p>
+            <h1>Manual de uso de Wireless HeatMapper</h1>
             <p>
-              Esta guia explica las funciones disponibles en la aplicacion web,
-              la app movil Android y el portal para clientes. El contenido se
-              organiza segun las pantallas y flujos existentes en el codigo.
+              Esta guía describe lo que el usuario puede hacer en la aplicación web,
+              la aplicación móvil Android y el portal del cliente. Los nombres de
+              botones, pestañas, campos y mensajes corresponden a la implementación
+              actual.
             </p>
             <div class="hero-actions">
-              <a class="button primary" href="#admin">Ver panel web</a>
-              <a class="button secondary" href="#movil">Ver app movil</a>
+              <a class="button primary" href="#web">Usar aplicación web</a>
+              <a class="button secondary" href="#movil">Usar aplicación móvil</a>
+              <a class="button secondary" href="#portal">Ver portal cliente</a>
             </div>
           </div>
           <figure class="hero-visual">
-            <img src="./assets/vista-general.svg" alt="Vista general del ecosistema Wireless HeatMapper" />
+            <img src="./assets/vista-general.svg" alt="Vista general de Wireless HeatMapper con panel web, aplicación móvil y portal del cliente" />
           </figure>
         </section>
 
-        <section id="roles" class="manual-section" data-search="roles acceso administrador tecnico cliente login enlace">
+        <section class="manual-section" data-search="alcance funcionalidades principales panel movil portal cliente mapas">
+          <div class="summary-bar" aria-label="Resumen funcional">
+            <article>
+              <span>Panel web</span>
+              <strong>Operación RF</strong>
+              <small>Usuarios, clientes, proyectos, IA y publicación.</small>
+            </article>
+            <article>
+              <span>App móvil</span>
+              <strong>Trabajo en campo</strong>
+              <small>Proyectos, planos, captura WiFi y heatmaps.</small>
+            </article>
+            <article>
+              <span>Portal cliente</span>
+              <strong>Entrega por enlace</strong>
+              <small>Datos relevados, modelo IA y mapas interactivos.</small>
+            </article>
+            <article>
+              <span>Uso</span>
+              <strong>Con conexión</strong>
+              <small>Las pantallas cargan y guardan información en línea.</small>
+            </article>
+          </div>
+
+          <div class="route-panel">
+            <div>
+              <p class="eyebrow">Flujo principal</p>
+              <h2>De campo a cliente</h2>
+            </div>
+            <dl>
+              <div><dt>1. Preparar</dt><dd>Crear usuarios, clientes y proyectos RF.</dd></div>
+              <div><dt>2. Relevar</dt><dd>Importar planos y capturar puntos WiFi en campo.</dd></div>
+              <div><dt>3. Revisar</dt><dd>Previsualizar datos de campo y generar propuestas IA.</dd></div>
+              <div><dt>4. Entregar</dt><dd>Seleccionar contenido y generar un enlace para el cliente.</dd></div>
+            </dl>
+          </div>
+        </section>
+
+        <section id="roles" class="manual-section" data-search="roles acceso administrador tecnico cliente contraseña enlace">
           <div class="section-heading">
             <p class="eyebrow">Acceso al sistema</p>
             <h2>Roles principales</h2>
             <p>
-              Cada perfil ve un flujo distinto. Use esta seccion para ubicar
-              rapidamente que parte del sistema corresponde a cada usuario.
+              Cada rol ve solamente las pantallas necesarias para su trabajo. El
+              administrador trabaja desde la web, el técnico desde Android y el
+              cliente ingresa mediante un enlace compartido.
             </p>
           </div>
 
@@ -73,102 +122,149 @@
               <span class="icon-badge">A</span>
               <h3>Administrador web</h3>
               <p>
-                Ingresa al panel de administracion para gestionar usuarios,
-                clientes, proyectos, conjuntos de APs, escenarios IA y enlaces
-                publicados.
+                Ingresa a “Wireless HeatMapper”, gestiona “Usuarios”, “Clientes”
+                y “Proyectos RF”, revisa “Datos de campo”, genera “Escenarios IA”
+                y prepara la “Publicación”.
               </p>
-              <a href="#admin">Flujo del administrador</a>
+              <a href="#web">Ver guía web</a>
             </article>
             <article class="role-card">
               <span class="icon-badge">T</span>
-              <h3>Tecnico movil</h3>
+              <h3>Técnico de campo</h3>
               <p>
-                Usa la app Android para autenticarse, administrar sus proyectos,
-                importar planos, calibrarlos, capturar puntos WiFi y consultar
-                heatmaps.
+                Ingresa con correo y contraseña, trabaja en “Mis Proyectos”,
+                importa planos, calibra distancias, captura WiFi y genera mapas
+                desde “Heatmap”.
               </p>
-              <a href="#movil">Flujo del tecnico</a>
+              <a href="#movil">Ver guía móvil</a>
             </article>
             <article class="role-card">
               <span class="icon-badge">C</span>
               <h3>Cliente por enlace</h3>
               <p>
-                Accede mediante una URL generada por el administrador para ver
-                resultados publicados, explorar heatmaps y descargar reporte si
-                esta disponible.
+                Abre el portal ejecutivo compartido por Bulldog Tech. y revisa
+                solamente el contenido publicado para su proyecto.
               </p>
-              <a href="#portal">Flujo del cliente</a>
+              <a href="#portal">Ver guía cliente</a>
             </article>
           </div>
         </section>
 
-        <section id="admin" class="manual-section" data-search="admin web usuarios clientes proyectos pipeline reasignar archivar publicar">
+        <section id="web" class="manual-section" data-search="aplicacion web panel administrador heatmapper admin inicio usuarios clientes proyectos rf publicacion">
           <div class="section-heading split">
             <div>
-              <p class="eyebrow">Panel web</p>
-              <h2>Operacion del administrador</h2>
+              <p class="eyebrow">Aplicación web</p>
+              <h2>Panel administrativo y operación RF</h2>
               <p>
-                El panel organiza la operacion RF, la administracion de cuentas
-                y la publicacion de resultados desde una SPA React.
+                El panel muestra la navegación “HeatMapper Admin” con los grupos
+                “Centro RF”, “Operación RF” y “Administración”. Desde ahí se
+                accede a “Inicio”, “Proyectos RF”, “Usuarios” y “Clientes”.
               </p>
             </div>
-            <img class="section-image" src="./assets/panel-admin.svg" alt="Pantalla referencial del panel administrador" />
+            <img class="section-image" src="./assets/panel-admin.svg" alt="Reproducción del panel web con Proyectos RF para publicación" />
           </div>
 
-          <div class="feature-list">
+          <div class="workflow">
             <article>
-              <h3>1. Iniciar sesion</h3>
+              <span>01</span>
+              <h3>Iniciar sesión</h3>
               <p>
-                Entre por <strong>/admin/login</strong> con una cuenta de rol
-                administrador. Si la sesion no es valida, el sistema redirige al
-                login.
+                En la pantalla “Wireless HeatMapper” escriba “Correo electrónico”
+                y “Contraseña”. Use “Iniciar sesión” para entrar al panel.
               </p>
             </article>
             <article>
-              <h3>2. Revisar el centro RF</h3>
+              <span>02</span>
+              <h3>Revisar Inicio</h3>
               <p>
-                La pantalla de inicio resume proyectos totales, proyectos
-                activos, puntos WiFi capturados, tecnicos y clientes activos.
-                Tambien muestra relevamientos recientes y accesos directos.
+                “Inicio” muestra “Wireless HeatMapper”, indicadores como “Proyectos
+                activos”, “Puntos WiFi” y accesos a “Proyectos RF”, “Técnicos y
+                administradores” y “Clientes”.
               </p>
             </article>
             <article>
-              <h3>3. Gestionar usuarios</h3>
+              <span>03</span>
+              <h3>Gestionar Usuarios</h3>
               <p>
-                Desde <strong>Usuarios</strong> puede crear tecnicos, editar
-                datos de usuarios existentes y activar o desactivar cuentas. La
-                cuenta propia no se puede desactivar desde la misma sesion.
+                En “Usuarios” use “Nuevo técnico”. La tabla muestra “Nombre”,
+                “Correo”, “Rol”, “Estado”, “Creado” y “Acciones” con “Editar”,
+                “Activar” o “Desactivar”.
               </p>
             </article>
             <article>
-              <h3>4. Gestionar clientes</h3>
+              <span>04</span>
+              <h3>Gestionar Clientes</h3>
               <p>
-                Desde <strong>Clientes</strong> puede registrar, editar,
-                activar y desactivar clientes. El correo de referencia se usa
-                cuando se envia un enlace de portal cliente.
+                En “Clientes” use “Nuevo cliente”. Registre “Nombre del cliente”
+                y “Correo de referencia”. La tabla permite “Editar”, “Activar” y
+                “Desactivar”.
               </p>
             </article>
             <article>
-              <h3>5. Operar el pipeline de proyectos</h3>
+              <span>05</span>
+              <h3>Gestionar Proyectos RF</h3>
               <p>
-                En <strong>Pipeline de proyectos</strong> puede crear o editar
-                proyectos, asignar cliente, seleccionar tecnico responsable,
-                cambiar estado, filtrar por estado o tecnico, reasignar,
-                archivar y eliminar cuando el backend lo permite.
+                “Proyectos RF para publicación” permite “Nuevo proyecto”, filtrar
+                por “Todos los técnicos” y usar “Datos de campo”, “Escenarios IA”,
+                “Publicación”, “Editar”, “Reasignar” y “Eliminar”.
               </p>
             </article>
+            <article>
+              <span>06</span>
+              <h3>Cerrar sesión</h3>
+              <p>
+                Use el botón “Cerrar sesión” del panel lateral cuando termine el
+                trabajo administrativo.
+              </p>
+            </article>
+          </div>
+
+          <div class="info-table">
+            <h3>Pantallas web implementadas</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Pantalla</th>
+                  <th>Qué se ve</th>
+                  <th>Qué puede hacer</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Usuarios</td>
+                  <td>Listado de técnicos y administradores.</td>
+                  <td>Crear “Nuevo técnico”, editar datos y cambiar estado.</td>
+                </tr>
+                <tr>
+                  <td>Clientes</td>
+                  <td>Nombre, correo de referencia, estado y fecha de creación.</td>
+                  <td>Crear, editar, activar o desactivar clientes.</td>
+                </tr>
+                <tr>
+                  <td>Proyectos RF</td>
+                  <td>Tarjetas de proyectos con técnico, cliente y datos relevados.</td>
+                  <td>Crear, editar, reasignar, eliminar y entrar al espacio RF.</td>
+                </tr>
+                <tr>
+                  <td>Espacio RF del proyecto</td>
+                  <td>Pestañas “Datos de campo”, “Escenarios IA” y “Publicación”.</td>
+                  <td>Revisar datos reales, generar propuestas y preparar enlaces.</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </section>
 
-        <section id="movil" class="manual-section" data-search="movil android login proyectos planos calibrar captura wifi poligono regla">
+        <section id="movil" class="manual-section" data-search="aplicacion movil android login proyectos planos captura wifi heatmap conjunto area calibrar">
           <div class="section-heading split reverse">
-            <img class="section-image phone" src="./assets/app-movil.svg" alt="Pantallas referenciales de la app movil" />
+            <img class="section-image phone" src="./assets/app-movil.svg" alt="Reproducción de pantallas móviles Mis Proyectos, Captura WiFi y Heatmap" />
             <div>
-              <p class="eyebrow">App Android</p>
-              <h2>Trabajo del tecnico en campo</h2>
+              <p class="eyebrow">Aplicación móvil Android</p>
+              <h2>Trabajo del técnico en campo</h2>
               <p>
-                La app movil funciona como cliente en linea. Las operaciones de
-                dominio consultan y guardan datos en el backend.
+                La aplicación móvil muestra las pantallas “Mis Proyectos”,
+                “Planos”, editor de plano, “Captura WiFi” y “Heatmap”. Úsela con
+                conexión disponible durante el relevamiento.
               </p>
             </div>
           </div>
@@ -176,221 +272,252 @@
           <div class="steps">
             <article>
               <span>01</span>
-              <h3>Autenticarse</h3>
+              <h3>Ingresar</h3>
               <p>
-                El tecnico inicia sesion con correo y contrasena. Al cerrar
-                sesion se eliminan las credenciales locales de acceso.
+                Complete “Correo electrónico” y “Contraseña”. Si la conexión falla,
+                la pantalla muestra “Reintentar”.
               </p>
             </article>
             <article>
               <span>02</span>
-              <h3>Administrar sus proyectos</h3>
+              <h3>Mis Proyectos</h3>
               <p>
-                La pantalla <strong>Mis Proyectos</strong> permite buscar por
-                proyecto o cliente, refrescar la lista, crear nuevos proyectos,
-                editar, archivar y eliminar segun permisos del backend.
+                Busque con “Buscar por proyecto o cliente…”. Use “Nuevo proyecto”
+                para crear uno, o el menú “Opciones” para “Archivar” o “Eliminar”.
               </p>
             </article>
             <article>
               <span>03</span>
-              <h3>Importar y revisar planos</h3>
+              <h3>Nuevo proyecto</h3>
               <p>
-                Dentro de un proyecto el tecnico abre la lista de planos,
-                importa imagenes y entra al editor del plano seleccionado.
+                Registre “Nombre del proyecto *”, seleccione “Cliente” o “Sin
+                cliente”, agregue “Descripción (opcional)” y presione “Crear
+                proyecto” o “Guardar cambios”.
               </p>
             </article>
             <article>
               <span>04</span>
-              <h3>Calibrar escala</h3>
+              <h3>Planos</h3>
               <p>
-                En el editor se marcan dos puntos del plano y se registra la
-                distancia real. El modo regla permite medir distancias cuando el
-                plano ya esta calibrado.
+                Use “Importar plano”. En “Identificar plano” complete “Nombre del
+                área” y “Descripción opcional”. Si no hay planos, aparece “Importar
+                primer plano”.
               </p>
             </article>
             <article>
               <span>05</span>
-              <h3>Definir area de interes</h3>
+              <h3>Preparar el plano</h3>
               <p>
-                El tecnico traza un poligono de al menos tres vertices. Este
-                requisito bloquea la visualizacion del heatmap si no esta
-                guardado.
+                En el editor puede “Medir distancia”, escribir “Metros entre los
+                dos puntos”, “Calibrar”, definir “Área”, “Generar área con IA” y
+                “Eliminar área”.
               </p>
             </article>
             <article>
               <span>06</span>
-              <h3>Capturar senal WiFi</h3>
+              <h3>Captura WiFi</h3>
               <p>
-                Sobre el plano se marcan puntos de medicion. Cada punto guarda
-                lecturas WiFi, permite ver detalle y admite modo continuo con
-                intervalo para acumular lecturas sobre la misma posicion.
+                Entre con “Captura”. La pantalla “Captura WiFi” permite “Modo
+                puntual”, “Modo continuo — 15 s”, “Modo continuo — 30 s” y “Modo
+                continuo — 60 s”.
+              </p>
+            </article>
+            <article>
+              <span>07</span>
+              <h3>Ver puntos</h3>
+              <p>
+                Al capturar, la pantalla muestra estados como “Escaneando y
+                enviando…”. Desde el detalle de un punto puede usar “Eliminar punto”.
+              </p>
+            </article>
+            <article>
+              <span>08</span>
+              <h3>Heatmap</h3>
+              <p>
+                Use “Crear conjunto”, “Conjuntos”, “Cambiar APs”, “Generar
+                heatmap”, “Información del heatmap”, “Recomendaciones” y
+                “Regenerar heatmap”.
               </p>
             </article>
           </div>
+
+          <div class="callout">
+            <strong>Antes de capturar:</strong>
+            verifique que el plano corresponde al área visitada, que la escala ya
+            fue calibrada y que el área de interés tiene al menos tres vértices.
+          </div>
         </section>
 
-        <section id="rf" class="manual-section" data-search="heatmap analisis cobertura conjuntos aps ia escenarios recomendaciones rssi">
+        <section id="rf" class="manual-section" data-search="datos campo escenarios ia publicacion mapas heatmap previsualizar propuestas">
           <div class="section-heading split">
             <div>
-              <p class="eyebrow">Analisis RF</p>
-              <h2>Heatmaps, conjuntos de APs e IA</h2>
+              <p class="eyebrow">Datos y mapas</p>
+              <h2>Revisión RF en la web</h2>
               <p>
-                El sistema permite pasar de mediciones de campo a mapas de
-                calor, analisis de cobertura y recomendaciones optimizadas.
+                Dentro del “Espacio RF del proyecto” se trabaja con las pestañas
+                implementadas: “Datos de campo”, “Escenarios IA” y “Publicación”.
+                Estas pantallas preparan lo que después verá el cliente.
               </p>
             </div>
-            <img class="section-image wide" src="./assets/heatmap-ia.svg" alt="Vista referencial de heatmap e IA" />
+            <img class="section-image wide" src="./assets/heatmap-ia.svg" alt="Reproducción de Escenarios IA con plano, datos de campo fuente y propuestas IA" />
           </div>
 
           <div class="module-grid">
             <article>
-              <h3>Heatmap movil</h3>
+              <h3>Datos de campo</h3>
               <p>
-                Desde la app se genera un heatmap para el plano seleccionado,
-                con IDW y resolucion configurable. El tecnico puede
-                filtrar por AP, ver puntos de lectura y consultar analisis.
+                La pestaña “Datos de campo relevados” lista registros creados
+                desde la app móvil. Muestra “Registro”, “Plano”, “Vista”, “Origen”,
+                “Banda” y “APs”.
               </p>
             </article>
             <article>
-              <h3>Conjuntos de APs</h3>
+              <h3>Previsualizar</h3>
               <p>
-                El tecnico puede crear, editar y eliminar conjuntos de APs en la
-                app. En la web, el administrador revisa conjuntos por origen
-                movil, web o IA y decide cuales compartir con el cliente.
-              </p>
-            </article>
-            <article>
-              <h3>Ubicacion de APs</h3>
-              <p>
-                En el flujo de heatmap se pueden seleccionar APs de interes,
-                confirmar ubicaciones estimadas y ajustar posiciones sobre el
-                plano antes de generar resultados.
+                Use “Previsualizar” para abrir el registro, revisar sus APs y
+                consultar los “Mapas de calor generados”.
               </p>
             </article>
             <article>
               <h3>Escenarios IA</h3>
               <p>
-                En la web se elige un plano calibrado, un conjunto de entrada,
-                bandas 2,4/5 GHz, umbral RSSI objetivo, resolucion y cantidad
-                de recomendaciones. Luego se generan escenarios IA.
+                “Escenarios generados por IA” permite elegir “Plano”,
+                “Datos de campo fuente” y “Parámetros IA”.
               </p>
             </article>
             <article>
-              <h3>Gobernanza de resultados</h3>
+              <h3>Generar propuestas</h3>
               <p>
-                Los escenarios pueden revisarse, aprobarse internamente,
-                publicarse para cliente, descartarse o eliminarse. Tambien se
-                agrupan por fuente para facilitar limpieza y revision.
+                Complete “Umbral objetivo”, “Resolución”, “APs propuestos” y
+                “Cantidad de propuestas”. Luego use “Generar propuestas”.
               </p>
             </article>
             <article>
-              <h3>Comparacion</h3>
+              <h3>Propuestas IA del plano</h3>
               <p>
-                La pantalla de escenarios incluye consulta de comparacion para
-                revisar cobertura actual frente a la cobertura recomendada por
-                la IA cuando existe un escenario seleccionado.
+                La tabla muestra “Contenido”, “Plano”, “Vista”, “Origen”, “Banda”
+                y “APs”. También permite “Eliminar propuestas IA”.
+              </p>
+            </article>
+            <article>
+              <h3>Publicación</h3>
+              <p>
+                En “Publicación al cliente” seleccione contenido, defina “Vigencia”,
+                elija “Cliente” y use “Generar enlace” o “Enviar enlace”.
               </p>
             </article>
           </div>
         </section>
 
-        <section id="portal" class="manual-section" data-search="portal cliente enlace publicar revocar descargar reporte heatmap individual subconjunto conjunto">
+        <section id="portal" class="manual-section" data-search="portal cliente enlace datos relevados modelo ia generar heatmap capas aps puntos">
           <div class="section-heading split reverse">
-            <img class="section-image wide" src="./assets/portal-cliente.svg" alt="Vista referencial del portal cliente" />
+            <img class="section-image wide" src="./assets/portal-cliente.svg" alt="Reproducción del portal cliente con datos relevados, modelo IA y generación de heatmap" />
             <div>
-              <p class="eyebrow">Entrega al cliente</p>
-              <h2>Publicacion por enlace</h2>
+              <p class="eyebrow">Portal cliente</p>
+              <h2>Consulta de resultados publicados</h2>
               <p>
-                El portal es una ruta publica por token. El administrador decide
-                que conjuntos publicar y por cuanto tiempo estara vigente el
-                acceso.
+                El cliente abre el enlace compartido y ve el proyecto, el nombre
+                del cliente, un resumen ejecutivo y las áreas publicadas por
+                Bulldog Tech.
               </p>
             </div>
           </div>
 
           <div class="feature-list compact">
             <article>
-              <h3>Crear enlace</h3>
+              <h3>Resumen ejecutivo</h3>
               <p>
-                En <strong>Publicacion al cliente</strong> seleccione conjuntos
-                ya publicados para cliente, defina vigencia de 1, 7, 30 o 90
-                dias y genere la URL.
+                El portal muestra indicadores “Planos”, “Datos de campo”,
+                “Propuestas IA” y “Heatmaps”.
               </p>
             </article>
             <article>
-              <h3>Enviar o copiar</h3>
+              <h3>Áreas de análisis</h3>
               <p>
-                Si el cliente tiene correo de referencia, el enlace puede
-                enviarse desde el sistema cuando el correo esta configurado. Si
-                no, se genera y se copia para compartirlo manualmente.
+                El cliente alterna entre “Datos relevados” y “Modelo IA”, según
+                el contenido incluido por el administrador.
               </p>
             </article>
             <article>
-              <h3>Administrar enlaces</h3>
+              <h3>Generación</h3>
               <p>
-                La web muestra enlaces generados, accesos acumulados, fecha de
-                vencimiento y cantidad de conjuntos incluidos. Cada enlace puede
-                copiarse, abrirse, revocarse o reactivarse.
+                En “Generación” el cliente elige contenido, modo “Todos”,
+                “Selección” o “Un AP”, y presiona “Generar heatmap”.
               </p>
             </article>
             <article>
-              <h3>Explorar resultados</h3>
+              <h3>Capas del mapa</h3>
               <p>
-                El cliente visualiza metricas, alterna entre datos relevados e
-                IA, selecciona conjunto, genera heatmap por AP individual,
-                subconjunto o conjunto completo y descarga reporte si existe.
+                En el visor puede activar u ocultar “Heatmap”, “APs” y “Puntos”,
+                además de usar acercar y alejar.
               </p>
             </article>
+          </div>
+
+          <div class="callout warning">
+            <strong>Cuando el enlace no está disponible:</strong>
+            el portal muestra “Enlace no disponible” y explica que la publicación
+            no existe, expiró o fue revocada por Bulldog Tech.
           </div>
         </section>
 
-        <section id="limites" class="manual-section" data-search="condiciones limites requisitos conexion backend online calibrado poligono mediciones">
+        <section id="mensajes" class="manual-section" data-search="mensajes errores vacio conexión enlace disponible proyecto planos contenido">
           <div class="section-heading">
-            <p class="eyebrow">Uso correcto</p>
-            <h2>Condiciones y requisitos implementados</h2>
+            <p class="eyebrow">Solución de problemas</p>
+            <h2>Mensajes comunes y acciones</h2>
             <p>
-              Estas reglas ayudan a evitar errores durante una demo o uso real
-              del sistema.
+              Estos mensajes existen en la aplicación actual. Úselos como guía
+              para saber qué revisar antes de repetir la operación.
             </p>
           </div>
 
-          <div class="notice-grid">
-            <article>
-              <h3>Conexion requerida</h3>
-              <p>
-                La app movil opera en linea. Si el backend no esta disponible,
-                las operaciones de autenticacion, proyectos, planos, mediciones
-                y heatmaps pueden fallar.
-              </p>
-            </article>
-            <article>
-              <h3>Heatmap con precondiciones</h3>
-              <p>
-                Para ver heatmaps se requiere plano calibrado, mediciones
-                suficientes y poligono de interes cerrado con al menos tres
-                vertices.
-              </p>
-            </article>
-            <article>
-              <h3>IA con entrada revisada</h3>
-              <p>
-                La generacion IA desde web requiere plano calibrado y conjunto
-                de APs existente. Los resultados nacen como internos y deben
-                publicarse deliberadamente.
-              </p>
-            </article>
-            <article>
-              <h3>Enlaces controlados</h3>
-              <p>
-                El portal cliente depende de un token vigente. Un enlace
-                revocado, vencido o inexistente muestra estado no disponible.
-              </p>
-            </article>
+          <div class="info-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Mensaje o pantalla</th>
+                  <th>Dónde aparece</th>
+                  <th>Acción recomendada</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>“Sin conexión. Verifica tu red e intenta de nuevo.”</td>
+                  <td>Captura WiFi móvil.</td>
+                  <td>Revise la conexión del dispositivo y vuelva a capturar.</td>
+                </tr>
+                <tr>
+                  <td>“El polígono requiere al menos 3 vértices.”</td>
+                  <td>Editor de plano y Captura WiFi.</td>
+                  <td>Marque al menos tres puntos antes de guardar el área.</td>
+                </tr>
+                <tr>
+                  <td>“No hay datos de campo relevados para este proyecto.”</td>
+                  <td>Pestaña “Datos de campo”.</td>
+                  <td>Cree el registro desde “Heatmap” en la app móvil.</td>
+                </tr>
+                <tr>
+                  <td>“Seleccione al menos un contenido para el cliente.”</td>
+                  <td>“Publicación al cliente”.</td>
+                  <td>Marque uno o más contenidos antes de generar el enlace.</td>
+                </tr>
+                <tr>
+                  <td>“Todavía no hay enlaces de cliente para este proyecto.”</td>
+                  <td>“Enlaces generados”.</td>
+                  <td>Genere un nuevo enlace desde la misma pantalla.</td>
+                </tr>
+                <tr>
+                  <td>“Enlace no disponible”</td>
+                  <td>Portal cliente.</td>
+                  <td>Solicite a Bulldog Tech. un enlace vigente y activo.</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </section>
 
         <p id="sin-resultados" class="empty hidden">
-          No se encontraron secciones para esa busqueda.
+          No se encontraron secciones para esa búsqueda.
         </p>
       </main>
     </div>

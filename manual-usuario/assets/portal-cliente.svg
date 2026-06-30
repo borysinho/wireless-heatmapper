@@ -1,32 +1,54 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="920" height="560" viewBox="0 0 920 560" role="img" aria-label="Portal cliente">
-  <rect width="920" height="560" rx="8" fill="#FFFFFF"/>
-  <rect x="30" y="30" width="860" height="500" rx="8" fill="#F2F6FA" stroke="#D9E2EC"/>
-  <text x="62" y="78" font-family="Arial" font-size="16" font-weight="700" fill="#2980B9">Bulldog Tech.</text>
-  <text x="62" y="114" font-family="Arial" font-size="30" font-weight="700" fill="#17202A">Portal ejecutivo de cobertura WiFi</text>
-  <rect x="702" y="72" width="140" height="38" rx="8" fill="#2980B9"/>
-  <text x="732" y="96" font-family="Arial" font-size="14" font-weight="700" fill="#FFFFFF">Reporte PDF</text>
-  <g fill="#FFFFFF" stroke="#D9E2EC">
-    <rect x="62" y="146" width="184" height="76" rx="8"/>
-    <rect x="262" y="146" width="184" height="76" rx="8"/>
-    <rect x="462" y="146" width="184" height="76" rx="8"/>
-    <rect x="662" y="146" width="184" height="76" rx="8"/>
-  </g>
-  <g font-family="Arial" fill="#17202A" text-anchor="middle">
-    <text x="154" y="176" font-size="14">Planos</text><text x="154" y="202" font-size="26" font-weight="700">2</text>
-    <text x="354" y="176" font-size="14">Conjuntos reales</text><text x="354" y="202" font-size="26" font-weight="700">4</text>
-    <text x="554" y="176" font-size="14">Subconjuntos IA</text><text x="554" y="202" font-size="26" font-weight="700">3</text>
-    <text x="754" y="176" font-size="14">Escenarios IA</text><text x="754" y="202" font-size="26" font-weight="700">3</text>
-  </g>
-  <rect x="62" y="254" width="520" height="238" rx="8" fill="#FFFFFF" stroke="#D9E2EC"/>
-  <rect x="94" y="294" width="456" height="160" rx="8" fill="#FFFDE7"/>
-  <circle cx="206" cy="364" r="58" fill="#188F67" opacity="0.52"/>
-  <circle cx="316" cy="350" r="76" fill="#B7791F" opacity="0.36"/>
-  <circle cx="432" cy="386" r="62" fill="#C2413B" opacity="0.38"/>
-  <rect x="612" y="254" width="234" height="238" rx="8" fill="#FFFFFF" stroke="#D9E2EC"/>
-  <text x="638" y="292" font-family="Arial" font-size="20" font-weight="700" fill="#17202A">Generacion</text>
-  <rect x="638" y="320" width="182" height="34" rx="8" fill="#F2F6FA"/>
-  <rect x="638" y="374" width="78" height="34" rx="8" fill="#2980B9"/>
-  <rect x="728" y="374" width="92" height="34" rx="8" fill="#EBF5FB"/>
-  <rect x="638" y="428" width="182" height="38" rx="8" fill="#188F67"/>
-  <text x="682" y="452" font-family="Arial" font-size="14" font-weight="700" fill="#FFFFFF">Generar heatmap</text>
+<svg width="980" height="640" viewBox="0 0 980 640" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="titulo desc">
+  <title id="titulo">Portal cliente</title>
+  <desc id="desc">Reproducción del portal ejecutivo con datos relevados, modelo IA y heatmap.</desc>
+  <rect width="980" height="640" rx="18" fill="#F4F6F8"/>
+  <rect x="44" y="40" width="892" height="560" rx="14" fill="#FFFFFF" stroke="#D9E2EC"/>
+
+  <text x="78" y="86" font-family="Inter, Arial" font-size="13" font-weight="850" fill="#2980B9">Bulldog Tech.</text>
+  <text x="78" y="124" font-family="Inter, Arial" font-size="30" font-weight="850" fill="#17202A">Proyecto Torre Norte</text>
+  <text x="78" y="154" font-family="Inter, Arial" font-size="15" fill="#5D6B7A">Bulldog Tech. · Portal ejecutivo de cobertura WiFi</text>
+
+  <rect x="78" y="186" width="188" height="70" rx="10" fill="#F8FAFC" stroke="#D9E2EC"/>
+  <text x="102" y="214" font-family="Inter, Arial" font-size="12" font-weight="850" fill="#5D6B7A">Planos</text>
+  <text x="102" y="242" font-family="Inter, Arial" font-size="26" font-weight="850" fill="#17202A">2</text>
+  <rect x="286" y="186" width="188" height="70" rx="10" fill="#F8FAFC" stroke="#D9E2EC"/>
+  <text x="310" y="214" font-family="Inter, Arial" font-size="12" font-weight="850" fill="#5D6B7A">Conjuntos reales</text>
+  <text x="310" y="242" font-family="Inter, Arial" font-size="26" font-weight="850" fill="#17202A">3</text>
+  <rect x="494" y="186" width="188" height="70" rx="10" fill="#F8FAFC" stroke="#D9E2EC"/>
+  <text x="518" y="214" font-family="Inter, Arial" font-size="12" font-weight="850" fill="#5D6B7A">Subconjuntos IA</text>
+  <text x="518" y="242" font-family="Inter, Arial" font-size="26" font-weight="850" fill="#17202A">2</text>
+  <rect x="702" y="186" width="188" height="70" rx="10" fill="#F8FAFC" stroke="#D9E2EC"/>
+  <text x="726" y="214" font-family="Inter, Arial" font-size="12" font-weight="850" fill="#5D6B7A">Heatmaps</text>
+  <text x="726" y="242" font-family="Inter, Arial" font-size="26" font-weight="850" fill="#17202A">5</text>
+
+  <rect x="78" y="286" width="540" height="274" rx="12" fill="#F8FAFC" stroke="#D9E2EC"/>
+  <text x="110" y="324" font-family="Inter, Arial" font-size="20" font-weight="850" fill="#17202A">Vista del relevamiento en sitio</text>
+  <text x="110" y="350" font-family="Inter, Arial" font-size="13" fill="#5D6B7A">Conjunto recepción · Todos</text>
+  <rect x="110" y="380" width="476" height="128" rx="10" fill="#FFFFFF" stroke="#D9E2EC"/>
+  <path d="M140 470C202 374 282 514 358 410C430 312 502 448 558 392" stroke="#2980B9" stroke-width="34" stroke-linecap="round" opacity=".28"/>
+  <circle cx="184" cy="430" r="8" fill="#188F67"/>
+  <circle cx="292" cy="454" r="8" fill="#B7791F"/>
+  <circle cx="456" cy="408" r="8" fill="#C2413B"/>
+  <circle cx="512" cy="452" r="12" fill="#2980B9"/>
+  <text x="508" y="457" font-family="Inter, Arial" font-size="10" font-weight="850" fill="#FFFFFF">1</text>
+  <rect x="110" y="524" width="92" height="26" rx="7" fill="#EBF5FB"/>
+  <text x="128" y="542" font-family="Inter, Arial" font-size="11" font-weight="850" fill="#1F618D">Heatmap</text>
+  <rect x="214" y="524" width="64" height="26" rx="7" fill="#EBF5FB"/>
+  <text x="234" y="542" font-family="Inter, Arial" font-size="11" font-weight="850" fill="#1F618D">APs</text>
+  <rect x="290" y="524" width="76" height="26" rx="7" fill="#EBF5FB"/>
+  <text x="310" y="542" font-family="Inter, Arial" font-size="11" font-weight="850" fill="#1F618D">Puntos</text>
+
+  <rect x="646" y="286" width="244" height="274" rx="12" fill="#FFFFFF" stroke="#D9E2EC"/>
+  <text x="674" y="324" font-family="Inter, Arial" font-size="19" font-weight="850" fill="#17202A">Áreas de análisis</text>
+  <rect x="674" y="346" width="188" height="48" rx="9" fill="#EBF5FB" stroke="#BBD7EA"/>
+  <text x="694" y="366" font-family="Inter, Arial" font-size="12" font-weight="850" fill="#17202A">Datos relevados</text>
+  <text x="694" y="383" font-family="Inter, Arial" font-size="10" fill="#5D6B7A">3 conjunto(s) de campo</text>
+  <rect x="674" y="406" width="188" height="48" rx="9" fill="#FFFFFF" stroke="#D9E2EC"/>
+  <text x="694" y="426" font-family="Inter, Arial" font-size="12" font-weight="850" fill="#17202A">Modelo IA</text>
+  <text x="694" y="443" font-family="Inter, Arial" font-size="10" fill="#5D6B7A">2 propuesta(s) publicadas</text>
+  <text x="674" y="486" font-family="Inter, Arial" font-size="17" font-weight="850" fill="#17202A">Generación</text>
+  <rect x="674" y="504" width="188" height="30" rx="7" fill="#F8FAFC" stroke="#D9E2EC"/>
+  <text x="690" y="524" font-family="Inter, Arial" font-size="11" fill="#5D6B7A">Conjunto</text>
+  <rect x="674" y="544" width="188" height="34" rx="8" fill="#2980B9"/>
+  <text x="708" y="566" font-family="Inter, Arial" font-size="12" font-weight="850" fill="#FFFFFF">Generar heatmap</text>
 </svg>

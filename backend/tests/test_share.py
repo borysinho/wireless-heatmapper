@@ -165,6 +165,41 @@ def test_enlace_cliente_expone_solo_contenido_autorizado(
     assert enlace_db.ultimo_acceso is not None
 
 
+def test_portal_cliente_incluye_puntos_de_lectura_del_mapa(
+    client,
+    db_session,
+    admin_token,
+    tecnico_usuario,
+):
+    proyecto, mapa = _crear_proyecto_publicable(db_session, tecnico_usuario)
+    _crear_conjunto_con_mediciones(db_session, proyecto)
+
+    respuesta = client.post(
+        f"/share/proyectos/{proyecto.id}/enlaces",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"expira_en_dias": 7, "contenido": {"mapa_ids": [mapa.id]}},
+    )
+    token = respuesta.json()["url_publica"].removeprefix("/portal/")
+
+    portal = client.get(f"/share/{token}")
+
+    assert portal.status_code == 200
+    puntos = portal.json()["heatmaps"][0]["puntos_lectura"]
+    assert len(puntos) == 5
+    assert {punto["punto_id"] for punto in puntos}
+    assert all("pos_x" in punto and "pos_y" in punto for punto in puntos)
+    assert puntos[0]["total_lecturas"] == 1
+    assert puntos[0]["detalle_aps"] == [
+        {
+            "bssid": "aa:bb:cc:dd:ee:01",
+            "ssid": "BulldogCorp",
+            "total_lecturas": 1,
+            "lecturas_perdidas": 0,
+            "rssi_promedio": puntos[0]["rssi"],
+        }
+    ]
+
+
 def test_enlace_cliente_envia_correo_al_cliente_seleccionado(
     client,
     db_session,
@@ -387,7 +422,70 @@ def test_enlace_cliente_revocado_o_expirado_devuelve_404(
     assert client.get(f"/share/{token}").status_code == 404
 
 
-def test_portal_genera_heatmap_desde_conjunto_y_reutiliza_cache(
+def test_enlace_cliente_puede_eliminarse(
+    client,
+    db_session,
+    admin_token,
+    tecnico_usuario,
+):
+    proyecto, mapa = _crear_proyecto_publicable(db_session, tecnico_usuario)
+    respuesta = client.post(
+        f"/share/proyectos/{proyecto.id}/enlaces",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"expira_en_dias": 7, "contenido": {"mapa_ids": [mapa.id]}},
+    )
+    enlace = respuesta.json()
+    token = enlace["url_publica"].removeprefix("/portal/")
+
+    eliminado = client.delete(
+        f"/share/enlaces/{enlace['id']}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert eliminado.status_code == 204
+    assert (
+        db_session.query(TokenEnlaceCliente).filter_by(id=enlace["id"]).first()
+        is None
+    )
+    assert client.get(f"/share/{token}").status_code == 404
+
+
+def test_enlaces_cliente_pueden_eliminarse_por_proyecto(
+    client,
+    db_session,
+    admin_token,
+    tecnico_usuario,
+):
+    proyecto, mapa = _crear_proyecto_publicable(db_session, tecnico_usuario)
+    otro_proyecto, otro_mapa = _crear_proyecto_publicable(db_session, tecnico_usuario)
+    for _ in range(2):
+        client.post(
+            f"/share/proyectos/{proyecto.id}/enlaces",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            json={"expira_en_dias": 7, "contenido": {"mapa_ids": [mapa.id]}},
+        )
+    otro = client.post(
+        f"/share/proyectos/{otro_proyecto.id}/enlaces",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"expira_en_dias": 7, "contenido": {"mapa_ids": [otro_mapa.id]}},
+    ).json()
+
+    eliminado = client.delete(
+        f"/share/proyectos/{proyecto.id}/enlaces",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert eliminado.status_code == 204
+    assert (
+        db_session.query(TokenEnlaceCliente)
+        .filter_by(proyecto_id=proyecto.id)
+        .count()
+        == 0
+    )
+    assert db_session.query(TokenEnlaceCliente).filter_by(id=otro["id"]).count() == 1
+
+
+def test_portal_no_genera_heatmaps_desde_enlace_publico(
     client,
     db_session,
     admin_token,
@@ -416,21 +514,11 @@ def test_portal_genera_heatmap_desde_conjunto_y_reutiliza_cache(
         "algoritmo": "IDW",
         "resolucion": 64,
     }
-    primera = client.post(
+    respuesta_generacion = client.post(
         f"/share/{token}/conjuntos/{conjunto.id}/heatmaps",
         json=body,
     )
-    assert primera.status_code == 200
-    mapa_1 = primera.json()
-    assert mapa_1["conjunto_ap_id"] == conjunto.id
-    assert mapa_1["modo_generacion"] == "CONJUNTO_COMPLETO"
-
-    segunda = client.post(
-        f"/share/{token}/conjuntos/{conjunto.id}/heatmaps",
-        json=body,
-    )
-    assert segunda.status_code == 200
-    assert segunda.json()["id"] == mapa_1["id"]
+    assert respuesta_generacion.status_code == 404
 
 
 def test_enlace_cliente_rechaza_expiracion_mayor_a_365(

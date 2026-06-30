@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.api.v1.heatmaps import _conjunto_out, _generar_heatmap_core, _mapa_out
+from app.api.v1.heatmaps import _conjunto_out, _mapa_out
 from app.api.v1.planos import _firmar as _firmar_plano
 from app.core.config import settings
 from app.core.database import get_db
@@ -24,8 +24,12 @@ from app.models.plano import Plano
 from app.models.proyecto import Proyecto
 from app.models.share import TokenEnlaceCliente
 from app.models.usuario import Usuario
+from app.repositories.medicion_repository import (
+    ORIGEN_CAMPO,
+    ORIGEN_IA_ESTIMADA,
+    MedicionRepository,
+)
 from app.repositories.proyecto_repository import ProyectoRepository
-from app.schemas.heatmap import GenerarHeatmapConjuntoIn, MapaCalorOut
 from app.schemas.plano import PlanoOut
 from app.schemas.share import (
     ContenidoEnlaceIn,
@@ -240,6 +244,98 @@ def _obtener_enlace_publico(
     return enlace
 
 
+def _mapa_portal_out(
+    mapa: MapaCalor,
+    request: Request,
+    db: Session,
+):
+    bssids = mapa.bssids_generacion or [mapa.bssid]
+    conjunto = mapa.conjunto_ap
+    origen_lecturas = (
+        ORIGEN_IA_ESTIMADA
+        if conjunto is not None and conjunto.origen == "ia"
+        else ORIGEN_CAMPO
+    )
+    conjunto_lecturas_id = (
+        conjunto.id if conjunto is not None and conjunto.origen == "ia" else None
+    )
+    puntos = MedicionRepository(db).listar_puntos_rssi_heatmap(
+        plano_id=mapa.plano_id,
+        bssids=bssids,
+        origen=origen_lecturas,
+        conjunto_ap_id=conjunto_lecturas_id,
+    )
+    resumen_puntos = _resumen_lecturas_portal(
+        mapa=mapa,
+        bssids=bssids,
+        origen=origen_lecturas,
+        conjunto_lecturas_id=conjunto_lecturas_id,
+        db=db,
+    )
+    return _mapa_out(
+        mapa,
+        request,
+        puntos=puntos,
+        resumen_puntos=resumen_puntos,
+    )
+
+
+def _resumen_lecturas_portal(
+    *,
+    mapa: MapaCalor,
+    bssids: list[str],
+    origen: str,
+    conjunto_lecturas_id: int | None,
+    db: Session,
+) -> dict[int, dict]:
+    bssids_norm = [bssid.lower() for bssid in bssids]
+    aps_por_bssid = {
+        str(ap.get("bssid", "")).lower(): ap for ap in (mapa.aps_interes or [])
+    }
+    lecturas = MedicionRepository(db).listar_lecturas_por_plano(
+        plano_id=mapa.plano_id,
+        origen=origen,
+        conjunto_ap_id=conjunto_lecturas_id,
+    )
+    lecturas_por_punto: dict[int, list] = {}
+    for lectura in lecturas:
+        lecturas_por_punto.setdefault(lectura.punto_id, []).append(lectura)
+
+    resumen: dict[int, dict] = {}
+    for punto_id, lecturas_punto in lecturas_por_punto.items():
+        capturas = {lectura.numero_lectura for lectura in lecturas_punto}
+        total_capturas = len(capturas)
+        detalle_aps = []
+        for bssid in bssids_norm:
+            lecturas_ap = [
+                lectura for lectura in lecturas_punto if lectura.bssid == bssid
+            ]
+            capturas_ap = {lectura.numero_lectura for lectura in lecturas_ap}
+            ap = aps_por_bssid.get(bssid, {})
+            detalle_aps.append(
+                {
+                    "bssid": bssid,
+                    "ssid": ap.get("ssid"),
+                    "total_lecturas": len(capturas_ap),
+                    "lecturas_perdidas": max(total_capturas - len(capturas_ap), 0),
+                    "rssi_promedio": (
+                        round(
+                            sum(lectura.rssi for lectura in lecturas_ap)
+                            / len(lecturas_ap),
+                            2,
+                        )
+                        if lecturas_ap
+                        else None
+                    ),
+                }
+            )
+        resumen[punto_id] = {
+            "total_lecturas": total_capturas,
+            "detalle_aps": detalle_aps,
+        }
+    return resumen
+
+
 @router.post(
     "/proyectos/{proyecto_id}/enlaces",
     response_model=EnlaceClienteOut,
@@ -311,6 +407,28 @@ def listar_enlaces_cliente(
     return [_enlace_out(enlace) for enlace in enlaces]
 
 
+@router.delete(
+    "/proyectos/{proyecto_id}/enlaces",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def eliminar_enlaces_cliente_proyecto(
+    proyecto_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin),
+) -> None:
+    proyecto = _proyecto_admin(
+        proyecto_id=proyecto_id,
+        current_user=current_user,
+        db=db,
+    )
+    (
+        db.query(TokenEnlaceCliente)
+        .filter(TokenEnlaceCliente.proyecto_id == proyecto.id)
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+
+
 @router.patch("/enlaces/{enlace_id}", response_model=EnlaceClienteOut)
 def actualizar_enlace_cliente(
     enlace_id: int,
@@ -328,6 +446,22 @@ def actualizar_enlace_cliente(
     db.commit()
     db.refresh(enlace)
     return _enlace_out(enlace)
+
+
+@router.delete("/enlaces/{enlace_id}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_enlace_cliente(
+    enlace_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin),
+) -> None:
+    enlace = (
+        db.query(TokenEnlaceCliente).filter(TokenEnlaceCliente.id == enlace_id).first()
+    )
+    if enlace is None:
+        raise HTTPException(status_code=404, detail="Enlace no encontrado.")
+    _proyecto_admin(proyecto_id=enlace.proyecto_id, current_user=current_user, db=db)
+    db.delete(enlace)
+    db.commit()
 
 
 @router.post(
@@ -426,95 +560,5 @@ def obtener_portal_cliente(
             for plano in planos
         ],
         conjuntos=[_conjunto_out(conjunto) for conjunto in conjuntos],
-        heatmaps=[_mapa_out(mapa, request) for mapa in mapas],
-    )
-
-
-@router.post(
-    "/{token}/conjuntos/{conjunto_id}/heatmaps",
-    response_model=MapaCalorOut,
-)
-def generar_heatmap_portal(
-    token: str,
-    conjunto_id: int,
-    body: GenerarHeatmapConjuntoIn,
-    request: Request,
-    db: Session = Depends(get_db),
-) -> MapaCalorOut:
-    enlace = _obtener_enlace_publico(token=token, db=db)
-    contenido = _contenido_from_model(enlace)
-    if conjunto_id not in contenido.conjunto_ids:
-        raise HTTPException(status_code=404, detail="Conjunto no disponible.")
-
-    proyecto = enlace.proyecto
-    plano_ids = {plano.id for plano in proyecto.planos}
-    conjunto = (
-        db.query(ConjuntoAP)
-        .filter(
-            ConjuntoAP.id == conjunto_id,
-            ConjuntoAP.plano_id.in_(plano_ids),
-        )
-        .first()
-    )
-    if conjunto is None:
-        raise HTTPException(status_code=404, detail="Conjunto no disponible.")
-
-    bssids_conjunto = [item.bssid.lower() for item in conjunto.items]
-    bssids_solicitados = [bssid.strip().lower() for bssid in (body.bssids or [])]
-    if body.modo == "CONJUNTO_COMPLETO":
-        bssids_generacion = bssids_conjunto
-    elif body.modo == "INDIVIDUAL":
-        if len(bssids_solicitados) != 1:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="El modo INDIVIDUAL requiere exactamente un AP del conjunto.",
-            )
-        bssids_generacion = bssids_solicitados
-    else:
-        if not bssids_solicitados:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="El modo SUBCONJUNTO requiere al menos un AP del conjunto.",
-            )
-        bssids_generacion = bssids_solicitados
-
-    fuera_del_conjunto = [
-        bssid for bssid in bssids_generacion if bssid not in bssids_conjunto
-    ]
-    if fuera_del_conjunto:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Uno o más APs seleccionados no pertenecen al conjunto.",
-        )
-
-    items_por_bssid = {item.bssid.lower(): item for item in conjunto.items}
-    ap_pos_x = [
-        items_por_bssid[bssid].pos_x
-        for bssid in bssids_generacion
-        if items_por_bssid[bssid].pos_x is not None
-    ]
-    ap_pos_y = [
-        items_por_bssid[bssid].pos_y
-        for bssid in bssids_generacion
-        if items_por_bssid[bssid].pos_y is not None
-    ]
-    posiciones_completas = len(ap_pos_x) == len(bssids_generacion) and len(
-        ap_pos_y
-    ) == len(bssids_generacion)
-    tecnico = db.query(Usuario).filter(Usuario.id == proyecto.tecnico_id).first()
-    if tecnico is None:
-        raise HTTPException(status_code=404, detail="Proyecto no disponible.")
-
-    return _generar_heatmap_core(
-        plano_id=conjunto.plano_id,
-        request=request,
-        bssid=bssids_generacion,
-        ap_pos_x=ap_pos_x if posiciones_completas else None,
-        ap_pos_y=ap_pos_y if posiciones_completas else None,
-        algoritmo=body.algoritmo,
-        resolucion=body.resolucion,
-        db=db,
-        current_user=tecnico,
-        conjunto_ap_id=conjunto.id,
-        modo_generacion=body.modo,
+        heatmaps=[_mapa_portal_out(mapa, request, db) for mapa in mapas],
     )

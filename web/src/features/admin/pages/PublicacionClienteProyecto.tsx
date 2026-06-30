@@ -1,17 +1,29 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { Copy, ExternalLink, Link2, Mail, RotateCcw, XCircle } from "lucide-react";
+import {
+  CheckSquare,
+  Copy,
+  ExternalLink,
+  Link2,
+  Mail,
+  RotateCcw,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import { useOutletContext } from "react-router-dom";
-import { Button, EmptyState, useToast } from "@/shared/components";
+import { Button, ConfirmDialog, EmptyState, useToast } from "@/shared/components";
 import {
   useActualizarEnlaceCliente,
   useConjuntosPorPlanos,
   useCrearEnlaceCliente,
+  useEliminarEnlaceCliente,
+  useEliminarEnlacesClienteProyecto,
   useEnlacesCliente,
   useEnviarCorreoEnlaceCliente,
+  useMapasPorPlanos,
   usePlanosProyecto,
+  useProyectoAdmin,
 } from "../hooks/useProyectosOrg";
-import { useClientes } from "../hooks/useClientes";
-import type { ConjuntoAPOut } from "../types";
+import type { ConjuntoAPOut, MapaCalorOut, PlanoOut } from "../types";
 import styles from "./PublicacionClienteProyecto.module.css";
 
 export default function PublicacionClienteProyecto() {
@@ -23,9 +35,8 @@ export default function PublicacionClienteProyecto() {
   const [diasEnlace, setDiasEnlace] = useState(7);
   const [clienteDestinoId, setClienteDestinoId] = useState<number | null>(null);
   const [ultimoEnlace, setUltimoEnlace] = useState<string | null>(null);
-  const [clientesEnvioPorEnlace, setClientesEnvioPorEnlace] = useState<
-    Record<number, number | "">
-  >({});
+  const [enlaceEliminarId, setEnlaceEliminarId] = useState<number | null>(null);
+  const [confirmarEliminarTodos, setConfirmarEliminarTodos] = useState(false);
   const [conjuntosSeleccionados, setConjuntosSeleccionados] = useState<Set<number>>(
     () => new Set(),
   );
@@ -34,14 +45,19 @@ export default function PublicacionClienteProyecto() {
     usePlanosProyecto(proyectoId);
   const planoIds = useMemo(() => (planos ?? []).map((plano) => plano.id), [planos]);
   const consultasConjuntos = useConjuntosPorPlanos(planoIds);
-  const { data: clientes, isLoading: cargandoClientes, isError: errorClientes } =
-    useClientes();
+  const consultasMapas = useMapasPorPlanos(planoIds);
+  const { data: proyecto, isLoading: cargandoProyecto, isError: errorProyecto } =
+    useProyectoAdmin(proyectoId);
   const { data: enlacesCliente, isLoading: cargandoEnlaces } =
     useEnlacesCliente(proyectoId);
   const { mutateAsync: crearEnlace, isPending: creandoEnlace } =
     useCrearEnlaceCliente(proyectoId);
   const { mutateAsync: actualizarEnlace, isPending: actualizandoEnlace } =
     useActualizarEnlaceCliente(proyectoId);
+  const { mutateAsync: eliminarEnlace, isPending: eliminandoEnlace } =
+    useEliminarEnlaceCliente(proyectoId);
+  const { mutateAsync: eliminarTodosEnlaces, isPending: eliminandoTodosEnlaces } =
+    useEliminarEnlacesClienteProyecto(proyectoId);
   const { mutateAsync: enviarCorreoEnlace, isPending: enviandoCorreo } =
     useEnviarCorreoEnlaceCliente(proyectoId);
 
@@ -58,22 +74,31 @@ export default function PublicacionClienteProyecto() {
         .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1)),
     [conjuntos],
   );
+  const mapas = useMemo(
+    () => consultasMapas.flatMap((consulta) => consulta.data ?? []),
+    [consultasMapas],
+  );
   const cargandoConjuntos = consultasConjuntos.some((consulta) => consulta.isLoading);
   const errorConjuntos = consultasConjuntos.some((consulta) => consulta.isError);
+  const cargandoMapas = consultasMapas.some((consulta) => consulta.isLoading);
+  const errorMapas = consultasMapas.some((consulta) => consulta.isError);
   const cargando =
     cargandoPlanos ||
     cargandoConjuntos ||
-    cargandoClientes;
+    cargandoMapas ||
+    cargandoProyecto;
   const error =
     errorPlanos ||
     errorConjuntos ||
-    errorClientes;
-  const clientesActivos = useMemo(
-    () => (clientes ?? []).filter((cliente) => cliente.activo),
-    [clientes],
-  );
+    errorMapas ||
+    errorProyecto;
+  const clienteProyecto = proyecto?.cliente ?? null;
+  const clienteProyectoConCorreo =
+    clienteProyecto?.email_referencia ? clienteProyecto : null;
   const clienteDestino =
-    clientesActivos.find((cliente) => cliente.id === clienteDestinoId) ?? null;
+    clienteProyectoConCorreo?.id === clienteDestinoId
+      ? clienteProyectoConCorreo
+      : null;
 
   const conjuntosSeleccionadosPublicados = useMemo(
     () =>
@@ -83,10 +108,29 @@ export default function PublicacionClienteProyecto() {
     [conjuntosPublicables, conjuntosSeleccionados],
   );
   const totalSeleccionado = conjuntosSeleccionadosPublicados.length;
+  const todosSeleccionados =
+    conjuntosPublicables.length > 0 &&
+    conjuntosPublicables.every((conjunto) =>
+      conjuntosSeleccionados.has(conjunto.id),
+    );
+  const mapasSeleccionadosPublicados = useMemo(() => {
+    const conjuntoIds = new Set(
+      conjuntosSeleccionadosPublicados.map((conjunto) => conjunto.id),
+    );
+    return mapas.filter(
+      (mapa) =>
+        typeof mapa.conjunto_ap_id === "number" &&
+        conjuntoIds.has(mapa.conjunto_ap_id),
+    );
+  }, [conjuntosSeleccionadosPublicados, mapas]);
+  const gruposPorPlano = useMemo(
+    () => _agruparContenidoPorPlano(planos ?? [], conjuntosPublicables, mapas),
+    [planos, conjuntosPublicables, mapas],
+  );
 
   const handleCrearEnlace = async () => {
     if (totalSeleccionado === 0) {
-      toast.error("Seleccione al menos un conjunto para el cliente.");
+      toast.error("Seleccione al menos un contenido para el cliente.");
       return;
     }
     if (clienteDestinoId !== null && !clienteDestino?.email_referencia) {
@@ -99,6 +143,7 @@ export default function PublicacionClienteProyecto() {
         cliente_id: clienteDestinoId,
         contenido: {
           conjunto_ids: conjuntosSeleccionadosPublicados.map((item) => item.id),
+          mapa_ids: mapasSeleccionadosPublicados.map((item) => item.id),
         },
       });
       const url = `${window.location.origin}${enlace.url_publica}`;
@@ -116,6 +161,16 @@ export default function PublicacionClienteProyecto() {
     }
   };
 
+  const handleToggleTodosConjuntos = () => {
+    setConjuntosSeleccionados((prev) => {
+      if (todosSeleccionados) return new Set();
+      return new Set([
+        ...prev,
+        ...conjuntosPublicables.map((conjunto) => conjunto.id),
+      ]);
+    });
+  };
+
   const handleActualizarEnlace = async (enlaceId: number, revocado: boolean) => {
     try {
       await actualizarEnlace({ enlaceId, revocado });
@@ -126,18 +181,15 @@ export default function PublicacionClienteProyecto() {
   };
 
   const handleEnviarCorreo = async (enlaceId: number) => {
-    const clienteId = clientesEnvioPorEnlace[enlaceId];
-    if (typeof clienteId !== "number") {
-      toast.error("Seleccione un cliente con correo de referencia.");
-      return;
-    }
-    const cliente = clientesActivos.find((item) => item.id === clienteId);
-    if (!cliente?.email_referencia) {
-      toast.error("El cliente seleccionado no tiene correo de referencia registrado.");
+    if (!clienteProyectoConCorreo) {
+      toast.error("El cliente del proyecto no tiene correo de referencia registrado.");
       return;
     }
     try {
-      await enviarCorreoEnlace({ enlaceId, clienteId });
+      await enviarCorreoEnlace({
+        enlaceId,
+        clienteId: clienteProyectoConCorreo.id,
+      });
       toast.exito("Correo enviado al cliente.");
     } catch {
       toast.error("No se pudo enviar el correo del enlace.");
@@ -151,6 +203,27 @@ export default function PublicacionClienteProyecto() {
     toast.exito(copiado ? "Enlace copiado." : "Enlace disponible en pantalla.");
   };
 
+  const handleEliminarEnlace = async () => {
+    if (enlaceEliminarId === null) return;
+    try {
+      await eliminarEnlace(enlaceEliminarId);
+      toast.exito("Enlace eliminado.");
+      setEnlaceEliminarId(null);
+    } catch {
+      toast.error("No se pudo eliminar el enlace.");
+    }
+  };
+
+  const handleEliminarTodosEnlaces = async () => {
+    try {
+      await eliminarTodosEnlaces();
+      toast.exito("Enlaces eliminados.");
+      setConfirmarEliminarTodos(false);
+    } catch {
+      toast.error("No se pudieron eliminar los enlaces.");
+    }
+  };
+
   if (cargando) return <div className={styles.skeleton} />;
   if (error) return <EmptyState mensaje="No se pudo cargar el contenido publicable." />;
 
@@ -159,98 +232,137 @@ export default function PublicacionClienteProyecto() {
       <div className={styles.encabezadoSeccion}>
         <div>
           <h2>Publicación al cliente</h2>
-          <p>El enlace incluye los conjuntos seleccionados, sean relevados en campo o propuestos por IA.</p>
-        </div>
-        <div className={styles.generador}>
-          <label>
-            Vigencia
-            <select
-              value={diasEnlace}
-              onChange={(event) => setDiasEnlace(Number(event.target.value))}
-            >
-              <option value={1}>1 día</option>
-              <option value={7}>7 días</option>
-              <option value={30}>30 días</option>
-              <option value={90}>90 días</option>
-            </select>
-          </label>
-          <label className={styles.clienteDestino}>
-            Cliente
-            <select
-              value={clienteDestinoId ?? ""}
-              onChange={(event) =>
-                setClienteDestinoId(event.target.value ? Number(event.target.value) : null)
-              }
-            >
-              <option value="">Solo generar enlace</option>
-              {clientesActivos.map((cliente) => (
-                <option
-                  key={cliente.id}
-                  value={cliente.id}
-                  disabled={!cliente.email_referencia}
-                >
-                  {cliente.nombre}
-                  {cliente.email_referencia
-                    ? ` · ${cliente.email_referencia}`
-                    : " · sin correo de referencia"}
-                </option>
-              ))}
-            </select>
-          </label>
-          <Button
-            type="button"
-            disabled={totalSeleccionado === 0}
-            isLoading={creandoEnlace}
-            onClick={handleCrearEnlace}
-          >
-            {clienteDestino ? (
-              <Mail size={16} aria-hidden="true" />
-            ) : (
-              <Link2 size={16} aria-hidden="true" />
-            )}
-            {clienteDestino ? "Enviar enlace" : "Generar enlace"}
-          </Button>
+          <p>El enlace incluye los datos seleccionados, sean relevados en campo o propuestos por IA.</p>
         </div>
       </div>
 
-      <div className={styles.selectorGrid}>
+      <div className={styles.publicacionGrid}>
         <PanelSeleccion
-          titulo="Conjuntos disponibles"
-          vacio="No hay conjuntos disponibles para este proyecto."
+          titulo="Contenido disponible"
+          vacio="No hay contenido disponible para este proyecto."
+          acciones={
+            <Button
+              type="button"
+              variante="secondary"
+              tamano="sm"
+              disabled={conjuntosPublicables.length === 0}
+              onClick={handleToggleTodosConjuntos}
+            >
+              <CheckSquare size={14} aria-hidden="true" />
+              {todosSeleccionados ? "Quitar selección" : "Seleccionar todos"}
+            </Button>
+          }
         >
-          {conjuntosPublicables.map((conjunto) => (
-            <SeleccionConjunto
-              key={conjunto.id}
-              conjunto={conjunto}
-              seleccionado={conjuntosSeleccionados.has(conjunto.id)}
-              onToggle={() =>
-                setConjuntosSeleccionados((prev) =>
-                  _toggleSet(prev, conjunto.id),
-                )
-              }
-            />
+          {gruposPorPlano.map((grupo) => (
+            <div key={grupo.planoId} className={styles.grupoPlano}>
+              <div className={styles.grupoPlanoHeader}>
+                <div>
+                  <strong>{grupo.nombre}</strong>
+                  <small>
+                    {grupo.conjuntos.length} contenido(s) · {grupo.mapas.length} mapa(s)
+                  </small>
+                </div>
+              </div>
+              {grupo.conjuntos.map((conjunto) => (
+                <SeleccionConjunto
+                  key={conjunto.id}
+                  conjunto={conjunto}
+                  mapas={grupo.mapasPorConjunto.get(conjunto.id) ?? []}
+                  seleccionado={conjuntosSeleccionados.has(conjunto.id)}
+                  onToggle={() =>
+                    setConjuntosSeleccionados((prev) =>
+                      _toggleSet(prev, conjunto.id),
+                    )
+                  }
+                />
+              ))}
+            </div>
           ))}
         </PanelSeleccion>
 
-        <PanelSeleccion
-          titulo="Criterio de publicación"
-          vacio="Seleccione conjuntos específicos para crear el enlace."
-        />
+        <section className={styles.panelGeneracion}>
+          <div className={styles.panelGeneracionHeader}>
+            <h2>Enlace de cliente</h2>
+            <span>
+              {totalSeleccionado} contenido(s) · {mapasSeleccionadosPublicados.length} mapa(s)
+            </span>
+          </div>
+          <div className={styles.generador}>
+            <label>
+              Vigencia
+              <select
+                value={diasEnlace}
+                onChange={(event) => setDiasEnlace(Number(event.target.value))}
+              >
+                <option value={1}>1 día</option>
+                <option value={7}>7 días</option>
+                <option value={30}>30 días</option>
+                <option value={90}>90 días</option>
+              </select>
+            </label>
+            <label className={styles.clienteDestino}>
+              Cliente
+              <select
+                value={clienteDestinoId ?? ""}
+                onChange={(event) =>
+                  setClienteDestinoId(event.target.value ? Number(event.target.value) : null)
+                }
+              >
+                <option value="">Solo generar enlace</option>
+                {clienteProyectoConCorreo && (
+                  <option
+                    value={clienteProyectoConCorreo.id}
+                  >
+                    {clienteProyectoConCorreo.nombre} ·{" "}
+                    {clienteProyectoConCorreo.email_referencia}
+                  </option>
+                )}
+              </select>
+            </label>
+            <Button
+              type="button"
+              disabled={totalSeleccionado === 0}
+              isLoading={creandoEnlace}
+              onClick={handleCrearEnlace}
+            >
+              {clienteDestino ? (
+                <Mail size={16} aria-hidden="true" />
+              ) : (
+                <Link2 size={16} aria-hidden="true" />
+              )}
+              {clienteDestino ? "Enviar enlace" : "Generar enlace"}
+            </Button>
+          </div>
+          {ultimoEnlace && <p className={styles.enlaceReciente}>{ultimoEnlace}</p>}
+        </section>
       </div>
 
-      {ultimoEnlace && <p className={styles.enlaceReciente}>{ultimoEnlace}</p>}
-
       <section className={styles.enlaces}>
-        <h2>Enlaces generados</h2>
+        <div className={styles.enlacesHeader}>
+          <h2>Enlaces generados</h2>
+          <Button
+            type="button"
+            variante="danger"
+            tamano="sm"
+            disabled={
+              !enlacesCliente ||
+              enlacesCliente.length === 0 ||
+              eliminandoTodosEnlaces
+            }
+            isLoading={eliminandoTodosEnlaces}
+            onClick={() => setConfirmarEliminarTodos(true)}
+          >
+            <Trash2 size={14} aria-hidden="true" />
+            Eliminar todos
+          </Button>
+        </div>
         {cargandoEnlaces ? (
           <div className={styles.skeletonMini} />
         ) : !enlacesCliente || enlacesCliente.length === 0 ? (
           <EmptyState mensaje="Todavía no hay enlaces de cliente para este proyecto." />
         ) : (
           <div className={styles.enlacesLista}>
-            {enlacesCliente.map((enlace) => {
-              const clienteEnvioId = clientesEnvioPorEnlace[enlace.id] ?? "";
-              return (
+            {enlacesCliente.map((enlace) => (
                 <div key={enlace.id} className={styles.enlaceRow}>
                   <div>
                     <strong>
@@ -259,49 +371,27 @@ export default function PublicacionClienteProyecto() {
                     </strong>
                     <small>
                       {enlace.accesos} acceso(s) ·{" "}
-                      {enlace.contenido.conjunto_ids.length} conjunto(s)
+                      {enlace.contenido.conjunto_ids.length} contenido(s) ·{" "}
+                      {enlace.contenido.mapa_ids.length} mapa(s)
                     </small>
                   </div>
                   <div className={styles.enlaceAcciones}>
-                    <select
-                      className={styles.selectorCorreo}
-                      value={clienteEnvioId}
-                      disabled={enlace.revocado || enviandoCorreo}
-                      aria-label="Cliente destino para correo"
-                      onChange={(event) =>
-                        setClientesEnvioPorEnlace((prev) => ({
-                          ...prev,
-                          [enlace.id]: event.target.value
-                            ? Number(event.target.value)
-                            : "",
-                        }))
-                      }
-                    >
-                      <option value="">Cliente</option>
-                      {clientesActivos.map((cliente) => (
-                        <option
-                          key={cliente.id}
-                          value={cliente.id}
-                          disabled={!cliente.email_referencia}
-                        >
-                          {cliente.nombre}
-                          {cliente.email_referencia
-                            ? ` · ${cliente.email_referencia}`
-                            : " · sin correo"}
-                        </option>
-                      ))}
-                    </select>
                     <Button
                       type="button"
                       variante="secondary"
                       tamano="sm"
                       disabled={
                         enlace.revocado ||
-                        typeof clienteEnvioId !== "number" ||
+                        !clienteProyectoConCorreo ||
                         enviandoCorreo
                       }
                       isLoading={enviandoCorreo}
                       onClick={() => handleEnviarCorreo(enlace.id)}
+                      title={
+                        clienteProyectoConCorreo
+                          ? `Enviar a ${clienteProyectoConCorreo.email_referencia}`
+                          : "El cliente no tiene correo de referencia"
+                      }
                     >
                       <Mail size={14} aria-hidden="true" />
                       Enviar
@@ -340,13 +430,44 @@ export default function PublicacionClienteProyecto() {
                       )}
                       {enlace.revocado ? "Reactivar" : "Revocar"}
                     </Button>
+                    <Button
+                      type="button"
+                      variante="danger"
+                      tamano="sm"
+                      disabled={eliminandoEnlace}
+                      onClick={() => setEnlaceEliminarId(enlace.id)}
+                    >
+                      <Trash2 size={14} aria-hidden="true" />
+                      Eliminar
+                    </Button>
                   </div>
                 </div>
-              );
-            })}
+              ))}
           </div>
         )}
       </section>
+
+      {enlaceEliminarId !== null && (
+        <ConfirmDialog
+          titulo="¿Eliminar enlace?"
+          descripcion="Se eliminará el registro del enlace generado y dejará de estar disponible para el cliente."
+          textoConfirmar="Eliminar"
+          cargando={eliminandoEnlace}
+          onCancelar={() => setEnlaceEliminarId(null)}
+          onConfirmar={handleEliminarEnlace}
+        />
+      )}
+
+      {confirmarEliminarTodos && (
+        <ConfirmDialog
+          titulo="¿Eliminar todos los enlaces?"
+          descripcion="Se eliminarán todos los enlaces generados para este proyecto. El contenido y los mapas publicados no serán modificados."
+          textoConfirmar="Eliminar todos"
+          cargando={eliminandoTodosEnlaces}
+          onCancelar={() => setConfirmarEliminarTodos(false)}
+          onConfirmar={handleEliminarTodosEnlaces}
+        />
+      )}
     </section>
   );
 }
@@ -355,16 +476,21 @@ function PanelSeleccion({
   titulo,
   vacio,
   children,
+  acciones,
 }: {
   titulo: string;
   vacio: string;
   children?: ReactNode;
+  acciones?: ReactNode;
 }) {
   const items = Array.isArray(children) ? children.filter(Boolean) : children;
   const estaVacio = Array.isArray(items) ? items.length === 0 : !items;
   return (
     <section className={styles.panelSeleccion}>
-      <h2>{titulo}</h2>
+      <div className={styles.panelSeleccionHeader}>
+        <h2>{titulo}</h2>
+        {acciones}
+      </div>
       {estaVacio ? <p className={styles.vacio}>{vacio}</p> : <div>{items}</div>}
     </section>
   );
@@ -372,10 +498,12 @@ function PanelSeleccion({
 
 function SeleccionConjunto({
   conjunto,
+  mapas,
   seleccionado,
   onToggle,
 }: {
   conjunto: ConjuntoAPOut;
+  mapas: MapaCalorOut[];
   seleccionado: boolean;
   onToggle: () => void;
 }) {
@@ -387,6 +515,10 @@ function SeleccionConjunto({
         <small>
           {_labelOrigen(conjunto.origen)} · {conjunto.cantidad_aps} APs
         </small>
+        <span className={styles.itemMeta}>
+          <span>{mapas.length} mapa(s) generados</span>
+          <span>{conjunto.banda_objetivo} GHz</span>
+        </span>
       </span>
     </label>
   );
@@ -426,4 +558,46 @@ function _labelOrigen(origen: string): string {
     ia: "IA",
   };
   return mapa[origen] ?? origen;
+}
+
+function _agruparContenidoPorPlano(
+  planos: PlanoOut[],
+  conjuntos: ConjuntoAPOut[],
+  mapas: MapaCalorOut[],
+) {
+  const planosPorId = new Map(planos.map((plano) => [plano.id, plano]));
+  const mapasPorPlano = new Map<number, MapaCalorOut[]>();
+  const mapasPorConjunto = new Map<number, MapaCalorOut[]>();
+  for (const mapa of mapas) {
+    mapasPorPlano.set(mapa.plano_id, [...(mapasPorPlano.get(mapa.plano_id) ?? []), mapa]);
+    if (typeof mapa.conjunto_ap_id === "number") {
+      mapasPorConjunto.set(
+        mapa.conjunto_ap_id,
+        [...(mapasPorConjunto.get(mapa.conjunto_ap_id) ?? []), mapa],
+      );
+    }
+  }
+  const grupos = new Map<
+    number,
+    {
+      planoId: number;
+      nombre: string;
+      conjuntos: ConjuntoAPOut[];
+      mapas: MapaCalorOut[];
+      mapasPorConjunto: Map<number, MapaCalorOut[]>;
+    }
+  >();
+  for (const conjunto of conjuntos) {
+    const plano = planosPorId.get(conjunto.plano_id);
+    const grupo = grupos.get(conjunto.plano_id) ?? {
+      planoId: conjunto.plano_id,
+      nombre: plano?.nombre ?? `Plano ${conjunto.plano_id}`,
+      conjuntos: [],
+      mapas: mapasPorPlano.get(conjunto.plano_id) ?? [],
+      mapasPorConjunto,
+    };
+    grupo.conjuntos.push(conjunto);
+    grupos.set(conjunto.plano_id, grupo);
+  }
+  return Array.from(grupos.values()).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 }

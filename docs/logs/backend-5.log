@@ -1,0 +1,257 @@
+ docker compose build
+[+] Building 20.5s (25/25) FINISHED                                                                               
+ => [internal] load local bake definitions                                                                   0.0s
+ => => reading from stdin 1.12kB                                                                             0.0s
+ => [web internal] load build definition from Dockerfile                                                     0.0s
+ => => transferring dockerfile: 376B                                                                         0.0s
+ => [backend internal] load build definition from Dockerfile                                                 0.0s
+ => => transferring dockerfile: 950B                                                                         0.0s
+ => [backend internal] load metadata for docker.io/library/python:3.12-slim                                  1.9s
+ => [web internal] load metadata for docker.io/library/node:24-alpine                                        1.7s
+ => [web internal] load .dockerignore                                                                        0.0s
+ => => transferring context: 156B                                                                            0.0s
+ => [web builder 1/6] FROM docker.io/library/node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908  0.0s
+ => => resolve docker.io/library/node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a9543  0.0s
+ => [web internal] load build context                                                                        0.0s
+ => => transferring context: 252.49kB                                                                        0.0s
+ => CACHED [web builder 2/6] WORKDIR /app                                                                    0.0s
+ => CACHED [web builder 3/6] COPY package*.json ./                                                           0.0s
+ => CACHED [web builder 4/6] RUN npm ci                                                                      0.0s
+ => [web builder 5/6] COPY . .                                                                               0.1s
+ => [web builder 6/6] RUN npm run build                                                                     17.8s
+ => [backend internal] load .dockerignore                                                                    0.0s
+ => => transferring context: 297B                                                                            0.0s
+ => [backend base 1/2] FROM docker.io/library/python:3.12-slim@sha256:423ed6ab25b1921a477529254bfeeabf58551  0.0s
+ => => resolve docker.io/library/python:3.12-slim@sha256:423ed6ab25b1921a477529254bfeeabf5855151dc2c3141699  0.0s
+ => [backend internal] load build context                                                                    0.0s
+ => => transferring context: 307.32kB                                                                        0.0s
+ => CACHED [backend base 2/2] WORKDIR /app                                                                   0.0s
+ => CACHED [backend builder 1/4] RUN pip install --upgrade pip                                               0.0s
+ => CACHED [backend builder 2/4] COPY pyproject.toml .                                                       0.0s
+ => CACHED [backend builder 3/4] RUN pip install --no-cache-dir ".[dev]"                                     0.0s
+ => [backend builder 4/4] COPY app ./app                                                                     0.1s
+ => [backend] exporting to image                                                                             0.3s
+ => => exporting layers                                                                                      0.1s
+ => => exporting manifest sha256:f70fbed505768abc25a6ffb6374cb3eab7fee1b4b37f22517987f3aff5ab6f7d            0.0s
+ => => exporting config sha256:94ff7cad3428fc69715bca0c05f6bd5316db02f63267c352974cf29056fb959c              0.0s
+ => => exporting attestation manifest sha256:58e817cd7c18270b0875b34bdce4e73699da680f6f3c39197cd96a118bfe8a  0.0s
+ => => exporting manifest list sha256:bd373792f89ebda3029222d248e8903c678b6797b2c3c699e1e1ab8336e565ff       0.0s
+ => => naming to docker.io/library/proyecto-final-backend:latest                                             0.0s
+ => => unpacking to docker.io/library/proyecto-final-backend:latest                                          0.1s
+ => [backend] resolving provenance for metadata file                                                         0.0s
+ => [web] exporting to image                                                                                 0.6s
+ => => exporting layers                                                                                      0.4s
+ => => exporting manifest sha256:0978eb0481dfd5a4f697854273cd54ab063d5889816e5956485082cbdb7ed4bb            0.0s
+ => => exporting config sha256:cbb7e1a11adc65dddbb95e0a8098883acb1046420dc2468c1c587c4154a9b4fb              0.0s
+ => => exporting attestation manifest sha256:88d273867205cce4c3ec980e20c022ff1d522489a60b42afa23ba8efbac938  0.0s
+ => => exporting manifest list sha256:156ac5c263b880dbe718d00458e257e63d0d87ba832271eec12bcbd73bb8e05c       0.0s
+ => => naming to docker.io/library/proyecto-final-web:latest                                                 0.0s
+ => => unpacking to docker.io/library/proyecto-final-web:latest                                              0.1s
+ => [web] resolving provenance for metadata file                                                             0.0s
+[+] build 2/2
+ ✔ Image proyecto-final-backend Built                                                                        20.5s
+ ✔ Image proyecto-final-web     Built                                                                        20.5s
+bquiroga@fedora:~/Documentos/dev/taller/proyecto-final$ docker compose up
+[+] up 2/2
+ ✔ Container proyecto-final-backend-1 Recreated                                                               0.5s
+ ✔ Container proyecto-final-web-1     Recreated                                                               0.5s
+Attaching to backend-1, db-1, pgadmin-1, web-1
+Container proyecto-final-db-1 Waiting 
+Container proyecto-final-db-1 Waiting 
+db-1  | 
+db-1  | PostgreSQL Database directory appears to contain a database; Skipping initialization
+db-1  | 
+db-1  | 2026-06-30 08:01:06.064 UTC [1] LOG:  starting PostgreSQL 15.18 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+db-1  | 2026-06-30 08:01:06.065 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+db-1  | 2026-06-30 08:01:06.065 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+db-1  | 2026-06-30 08:01:06.067 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+db-1  | 2026-06-30 08:01:06.074 UTC [29] LOG:  database system was interrupted; last known up at 2026-06-30 07:59:16 UTC
+db-1  | 2026-06-30 08:01:06.115 UTC [29] LOG:  database system was not properly shut down; automatic recovery in progress
+db-1  | 2026-06-30 08:01:06.121 UTC [29] LOG:  redo starts at 0/4C32448
+db-1  | 2026-06-30 08:01:06.127 UTC [29] LOG:  invalid record length at 0/4C382D8: wanted 24, got 0
+db-1  | 2026-06-30 08:01:06.128 UTC [29] LOG:  redo done at 0/4C382B0 system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+db-1  | 2026-06-30 08:01:06.133 UTC [27] LOG:  checkpoint starting: end-of-recovery immediate wait
+db-1  | 2026-06-30 08:01:06.167 UTC [27] LOG:  checkpoint complete: wrote 15 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.003 s, sync=0.024 s, total=0.036 s; sync files=14, longest=0.005 s, average=0.002 s; distance=23 kB, estimate=23 kB
+db-1  | 2026-06-30 08:01:06.174 UTC [1] LOG:  database system is ready to accept connections
+web-1  | 
+web-1  | > web@0.0.0 dev
+web-1  | > vite --host 0.0.0.0 --port 80
+web-1  | 
+web-1  | 
+web-1  |   VITE v7.3.2  ready in 585 ms
+web-1  | 
+web-1  |   ➜  Local:   http://localhost:80/
+web-1  |   ➜  Network: http://172.23.0.2:80/
+Container proyecto-final-db-1 Healthy 
+Container proyecto-final-db-1 Healthy 
+pgadmin-1  | postfix/postlog: starting the Postfix mail system
+backend-1  | INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+backend-1  | INFO  [alembic.runtime.migration] Will assume transactional DDL.
+db-1       | 2026-06-30 08:01:14.757 UTC [41] ERROR:  duplicate key value violates unique constraint "plano_ruta_storage_key"
+db-1       | 2026-06-30 08:01:14.757 UTC [41] DETAIL:  Key (ruta_storage)=(seed/campo_villamontes/campo_villamontes_base_logistica.jpg) already exists.
+db-1       | 2026-06-30 08:01:14.757 UTC [41] STATEMENT:  INSERT INTO plano (proyecto_id, nombre, descripcion, formato, ruta_storage, ancho_px, alto_px, tamano_bytes, calibracion_x1, calibracion_y1, calibracion_x2, calibracion_y2, distancia_real_m, escala_m_por_px, poligono_interes) VALUES (172, 'Base Logistica', NULL, 'jpg', 'seed/campo_villamontes/campo_villamontes_base_logistica.jpg', 1040, 1024, 331787, 49.388115271345676, 727.5817366001132, 954.6496253864019, 729.8573618632232, 29, 0.03203484081653699, '[{"x": 257.3993, "y": 756.228}, {"x": 52.5211, "y": 752.4681}, {"x": 48.1478, "y": 509.2923}, {"x": 122.1498, "y": 501.6517}, {"x": 115.3217, "y": 525.0164}, {"x": 313.9275, "y": 523.4292}, {"x": 315.6896, "y": 111.6765}, {"x": 527.0658, "y": 102.3617}, {"x": 527.3241, "y": 36.66}, {"x": 788.5246, "y": 36.4755}, {"x": 789.4474, "y": 108.895}, {"x": 761.286, "y": 110.4453}, {"x": 773.7611, "y": 242.7715}, {"x": 877.0795, "y": 241.3087}, {"x": 876.452, "y": 263.0493}, {"x": 935.875, "y": 267.0357}, {"x": 936.0596, "y": 312.8423}, {"x": 960.1979, "y": 316.4596}, {"x": 952.6316, "y": 387.4765}, {"x": 930.1173, "y": 387.1812}, {"x": 931.9682, "y": 629.2115}, {"x": 952.4894, "y": 634.9696}, {"x": 955.8481, "y": 694.7656}, {"x": 1006.698, "y": 696.6039}, {"x": 1000.4613, "y": 982.6417}, {"x": 705.4899, "y": 980.0919}, {"x": 708.8241, "y": 947.3762}, {"x": 625.932, "y": 939.8604}, {"x": 627.501, "y": 920.6782}, {"x": 409.3713, "y": 916.5593}, {"x": 397.8059, "y": 938.2755}, {"x": 341.3612, "y": 940.943}, {"x": 337.9094, "y": 917.7988}, {"x": 278.4837, "y": 920.6232}, {"x": 281.1117, "y": 870.216}, {"x": 255.1841, "y": 867.3131}]'::JSON) RETURNING plano.id, plano.created_at, plano.updated_at
+backend-1  | Traceback (most recent call last):
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+backend-1  |     self.dialect.do_execute(
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+backend-1  |     cursor.execute(statement, parameters)
+backend-1  | psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "plano_ruta_storage_key"
+backend-1  | DETAIL:  Key (ruta_storage)=(seed/campo_villamontes/campo_villamontes_base_logistica.jpg) already exists.
+backend-1  | 
+backend-1  | 
+backend-1  | The above exception was the direct cause of the following exception:
+backend-1  | 
+backend-1  | Traceback (most recent call last):
+backend-1  |   File "<frozen runpy>", line 198, in _run_module_as_main
+backend-1  |   File "<frozen runpy>", line 88, in _run_code
+backend-1  |   File "/app/scripts/seed_dev.py", line 312, in <module>
+backend-1  |     seed()
+backend-1  |   File "/app/scripts/seed_dev.py", line 305, in seed
+backend-1  |     _seed_campo_villamontes(db, tecnico)
+backend-1  |   File "/app/scripts/seed_dev.py", line 213, in _seed_campo_villamontes
+backend-1  |     db.flush()
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4353, in flush
+backend-1  |     self._flush(objects)
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4488, in _flush
+backend-1  |     with util.safe_reraise():
+backend-1  |          ^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 122, in __exit__
+backend-1  |     raise exc_value.with_traceback(exc_tb)
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4449, in _flush
+backend-1  |     flush_context.execute()
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 465, in execute
+backend-1  |     rec.execute(self)
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 641, in execute
+backend-1  |     util.preloaded.orm_persistence.save_obj(
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 94, in save_obj
+backend-1  |     _emit_insert_statements(
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 1234, in _emit_insert_statements
+backend-1  |     result = connection.execute(
+backend-1  |              ^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1421, in execute
+backend-1  |     return meth(
+backend-1  |            ^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+backend-1  |     return connection._execute_clauseelement(
+backend-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1643, in _execute_clauseelement
+backend-1  |     ret = self._execute_context(
+backend-1  |           ^^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+backend-1  |     return self._exec_single_context(
+backend-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+backend-1  |     self._handle_dbapi_exception(
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2365, in _handle_dbapi_exception
+backend-1  |     raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+backend-1  |     self.dialect.do_execute(
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+backend-1  |     cursor.execute(statement, parameters)
+backend-1  | sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "plano_ruta_storage_key"
+backend-1  | DETAIL:  Key (ruta_storage)=(seed/campo_villamontes/campo_villamontes_base_logistica.jpg) already exists.
+backend-1  | 
+backend-1  | [SQL: INSERT INTO plano (proyecto_id, nombre, descripcion, formato, ruta_storage, ancho_px, alto_px, tamano_bytes, calibracion_x1, calibracion_y1, calibracion_x2, calibracion_y2, distancia_real_m, escala_m_por_px, poligono_interes) VALUES (%(proyecto_id)s, %(nombre)s, %(descripcion)s, %(formato)s, %(ruta_storage)s, %(ancho_px)s, %(alto_px)s, %(tamano_bytes)s, %(calibracion_x1)s, %(calibracion_y1)s, %(calibracion_x2)s, %(calibracion_y2)s, %(distancia_real_m)s, %(escala_m_por_px)s, %(poligono_interes)s::JSON) RETURNING plano.id, plano.created_at, plano.updated_at]
+backend-1  | [parameters: {'proyecto_id': 172, 'nombre': 'Base Logistica', 'descripcion': None, 'formato': 'jpg', 'ruta_storage': 'seed/campo_villamontes/campo_villamontes_base_logistica.jpg', 'ancho_px': 1040, 'alto_px': 1024, 'tamano_bytes': 331787, 'calibracion_x1': 49.388115271345676, 'calibracion_y1': 727.5817366001132, 'calibracion_x2': 954.6496253864019, 'calibracion_y2': 729.8573618632232, 'distancia_real_m': 29, 'escala_m_por_px': 0.03203484081653699, 'poligono_interes': '[{"x": 257.3993, "y": 756.228}, {"x": 52.5211, "y": 752.4681}, {"x": 48.1478, "y": 509.2923}, {"x": 122.1498, "y": 501.6517}, {"x": 115.3217, "y": 52 ... (840 characters truncated) ... 1.3612, "y": 940.943}, {"x": 337.9094, "y": 917.7988}, {"x": 278.4837, "y": 920.6232}, {"x": 281.1117, "y": 870.216}, {"x": 255.1841, "y": 867.3131}]'}]
+backend-1  | (Background on this error at: https://sqlalche.me/e/20/gkpj)
+backend-1  | [seed_dev] Ya existe: admin@bulldogtech.bo — omitido.
+backend-1  | [seed_dev] Ya existe: tecnico@bulldogtech.bo — omitido.
+backend-1  | [seed_dev] Ya existe cliente: Bulldog Tech. — omitido.
+backend-1  | [seed_dev] Ya existe cliente: Cliente Beta S.A. — omitido.
+backend-1  | [seed_dev] Proyecto real creado: Campo Villamontes
+backend-1  | [seed_dev] Plano real creado: Base Logistica
+backend-1 exited with code 1 (restarting)
+backend-1  | INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+backend-1  | INFO  [alembic.runtime.migration] Will assume transactional DDL.
+db-1       | 2026-06-30 08:01:17.765 UTC [43] ERROR:  duplicate key value violates unique constraint "plano_ruta_storage_key"
+db-1       | 2026-06-30 08:01:17.765 UTC [43] DETAIL:  Key (ruta_storage)=(seed/campo_villamontes/campo_villamontes_base_logistica.jpg) already exists.
+db-1       | 2026-06-30 08:01:17.765 UTC [43] STATEMENT:  INSERT INTO plano (proyecto_id, nombre, descripcion, formato, ruta_storage, ancho_px, alto_px, tamano_bytes, calibracion_x1, calibracion_y1, calibracion_x2, calibracion_y2, distancia_real_m, escala_m_por_px, poligono_interes) VALUES (173, 'Base Logistica', NULL, 'jpg', 'seed/campo_villamontes/campo_villamontes_base_logistica.jpg', 1040, 1024, 331787, 49.388115271345676, 727.5817366001132, 954.6496253864019, 729.8573618632232, 29, 0.03203484081653699, '[{"x": 257.3993, "y": 756.228}, {"x": 52.5211, "y": 752.4681}, {"x": 48.1478, "y": 509.2923}, {"x": 122.1498, "y": 501.6517}, {"x": 115.3217, "y": 525.0164}, {"x": 313.9275, "y": 523.4292}, {"x": 315.6896, "y": 111.6765}, {"x": 527.0658, "y": 102.3617}, {"x": 527.3241, "y": 36.66}, {"x": 788.5246, "y": 36.4755}, {"x": 789.4474, "y": 108.895}, {"x": 761.286, "y": 110.4453}, {"x": 773.7611, "y": 242.7715}, {"x": 877.0795, "y": 241.3087}, {"x": 876.452, "y": 263.0493}, {"x": 935.875, "y": 267.0357}, {"x": 936.0596, "y": 312.8423}, {"x": 960.1979, "y": 316.4596}, {"x": 952.6316, "y": 387.4765}, {"x": 930.1173, "y": 387.1812}, {"x": 931.9682, "y": 629.2115}, {"x": 952.4894, "y": 634.9696}, {"x": 955.8481, "y": 694.7656}, {"x": 1006.698, "y": 696.6039}, {"x": 1000.4613, "y": 982.6417}, {"x": 705.4899, "y": 980.0919}, {"x": 708.8241, "y": 947.3762}, {"x": 625.932, "y": 939.8604}, {"x": 627.501, "y": 920.6782}, {"x": 409.3713, "y": 916.5593}, {"x": 397.8059, "y": 938.2755}, {"x": 341.3612, "y": 940.943}, {"x": 337.9094, "y": 917.7988}, {"x": 278.4837, "y": 920.6232}, {"x": 281.1117, "y": 870.216}, {"x": 255.1841, "y": 867.3131}]'::JSON) RETURNING plano.id, plano.created_at, plano.updated_at
+backend-1  | Traceback (most recent call last):
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_contextWatch   d Detach
+backend-1  |     self.dialect.do_execute(
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+backend-1  |     cursor.execute(statement, parameters)
+backend-1  | psycopg2.errors.UniqueViolation: duplicate key value violates unique constraint "plano_ruta_storage_key"
+backend-1  | DETAIL:  Key (ruta_storage)=(seed/campo_villamontes/campo_villamontes_base_logistica.jpg) already exists.
+backend-1  | 
+backend-1  | 
+backend-1  | The above exception was the direct cause of the following exception:
+backend-1  | 
+backend-1  | Traceback (most recent call last):
+backend-1  |   File "<frozen runpy>", line 198, in _run_module_as_main
+backend-1  |   File "<frozen runpy>", line 88, in _run_code
+backend-1  |   File "/app/scripts/seed_dev.py", line 312, in <module>
+backend-1  |     seed()
+backend-1  |   File "/app/scripts/seed_dev.py", line 305, in seed
+backend-1  |     _seed_campo_villamontes(db, tecnico)
+backend-1  |   File "/app/scripts/seed_dev.py", line 213, in _seed_campo_villamontes
+backend-1  |     db.flush()
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4353, in flush
+backend-1  |     self._flush(objects)
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4488, in _flush
+backend-1  |     with util.safe_reraise():
+backend-1  |          ^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 122, in __exit__
+backend-1  |     raise exc_value.with_traceback(exc_tb)
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4449, in _flush
+backend-1  |     flush_context.execute()
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 465, in execute
+backend-1  |     rec.execute(self)
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 641, in execute
+backend-1  |     util.preloaded.orm_persistence.save_obj(
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 94, in save_obj
+backend-1  |     _emit_insert_statements(
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 1234, in _emit_insert_statements
+backend-1  |     result = connection.execute(
+backend-1  |              ^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1421, in execute
+backend-1  |     return meth(
+backend-1  |            ^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+backend-1  |     return connection._execute_clauseelement(
+backend-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1643, in _execute_clauseelement
+backend-1  |     ret = self._execute_context(
+backend-1  |           ^^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1848, in _execute_context
+backend-1  |     return self._exec_single_context(
+backend-1  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1988, in _exec_single_context
+backend-1  |     self._handle_dbapi_exception(
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2365, in _handle_dbapi_exception
+backend-1  | [seed_dev] Ya existe: admin@bulldogtech.bo — omitido.
+backend-1  | [seed_dev] Ya existe: tecnico@bulldogtech.bo — omitido.
+backend-1  | [seed_dev] Ya existe cliente: Bulldog Tech. — omitido.
+backend-1  | [seed_dev] Ya existe cliente: Cliente Beta S.A. — omitido.
+backend-1  | [seed_dev] Proyecto real creado: Campo Villamontes
+backend-1  | [seed_dev] Plano real creado: Base Logistica
+backend-1  |     raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1969, in _exec_single_context
+backend-1  |     self.dialect.do_execute(
+backend-1  |   File "/usr/local/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+backend-1  |     cursor.execute(statement, parameters)
+backend-1  | sqlalchemy.exc.IntegrityError: (psycopg2.errors.UniqueViolation) duplicate key value violates unique constraint "plano_ruta_storage_key"
+backend-1  | DETAIL:  Key (ruta_storage)=(seed/campo_villamontes/campo_villamontes_base_logistica.jpg) already exists.
+backend-1  | 
+backend-1  | [SQL: INSERT INTO plano (proyecto_id, nombre, descripcion, formato, ruta_storage, ancho_px, alto_px, tamano_bytes, calibracion_x1, calibracion_y1, calibracion_x2, calibracion_y2, distancia_real_m, escala_m_por_px, poligono_interes) VALUES (%(proyecto_id)s, %(nombre)s, %(descripcion)s, %(formato)s, %(ruta_storage)s, %(ancho_px)s, %(alto_px)s, %(tamano_bytes)s, %(calibracion_x1)s, %(calibracion_y1)s, %(calibracion_x2)s, %(calibracion_y2)s, %(distancia_real_m)s, %(escala_m_por_px)s, %(poligono_interes)s::JSON) RETURNING plano.id, plano.created_at, plano.updated_at]
+backend-1  | [parameters: {'proyecto_id': 173, 'nombre': 'Base Logistica', 'descripcion': None, 'formato': 'jpg', 'ruta_storage': 'seed/campo_villamontes/campo_villamontes_base_logistica.jpg', 'ancho_px': 1040, 'alto_px': 1024, 'tamano_bytes': 331787, 'calibracion_x1': 49.388115271345676, 'calibracion_y1': 727.5817366001132, 'calibracion_x2': 954.6496253864019, 'calibracion_y2': 729.8573618632232, 'distancia_real_m': 29, 'escala_m_por_px': 0.03203484081653699, 'poligono_interes': '[{"x": 257.3993, "y": 756.228}, {"x": 52.5211, "y": 752.4681}, {"x": 48.1478, "y": 509.2923}, {"x": 122.1498, "y": 501.6517}, {"x": 115.3217, "y": 52 ... (840 characters truncated) ... 1.3612, "y": 940.943}, {"x": 337.9094, "y": 917.7988}, {"x": 278.4837, "y": 920.6232}, {"x": 281.1117, "y": 870.216}, {"x": 255.1841, "y": 867.3131}]'}]
+backend-1  | (Background on this error at: https://sqlalche.me/e/20/gkpj)
+backend-1 exited with code 1 (restarting)
+Gracefully Stopping... press Ctrl+C again to force
+Container proyecto-final-web-1 Stopping 
+Container proyecto-final-pgadmin-1 Stopping 
+Container proyecto-final-backend-1 Stopping 
+Container proyecto-final-web-1 Stopped 
+web-1 exited with code 143
+^CContainer proyecto-final-db-1 Killing 
+Container proyecto-final-web-1 Killing 
+Container proyecto-final-backend-1 Killing 
+Container proyecto-final-pgadmin-1 Killing 
+Container proyecto-final-web-1 Error Error while Killing
+Container proyecto-final-pgadmin-1 Error Error while Killing
+Container proyecto-final-backend-1 Error Error while Killing
+Container proyecto-final-db-1 Error Error while Killing
+Container proyecto-final-pgadmin-1 Stopped 
+Container proyecto-final-backend-1 Stopped 
+Container proyecto-final-db-1 Stopping 
+Container proyecto-final-db-1 Stopped

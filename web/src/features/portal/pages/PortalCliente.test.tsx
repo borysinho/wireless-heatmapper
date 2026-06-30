@@ -1,11 +1,11 @@
 import { render, screen } from "@testing-library/react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import type { PortalClienteOut } from "@/features/admin/types";
 import PortalCliente from "./PortalCliente";
 
-vi.mock("@tanstack/react-query", () => ({ useMutation: vi.fn(), useQuery: vi.fn() }));
+vi.mock("@tanstack/react-query", () => ({ useQuery: vi.fn() }));
 vi.mock("react-router-dom", () => ({ useParams: vi.fn() }));
 
 const portal: PortalClienteOut = {
@@ -15,7 +15,25 @@ const portal: PortalClienteOut = {
     cliente: "Bulldog Tech.",
     descripcion: null,
   },
-  planos: [],
+  planos: [
+    {
+      id: 2,
+      proyecto_id: 1,
+      nombre: "Planta alta",
+      descripcion: null,
+      formato: "png",
+      ancho_px: 1000,
+      alto_px: 700,
+      tamano_bytes: 1024,
+      url_firmada: "/planos/planta-alta.png",
+      calibrado: true,
+      cantidad_puntos: 8,
+      escala_m_por_px: null,
+      distancia_real_m: null,
+      created_at: "2026-06-20T10:00:00Z",
+      updated_at: "2026-06-20T10:00:00Z",
+    },
+  ],
   conjuntos: [
     {
       id: 10,
@@ -61,25 +79,22 @@ const portal: PortalClienteOut = {
 };
 
 describe("PortalCliente", () => {
-  it("muestra el detalle de los conjuntos publicados", () => {
+  it("muestra el detalle del contenido publicado", () => {
     vi.mocked(useParams).mockReturnValue({ token: "token-publico" });
     vi.mocked(useQuery).mockReturnValue({
       data: portal,
       isLoading: false,
       isError: false,
     } as ReturnType<typeof useQuery>);
-    vi.mocked(useMutation).mockReturnValue({
-      mutate: vi.fn(),
-      isPending: false,
-      isError: false,
-    } as unknown as ReturnType<typeof useMutation>);
-
     render(<PortalCliente />);
 
-    expect(screen.getByRole("heading", { name: "Datos reales relevados en sitio" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Conjuntos propuestos por IA" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "APs planta alta" })).toBeVisible();
-    expect(screen.getByText("Validar cobertura del área administrativa")).toBeVisible();
-    expect(screen.getAllByText(/aa:bb:cc:dd:ee:01/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "Áreas de análisis" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Contenido publicado" })).toBeVisible();
+    expect(screen.getByText("Planta alta")).toBeVisible();
+    expect(screen.getByRole("button", { name: /APs planta alta/i })).toBeVisible();
+    expect(screen.getByText("No hay mapas de calor compartidos para este contenido.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Generar heatmap/i })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Datos reales relevados en sitio" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Propuestas IA" })).toBeNull();
   });
 });

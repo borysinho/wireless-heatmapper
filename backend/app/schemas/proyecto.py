@@ -23,6 +23,7 @@ class ProyectoAdminCreate(ProyectoIn):
     """Alta de proyecto desde el panel web con técnico responsable."""
 
     tecnico_id: int
+    tecnico_ids: list[int] = Field(default_factory=list)
     estado: Literal["nuevo", "en_progreso", "completado", "archivado"] = "nuevo"
 
 
@@ -33,6 +34,7 @@ class ProyectoAdminUpdate(BaseModel):
     cliente_id: int | None = None
     descripcion: str | None = Field(default=None, max_length=500)
     tecnico_id: int | None = None
+    tecnico_ids: list[int] | None = None
     estado: Literal["nuevo", "en_progreso", "completado", "archivado"] | None = None
 
 
@@ -87,9 +89,35 @@ class ProyectoListOut(BaseModel):
     ultima_actividad: datetime
     cantidad_puntos: int
     tecnico: TecnicoBasicoOut
+    tecnicos: list[TecnicoBasicoOut] = Field(default_factory=list)
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @classmethod
+    def from_proyecto(cls, p: Proyecto) -> ProyectoListOut:
+        tecnicos_asignados = list(p.tecnicos or [])
+        if p.tecnico:
+            tecnico_responsable_incluido = any(
+                tecnico.id == p.tecnico.id for tecnico in tecnicos_asignados
+            )
+            if not tecnico_responsable_incluido:
+                tecnicos_asignados.insert(0, p.tecnico)
+        return cls(
+            id=p.id,
+            nombre=p.nombre,
+            descripcion=p.descripcion,
+            cliente=ClienteBasicoOut.model_validate(p.cliente) if p.cliente else None,
+            estado=p.estado,
+            ultima_actividad=p.ultima_actividad,
+            cantidad_puntos=p.cantidad_puntos,
+            tecnico=TecnicoBasicoOut.model_validate(p.tecnico),
+            tecnicos=[
+                TecnicoBasicoOut.model_validate(tecnico)
+                for tecnico in tecnicos_asignados
+            ],
+            created_at=p.created_at,
+        )
 
 
 class ProyectosPageOut(BaseModel):

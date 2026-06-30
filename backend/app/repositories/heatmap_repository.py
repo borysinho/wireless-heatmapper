@@ -99,12 +99,29 @@ class MapaCalorRepository:
         return mapa
 
     def invalidar_plano(self, *, plano_id: int) -> None:
-        """Elimina mapas cacheados de un plano cuando cambian sus mediciones."""
+        """Elimina resultados dependientes cuando cambian las mediciones del plano."""
+        conjuntos_ia = (
+            self._db.query(ConjuntoAP)
+            .filter(
+                ConjuntoAP.plano_id == plano_id,
+                ConjuntoAP.origen == "ia",
+            )
+            .all()
+        )
         (
             self._db.query(MapaCalor)
             .filter(MapaCalor.plano_id == plano_id)
             .delete(synchronize_session=False)
         )
+        for conjunto in conjuntos_ia:
+            (
+                self._db.query(LecturaRSSI)
+                .filter(LecturaRSSI.conjunto_ap_id == conjunto.id)
+                .delete(synchronize_session=False)
+            )
+            self._db.delete(conjunto)
+
+        self._db.flush()
 
     def eliminar(self, *, mapa: MapaCalor) -> None:
         self._db.delete(mapa)

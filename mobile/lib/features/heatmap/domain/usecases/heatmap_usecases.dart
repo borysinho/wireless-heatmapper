@@ -35,6 +35,7 @@ class CrearConjuntoAPUseCase {
     String? descripcion,
     required String bandaObjetivo,
     required List<String> bssids,
+    List<Map<String, dynamic>> configuracionesRadio = const [],
   }) {
     return _repo.crearConjuntoAP(
       planoId: planoId,
@@ -43,6 +44,7 @@ class CrearConjuntoAPUseCase {
       descripcion: descripcion,
       bandaObjetivo: bandaObjetivo,
       bssids: bssids,
+      configuracionesRadio: configuracionesRadio,
     );
   }
 }
@@ -58,6 +60,7 @@ class ActualizarConjuntoAPUseCase {
     String? descripcion,
     required String bandaObjetivo,
     required List<String> bssids,
+    List<Map<String, dynamic>> configuracionesRadio = const [],
   }) {
     return _repo.actualizarConjuntoAP(
       conjuntoId: conjuntoId,
@@ -66,6 +69,7 @@ class ActualizarConjuntoAPUseCase {
       descripcion: descripcion,
       bandaObjetivo: bandaObjetivo,
       bssids: bssids,
+      configuracionesRadio: configuracionesRadio,
     );
   }
 }

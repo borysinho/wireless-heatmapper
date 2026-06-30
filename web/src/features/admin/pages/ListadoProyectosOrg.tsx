@@ -34,6 +34,7 @@ const formularioVacio: ProyectoAdminCreate = {
   descripcion: "",
   cliente_id: null,
   tecnico_id: 0,
+  tecnico_ids: [],
   estado: "nuevo",
 };
 
@@ -63,7 +64,12 @@ export default function ListadoProyectosOrg() {
   );
 
   const abrirNuevo = () => {
-    setFormulario({ ...formularioVacio, tecnico_id: tecnicos[0]?.id ?? 0 });
+    const tecnicoInicial = tecnicos[0]?.id ?? 0;
+    setFormulario({
+      ...formularioVacio,
+      tecnico_id: tecnicoInicial,
+      tecnico_ids: tecnicoInicial > 0 ? [tecnicoInicial] : [],
+    });
     setProyectoEditar("nuevo");
     setErrorModal(null);
   };
@@ -74,6 +80,10 @@ export default function ListadoProyectosOrg() {
       descripcion: proyecto.descripcion ?? "",
       cliente_id: proyecto.cliente?.id ?? null,
       tecnico_id: proyecto.tecnico.id,
+      tecnico_ids:
+        proyecto.tecnicos.length > 0
+          ? proyecto.tecnicos.map((tecnico) => tecnico.id)
+          : [proyecto.tecnico.id],
       estado: proyecto.estado,
     });
     setProyectoEditar(proyecto);
@@ -82,12 +92,16 @@ export default function ListadoProyectosOrg() {
 
   const guardarProyecto = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formulario.nombre.trim() || formulario.tecnico_id <= 0) return;
+    const tecnicoIds = _normalizarTecnicosFormulario(formulario);
+    if (!formulario.nombre.trim() || tecnicoIds.length === 0) return;
     setErrorModal(null);
+    const tecnicoResponsableId = tecnicoIds[0];
     const body = {
       ...formulario,
       nombre: formulario.nombre.trim(),
       descripcion: formulario.descripcion?.trim() || null,
+      tecnico_id: tecnicoResponsableId,
+      tecnico_ids: tecnicoIds,
     };
     try {
       if (proyectoEditar === "nuevo") {
@@ -137,7 +151,7 @@ export default function ListadoProyectosOrg() {
   const totalPuntos = proyectos.reduce((total, proyecto) => total + proyecto.cantidad_puntos, 0);
   const proyectosConDatos = proyectos.filter((proyecto) => proyecto.cantidad_puntos > 0).length;
 
-  const navegarRF = (proyecto: ProyectoListOut, seccion = "conjuntos-ap") => {
+  const navegarRF = (proyecto: ProyectoListOut, seccion = "datos-campo") => {
     navigate(`/admin/proyectos/${proyecto.id}/rf/${seccion}`, {
       state: { proyectoNombre: proyecto.nombre },
     });
@@ -217,7 +231,7 @@ export default function ListadoProyectosOrg() {
                 <dl className={styles.detalles}>
                   <div>
                     <dt>Técnico</dt>
-                    <dd>{proyecto.tecnico.nombre}</dd>
+                    <dd>{_labelTecnicos(proyecto)}</dd>
                   </div>
                   <div>
                     <dt>Datos relevados</dt>
@@ -230,8 +244,8 @@ export default function ListadoProyectosOrg() {
                 </dl>
 
                 <div className={styles.flujoRF} aria-label={`Flujo RF de ${proyecto.nombre}`}>
-                  <Button variante="secondary" tamano="sm" onClick={() => navegarRF(proyecto, "conjuntos-ap")}>
-                    <RadioTower size={14} /> Seleccionar datos
+                  <Button variante="secondary" tamano="sm" onClick={() => navegarRF(proyecto, "datos-campo")}>
+                    <RadioTower size={14} /> Datos de campo
                   </Button>
                   <Button variante="secondary" tamano="sm" onClick={() => navegarRF(proyecto, "escenarios-ia")}>
                     <BrainCircuit size={14} /> Generar IA
@@ -263,16 +277,36 @@ export default function ListadoProyectosOrg() {
         <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby="modal-proyecto">
           <div className={`${styles.modal} ${styles.modalAmplio}`}>
             <h2 id="modal-proyecto" className={styles.modalTitulo}>{proyectoEditar === "nuevo" ? "Nuevo proyecto" : "Editar proyecto"}</h2>
-            <p className={styles.modalSubtitulo}>El técnico recibirá una notificación cuando se le asigne el proyecto.</p>
+            <p className={styles.modalSubtitulo}>Los técnicos asignados podrán trabajar sobre el mismo proyecto en línea.</p>
             <form onSubmit={guardarProyecto}>
               <div className={styles.grillaFormulario}>
                 <label className={styles.campo}><span>Nombre *</span><input autoFocus required maxLength={200} value={formulario.nombre} onChange={(e) => setFormulario((f) => ({ ...f, nombre: e.target.value }))} /></label>
-                <label className={styles.campo}><span>Técnico *</span><select required value={formulario.tecnico_id || ""} onChange={(e) => setFormulario((f) => ({ ...f, tecnico_id: Number(e.target.value) }))}><option value="">Seleccione…</option>{tecnicos.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}</select></label>
                 <label className={styles.campo}><span>Cliente</span><select value={formulario.cliente_id ?? ""} onChange={(e) => setFormulario((f) => ({ ...f, cliente_id: e.target.value ? Number(e.target.value) : null }))}><option value="">Sin cliente</option>{clientesDisponibles.map((c) => <option key={c.id} value={c.id}>{c.nombre}{c.activo ? "" : " (inactivo)"}</option>)}</select></label>
+                <fieldset className={`${styles.campo} ${styles.campoCompleto} ${styles.tecnicosAsignados}`}>
+                  <legend>Técnicos asignados</legend>
+                  <div className={styles.listaTecnicosAsignados}>
+                    {tecnicos.map((tecnico) => {
+                      const seleccionado = _normalizarTecnicosFormulario(formulario).includes(tecnico.id);
+                      return (
+                        <label key={tecnico.id}>
+                          <input
+                            type="checkbox"
+                            checked={seleccionado}
+                            onChange={() => setFormulario((f) => _toggleTecnicoAsignado(f, tecnico.id))}
+                          />
+                          <span>
+                            <strong>{tecnico.nombre}</strong>
+                            <small>{tecnico.email}</small>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </fieldset>
                 <label className={`${styles.campo} ${styles.campoCompleto}`}><span>Descripción</span><textarea rows={3} maxLength={500} value={formulario.descripcion ?? ""} onChange={(e) => setFormulario((f) => ({ ...f, descripcion: e.target.value }))} /></label>
               </div>
               {errorModal && <p className={styles.modalError} role="alert">{errorModal}</p>}
-              <div className={styles.modalAcciones}><Button variante="secondary" type="button" onClick={() => setProyectoEditar(null)}>Cancelar</Button><Button type="submit" isLoading={creando || actualizando} disabled={!formulario.nombre.trim() || formulario.tecnico_id <= 0}>Guardar</Button></div>
+              <div className={styles.modalAcciones}><Button variante="secondary" type="button" onClick={() => setProyectoEditar(null)}>Cancelar</Button><Button type="submit" isLoading={creando || actualizando} disabled={!formulario.nombre.trim() || _normalizarTecnicosFormulario(formulario).length === 0}>Guardar</Button></div>
             </form>
           </div>
         </div>
@@ -298,4 +332,37 @@ export default function ListadoProyectosOrg() {
 
 function _detalleError(error: unknown, alternativo: string): string {
   return (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? alternativo;
+}
+
+function _normalizarTecnicosFormulario(formulario: ProyectoAdminCreate): number[] {
+  return Array.from(
+    new Set([
+      ...(formulario.tecnico_ids ?? []),
+      formulario.tecnico_id,
+    ].filter((id) => id > 0)),
+  );
+}
+
+function _toggleTecnicoAsignado(
+  formulario: ProyectoAdminCreate,
+  tecnicoId: number,
+): ProyectoAdminCreate {
+  const actual = new Set(_normalizarTecnicosFormulario(formulario));
+  if (actual.has(tecnicoId)) {
+    actual.delete(tecnicoId);
+  } else {
+    actual.add(tecnicoId);
+  }
+  const tecnicoIds = Array.from(actual).filter((id) => id > 0);
+  return {
+    ...formulario,
+    tecnico_id: tecnicoIds[0] ?? 0,
+    tecnico_ids: tecnicoIds,
+  };
+}
+
+function _labelTecnicos(proyecto: ProyectoListOut): string {
+  const tecnicos = proyecto.tecnicos.length > 0 ? proyecto.tecnicos : [proyecto.tecnico];
+  if (tecnicos.length <= 1) return tecnicos[0]?.nombre ?? "Sin técnico";
+  return `${proyecto.tecnico.nombre} + ${tecnicos.length - 1}`;
 }

@@ -94,6 +94,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
     String? descripcion,
     required String bandaObjetivo,
     required List<String> bssids,
+    List<Map<String, dynamic>> configuracionesRadio = const [],
   }) async {
     final actual = state;
     final aps = actual is HeatmapConjuntos ? actual.aps : <APDisponible>[];
@@ -106,6 +107,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
         descripcion: descripcion,
         bandaObjetivo: bandaObjetivo,
         bssids: bssids,
+        configuracionesRadio: configuracionesRadio,
       );
       final conjuntos = await _listarConjuntos(planoId);
       emit(HeatmapConjuntos(
@@ -135,6 +137,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
     String? descripcion,
     required String bandaObjetivo,
     required List<String> bssids,
+    List<Map<String, dynamic>> configuracionesRadio = const [],
   }) async {
     final actual = state;
     final planoId = _planoId;
@@ -151,6 +154,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
         descripcion: descripcion,
         bandaObjetivo: bandaObjetivo,
         bssids: bssids,
+        configuracionesRadio: configuracionesRadio,
       );
       final conjuntos = await _listarConjuntos(planoId);
       emit(HeatmapConjuntos(

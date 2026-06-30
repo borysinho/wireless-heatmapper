@@ -36,6 +36,10 @@
 
 > **Refinamiento de generación masiva de heatmaps (29-jun-2026):** la previsualización web de conjuntos AP genera o actualiza únicamente el mapa global del conjunto y un mapa individual por cada AP. Esta regla aplica por igual a conjuntos técnicos (`manual_movil` / `manual_web`) y conjuntos propuestos por IA (`ia`), sin crear combinaciones intermedias.
 
+> **Refinamiento de portal cliente (30-jun-2026):** PB-16/PB-17 quedan restringidas a consulta de mapas incluidos explícitamente en `mapa_ids`; el portal público no genera heatmaps nuevos ni expone controles de generación.
+
+> **Refinamiento de clasificación por plano y ejecución colaborativa (30-jun-2026):** PB-15/PB-16/PB-17 agrupan el contenido publicable y publicado por plano para proyectos con múltiples mapas. PB-18 mantiene un responsable principal del proyecto y agrega técnicos asignados adicionales para ejecución colaborativa en campo, sin exponer información de técnicos en el portal público.
+
 ---
 
 ## 2. Listado completo de HU del plan de implementación

@@ -8,6 +8,7 @@ from datetime import UTC
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.security import hash_password
 from app.models.cliente import Cliente
 from app.models.proyecto import Proyecto
 from app.models.usuario import Usuario
@@ -16,7 +17,10 @@ from app.models.usuario import Usuario
 @pytest.fixture
 def cliente_seed(db_session) -> Cliente:
     """Crea un cliente de prueba reutilizable."""
-    cliente = Cliente(nombre="Cliente Test")
+    cliente = Cliente(
+        nombre="Cliente Test",
+        email_referencia="cliente.test@bulldog.test",
+    )
     db_session.add(cliente)
     db_session.commit()
     db_session.refresh(cliente)
@@ -102,6 +106,24 @@ class TestListarProyectos:
         assert resp.status_code == 200
         data = resp.json()
         assert all(p["tecnico"]["id"] == tecnico_usuario.id for p in data["items"])
+
+    def test_admin_obtiene_proyecto_por_id_con_cliente(
+        self,
+        client: TestClient,
+        admin_token: str,
+        proyectos_seed: list[Proyecto],
+    ):
+        """Detalle admin retorna solo el cliente asociado al proyecto."""
+        proyecto = proyectos_seed[0]
+        resp = client.get(
+            f"/admin/proyectos/{proyecto.id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["id"] == proyecto.id
+        assert data["cliente"]["id"] == proyecto.cliente_id
+        assert data["cliente"]["email_referencia"] == "cliente.test@bulldog.test"
 
     def test_sin_proyectos_retorna_lista_vacia(
         self,
@@ -384,3 +406,93 @@ class TestClienteEnProyecto:
                 assert isinstance(item["cliente"], dict)
                 assert "id" in item["cliente"]
                 assert "nombre" in item["cliente"]
+
+
+class TestTecnicosAsignados:
+    """Operación colaborativa: un proyecto puede tener más de un técnico."""
+
+    def test_admin_crea_proyecto_con_varios_tecnicos(
+        self,
+        client: TestClient,
+        db_session,
+        admin_token: str,
+        tecnico_usuario: Usuario,
+        cliente_seed: Cliente,
+    ):
+        segundo = Usuario(
+            nombre="Técnico Apoyo",
+            email="apoyo@test.bo",
+            password_hash=hash_password("Apoyo1234!"),
+            rol="tecnico",
+            activo=True,
+        )
+        db_session.add(segundo)
+        db_session.commit()
+        db_session.refresh(segundo)
+
+        resp = client.post(
+            "/admin/proyectos",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            json={
+                "nombre": "Proyecto colaborativo",
+                "cliente_id": cliente_seed.id,
+                "tecnico_id": tecnico_usuario.id,
+                "tecnico_ids": [tecnico_usuario.id, segundo.id],
+                "estado": "en_progreso",
+            },
+        )
+
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["tecnico"]["id"] == tecnico_usuario.id
+        assert {tecnico["id"] for tecnico in data["tecnicos"]} == {
+            tecnico_usuario.id,
+            segundo.id,
+        }
+
+    def test_tecnico_asignado_ve_proyecto_compartido(
+        self,
+        client: TestClient,
+        db_session,
+        admin_token: str,
+        tecnico_usuario: Usuario,
+        cliente_seed: Cliente,
+    ):
+        segundo = Usuario(
+            nombre="Técnico Apoyo",
+            email="apoyo@test.bo",
+            password_hash=hash_password("Apoyo1234!"),
+            rol="tecnico",
+            activo=True,
+        )
+        db_session.add(segundo)
+        db_session.commit()
+        db_session.refresh(segundo)
+        crear = client.post(
+            "/admin/proyectos",
+            headers={"Authorization": f"Bearer {admin_token}"},
+            json={
+                "nombre": "Proyecto compartido móvil",
+                "cliente_id": cliente_seed.id,
+                "tecnico_id": tecnico_usuario.id,
+                "tecnico_ids": [tecnico_usuario.id, segundo.id],
+                "estado": "en_progreso",
+            },
+        )
+        assert crear.status_code == 201
+
+        login = client.post(
+            "/auth/login",
+            json={"email": "apoyo@test.bo", "password": "Apoyo1234!"},
+        )
+        assert login.status_code == 200
+        resp = client.get(
+            "/proyectos",
+            headers={"Authorization": f"Bearer {login.json()['access_token']}"},
+        )
+
+        assert resp.status_code == 200
+        assert any(
+            proyecto["nombre"] == "Proyecto compartido móvil"
+            for proyecto in resp.json()
+        )

@@ -192,12 +192,7 @@ class _ProyectosPageState extends State<ProyectosPage> {
           BlocListener<ProyectoCubit, ProyectoState>(
             listener: (context, state) {
               if (state is ProyectoError) {
-                _mostrarSnackError(
-                  context,
-                  state.mensaje,
-                  onReintentar: () =>
-                      context.read<ProyectoCubit>().cargarProyectos(),
-                );
+                _mostrarSnackError(context, state.mensaje);
               }
               if (state is ProyectoEliminado) {
                 ScaffoldMessenger.of(context).showSnackBar(

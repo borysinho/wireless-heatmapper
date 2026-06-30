@@ -397,6 +397,8 @@ class OptimizadorAPService:
                         distancia_px=math.hypot(x - ap_x, y - ap_y),
                         metros_por_pixel=metros_por_pixel,
                         banda=banda,
+                        punto_x=x,
+                        punto_y=y,
                     )
                     for ap_x, ap_y in aps
                 )
@@ -428,6 +430,8 @@ class OptimizadorAPService:
             distancia_px=math.hypot(punto_critico.x - x, punto_critico.y - y),
             metros_por_pixel=metros_por_pixel,
             banda=banda,
+            punto_x=punto_critico.x,
+            punto_y=punto_critico.y,
         )
         radios = [
             self._configuracion_radio(banda_actual, orden) for banda_actual in bandas
@@ -501,6 +505,8 @@ class OptimizadorAPService:
                             distancia_px=math.hypot(punto.x - x, punto.y - y),
                             metros_por_pixel=metros_por_pixel,
                             banda=banda,
+                            punto_x=punto.x,
+                            punto_y=punto.y,
                             potencia_dbm=8.0 if banda == "2.4" else 14.0,
                         ),
                         indice,

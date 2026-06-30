@@ -11,6 +11,10 @@ class APDisponibleModel extends APDisponible {
     required super.posY,
     required super.cantidadPuntos,
     super.seleccionado,
+    super.potenciaTxDbm,
+    super.fuentePotencia,
+    super.confianzaPotencia,
+    super.radios,
   });
 
   factory APDisponibleModel.fromJson(Map<String, dynamic> json) {
@@ -24,6 +28,18 @@ class APDisponibleModel extends APDisponible {
       posY: (json['pos_y'] as num).toDouble(),
       cantidadPuntos: json['cantidad_puntos'] as int,
       seleccionado: json['seleccionado'] as bool? ?? false,
+      potenciaTxDbm: (json['potencia_tx_dbm'] as num?)?.toDouble(),
+      fuentePotencia: json['fuente_potencia'] as String?,
+      confianzaPotencia: json['confianza_potencia'] as String?,
+      radios: _listaMapas(json['radios']),
     );
+  }
+
+  static List<Map<String, dynamic>>? _listaMapas(Object? value) {
+    if (value is! List) return null;
+    return value
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList(growable: false);
   }
 }

@@ -8,13 +8,13 @@
 
 ## 1. Lectura funcional del esquema
 
-La base de datos está organizada alrededor de `proyecto`. Un administrador gestiona `usuario` y `cliente`; el técnico trabaja sobre `plano`, captura `punto_medicion` y `lectura_rssi`, define `conjunto_ap` con los APs relevantes del proyecto y genera `mapa_calor`. El portal cliente se controla con `token_enlace_cliente`, cuyo contenido selecciona explícitamente conjuntos y mapas.
+La base de datos está organizada alrededor de `proyecto`. Un administrador gestiona `usuario` y `cliente`; el proyecto mantiene un técnico responsable en `proyecto.tecnico_id` y también técnicos asignados mediante `proyecto_tecnico_asignacion`. El técnico trabaja sobre `plano`, captura `punto_medicion` y `lectura_rssi`, define `conjunto_ap` con los APs relevantes del proyecto y genera `mapa_calor`. El portal cliente se controla con `token_enlace_cliente`, cuyo contenido selecciona explícitamente conjuntos y mapas.
 
 La generación IA ya no persiste entidades separadas de escenario, recomendación, valores proyectados, diagnóstico o reporte. La regla vigente es:
 
 - Un conjunto AP de origen `ia` nace desde un único `conjunto_ap` técnico mediante `conjunto_origen_id`.
 - El conjunto IA reutiliza la misma estructura de `conjunto_ap` y `conjunto_ap_item`.
-- Los metadatos propios de IA se guardan en columnas opcionales del conjunto y de sus items.
+- Los metadatos propios de IA se guardan en columnas opcionales del conjunto y de sus items; `metricas_ia` conserva el resumen de cobertura, calibración, supuestos, mapas por banda y lecturas estimadas/simuladas para trazabilidad.
 - La IA materializa lecturas `IA_ESTIMADA` en `lectura_rssi` para su conjunto derivado.
 - El heatmap proyectado se genera con IDW sobre esas lecturas estimadas y se guarda como `mapa_calor` asociado al conjunto IA.
 - La publicación al cliente no depende de estados de aprobación; depende del contenido explícito en `token_enlace_cliente`.
@@ -118,6 +118,13 @@ package "Proyecto, planos y captura" {
     created_at : TIMESTAMPTZ
   }
 
+  entity "proyecto_tecnico_asignacion" as PROY_TEC {
+    * proyecto_id : INTEGER <<PK, FK>>
+    * tecnico_id : INTEGER <<PK, FK>>
+    --
+    created_at : TIMESTAMPTZ
+  }
+
   entity "plano" as PLANO {
     * id : INTEGER <<PK>>
     --
@@ -186,7 +193,7 @@ package "Conjuntos AP y heatmaps" {
     resumen_ia : TEXT
     metricas_ia : JSON
     restricciones_ia : JSON
-    version_motor_ia : VARCHAR(80)
+    version_motor_ia : VARCHAR(30)
     created_at : TIMESTAMPTZ
     updated_at : TIMESTAMPTZ
   }
@@ -239,8 +246,10 @@ package "Conjuntos AP y heatmaps" {
 USUARIO ||--o{ REFRESH : "tokens"
 USUARIO ||--o{ PUSH : "dispositivos"
 USUARIO ||--o{ PROYECTO : "tecnico_id"
+USUARIO ||--o{ PROY_TEC : "tecnico asignado"
 USUARIO ||--o{ TOKEN_CLIENTE : "creado_por"
 CLIENTE ||--o{ PROYECTO : "cliente"
+PROYECTO ||--o{ PROY_TEC : "asignaciones"
 PROYECTO ||--o{ PLANO : "planos"
 PROYECTO ||--o{ TOKEN_CLIENTE : "enlaces"
 PLANO ||--o{ PUNTO : "puntos"
@@ -283,11 +292,15 @@ end note
 | Tabla                    | Restricción / índice                                      | Sentido funcional                                    |
 | ------------------------ | --------------------------------------------------------- | ---------------------------------------------------- |
 | `usuario`                | `UNIQUE(email)`                                           | Login único                                         |
+| `refresh_token`          | `UNIQUE(token)`                                           | Refresh token no repetido                          |
+| `dispositivo_push`       | `UNIQUE(token)`                                           | Un token FCM se registra una sola vez              |
 | `cliente`                | `UNIQUE(nombre)`                                          | Evita duplicidad de clientes                        |
+| `proyecto_tecnico_asignacion` | `PRIMARY KEY(proyecto_id, tecnico_id)`              | Evita asignar dos veces el mismo técnico al proyecto |
 | `plano`                  | `UNIQUE(ruta_storage)`                                    | Cada archivo cargado tiene una ruta única           |
 | `lectura_rssi`           | `INDEX(origen)`, `INDEX(conjunto_ap_id)`                   | Separa lecturas reales y estimadas                  |
+| `conjunto_ap`            | `UNIQUE(plano_id, nombre)`                                | Un plano no repite nombres de conjuntos AP         |
 | `conjunto_ap_item`       | `UNIQUE(conjunto_ap_id, bssid)`                           | Un AP no se repite dentro del mismo conjunto        |
-| `mapa_calor`             | `UNIQUE(ruta_imagen)`                                     | Cada imagen generada tiene almacenamiento único     |
+| `mapa_calor`             | `UNIQUE(ruta_imagen)`, `UNIQUE(plano_id, algoritmo, resolucion, firma_mediciones)` | Cada imagen y cada caché de mapa son únicos |
 | `token_enlace_cliente`   | `UNIQUE(token)`                                           | El portal público se resuelve por token no repetido |
 
 ---
@@ -296,6 +309,10 @@ end note
 
 | Relación                         | Acción                         | Efecto esperado                                         |
 | -------------------------------- | ------------------------------ | ------------------------------------------------------- |
+| `usuario` → `refresh_token`      | `ON DELETE CASCADE`            | Borrar usuario elimina sus refresh tokens               |
+| `usuario` → `dispositivo_push`   | `ON DELETE CASCADE`            | Borrar usuario elimina sus dispositivos push            |
+| `proyecto` → `proyecto_tecnico_asignacion` | `ON DELETE CASCADE` | Borrar proyecto elimina sus asignaciones de técnicos    |
+| `usuario` → `proyecto_tecnico_asignacion`  | `ON DELETE CASCADE` | Borrar técnico elimina sus asignaciones                 |
 | `proyecto` → `plano`             | `ON DELETE CASCADE`            | Borrar proyecto elimina planos                          |
 | `plano` → `punto_medicion`       | `ON DELETE CASCADE`            | Borrar plano elimina puntos y lecturas asociadas        |
 | `punto_medicion` → `lectura_rssi`  | `ON DELETE CASCADE`          | Borrar punto elimina lecturas RSSI                      |
@@ -304,7 +321,7 @@ end note
 | `conjunto_ap` → `conjunto_ap_item` | `ON DELETE CASCADE`          | Borrar conjunto elimina sus APs                         |
 | `conjunto_ap.conjunto_origen_id` | `ON DELETE SET NULL`           | Si se borra la fuente, la propuesta IA conserva datos   |
 | `plano` → `mapa_calor`           | `ON DELETE CASCADE`            | Borrar plano elimina mapas                              |
-| `conjunto_ap` → `mapa_calor`     | `ON DELETE SET NULL`           | Borrar conjunto conserva mapas históricos sin vínculo   |
+| `conjunto_ap` → `mapa_calor`     | `ON DELETE SET NULL` en BD; el repositorio elimina mapas asociados | La API no conserva mapas al eliminar un conjunto |
 | `proyecto` → `token_enlace_cliente` | `ON DELETE CASCADE`         | Borrar proyecto elimina enlaces públicos                |
 
 ---
@@ -330,6 +347,7 @@ end note
 | ------------------------- | ---------------------------------------------------------- | ---------------------------------------------------- |
 | Seguridad y usuarios      | `usuario`, `refresh_token`, `dispositivo_push`             | Acceso, sesión y notificaciones                      |
 | Cliente y proyecto        | `cliente`, `proyecto`                                      | Organización del trabajo                            |
+| Asignación de técnicos    | `proyecto_tecnico_asignacion`                              | Técnicos vinculados a proyectos además del responsable principal |
 | Captura en campo          | `plano`, `punto_medicion`, `lectura_rssi`                  | Observaciones reales del relevamiento WiFi          |
 | Conjuntos AP              | `conjunto_ap`, `conjunto_ap_item`                          | APs relevantes técnicos y propuestas IA derivadas   |
 | Heatmaps                  | `mapa_calor`                                               | Mapas reales/proyectados asociados a conjuntos      |

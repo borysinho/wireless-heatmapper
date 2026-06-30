@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { Eye } from "lucide-react";
+import { Eye, Trash2 } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
-import { Button, EmptyState } from "@/shared/components";
+import { Button, ConfirmDialog, EmptyState, useToast } from "@/shared/components";
 import { ConjuntoAPPreviewModal } from "../components/ConjuntoAPPreviewModal";
 import {
   useConjuntosPorPlanos,
+  useEliminarConjuntoAP,
   useMapasPorPlanos,
   usePlanosProyecto,
 } from "../hooks/useProyectosOrg";
@@ -21,7 +22,11 @@ export default function ConjuntosAPProyecto() {
     proyectoId: number;
     proyectoNombre: string;
   }>();
+  const toast = useToast();
   const [vistaPrevia, setVistaPrevia] = useState<VistaPreviaConjunto | null>(null);
+  const [conjuntoEliminar, setConjuntoEliminar] = useState<ConjuntoAPOut | null>(
+    null,
+  );
 
   const {
     data: planos,
@@ -66,10 +71,26 @@ export default function ConjuntosAPProyecto() {
   const errorConjuntos = consultasConjuntos.some((consulta) => consulta.isError);
   const errorMapas = consultasMapas.some((consulta) => consulta.isError);
   const resumen = _resumenConjuntos(conjuntos);
+  const { mutateAsync: eliminarConjunto, isPending: eliminandoConjunto } =
+    useEliminarConjuntoAP();
+
+  const handleEliminarConjunto = async () => {
+    if (!conjuntoEliminar) return;
+    try {
+      await eliminarConjunto(conjuntoEliminar.id);
+      toast.exito("Registro de campo eliminado.");
+      setConjuntoEliminar(null);
+      if (vistaPrevia?.conjunto.id === conjuntoEliminar.id) {
+        setVistaPrevia(null);
+      }
+    } catch {
+      toast.error("No se pudo eliminar el registro de campo.");
+    }
+  };
 
   if (cargandoPlanos || cargandoConjuntos || cargandoMapas) return <div className={styles.skeleton} />;
   if (errorPlanos || errorConjuntos || errorMapas) {
-    return <EmptyState mensaje="No se pudieron cargar los conjuntos de APs." />;
+    return <EmptyState mensaje="No se pudieron cargar los datos de campo." />;
   }
   if (!planos || planos.length === 0) {
     return <EmptyState mensaje="El proyecto todavía no tiene planos." />;
@@ -79,31 +100,32 @@ export default function ConjuntosAPProyecto() {
     <section className={styles.contenedor}>
       <div className={styles.encabezadoSeccion}>
         <div>
-          <h2>Conjuntos de APs para cliente</h2>
+          <h2>Datos de campo relevados</h2>
           <p>
-            Revise los conjuntos creados por el técnico desde la aplicación móvil.
+            Revise las lecturas reales capturadas por el técnico desde la aplicación móvil.
           </p>
         </div>
       </div>
 
       <div className={styles.resumen}>
-        <ResumenItem etiqueta="Móvil" valor={resumen.manual_movil} />
-        <ResumenItem etiqueta="Total" valor={conjuntos.length} />
+        <ResumenItem etiqueta="Relevamientos móviles" valor={resumen.manual_movil} />
+        <ResumenItem etiqueta="Registros disponibles" valor={conjuntos.length} />
       </div>
 
       {conjuntos.length === 0 ? (
-        <EmptyState mensaje="No hay conjuntos de APs móviles en este proyecto." />
+        <EmptyState mensaje="No hay datos de campo relevados para este proyecto." />
       ) : (
         <div className={styles.tablaWrapper}>
           <table className={styles.tabla}>
             <thead>
               <tr>
-                <th>Conjunto</th>
+                <th>Registro</th>
                 <th>Plano</th>
                 <th>Vista</th>
                 <th>Origen</th>
                 <th>Banda</th>
                 <th>APs</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -136,6 +158,17 @@ export default function ConjuntosAPProyecto() {
                       <span className={styles.banda}>{conjunto.banda_objetivo} GHz</span>
                     </td>
                     <td>{conjunto.cantidad_aps}</td>
+                    <td>
+                      <Button
+                        variante="danger"
+                        tamano="sm"
+                        disabled={eliminandoConjunto}
+                        onClick={() => setConjuntoEliminar(conjunto)}
+                      >
+                        <Trash2 size={14} aria-hidden="true" />
+                        Eliminar
+                      </Button>
+                    </td>
                   </tr>
                 );
               })}
@@ -150,6 +183,17 @@ export default function ConjuntosAPProyecto() {
           mapas={mapasPorConjunto.get(vistaPrevia.conjunto.id) ?? []}
           plano={vistaPrevia.plano}
           onCerrar={() => setVistaPrevia(null)}
+        />
+      )}
+
+      {conjuntoEliminar && (
+        <ConfirmDialog
+          titulo={`¿Eliminar "${conjuntoEliminar.nombre}"?`}
+          descripcion="Se eliminará el registro de campo seleccionado. Los mapas de calor asociados permanecerán como históricos sin registro fuente."
+          textoConfirmar="Eliminar"
+          cargando={eliminandoConjunto}
+          onCancelar={() => setConjuntoEliminar(null)}
+          onConfirmar={handleEliminarConjunto}
         />
       )}
     </section>

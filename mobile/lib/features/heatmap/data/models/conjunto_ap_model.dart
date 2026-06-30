@@ -37,6 +37,10 @@ class ConjuntoAPModel extends ConjuntoAP {
             posY: (data['pos_y'] as num?)?.toDouble() ?? 0,
             cantidadPuntos: data['cantidad_puntos'] as int? ?? 0,
             seleccionado: false,
+            potenciaTxDbm: (data['potencia_tx_dbm'] as num?)?.toDouble(),
+            fuentePotencia: data['fuente_potencia'] as String?,
+            confianzaPotencia: data['confianza_potencia'] as String?,
+            radios: _listaMapas(data['radios']),
           );
         })
         .cast<APDisponibleModel>()
@@ -67,5 +71,13 @@ class ConjuntoAPModel extends ConjuntoAP {
     if (value is Map<String, dynamic>) return value;
     if (value is Map) return Map<String, dynamic>.from(value);
     return null;
+  }
+
+  static List<Map<String, dynamic>>? _listaMapas(Object? value) {
+    if (value is! List) return null;
+    return value
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList(growable: false);
   }
 }

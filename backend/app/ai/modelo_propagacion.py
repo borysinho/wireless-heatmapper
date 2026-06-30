@@ -20,6 +20,16 @@ class MuestraCalibracionRF:
 
 
 @dataclass(frozen=True)
+class CorreccionEspacialRF:
+    """Residuo local aprendido desde mediciones reales del plano."""
+
+    x_px: float
+    y_px: float
+    banda: str
+    error_db: float
+
+
+@dataclass(frozen=True)
 class ParametrosPropagacion:
     """Parámetros efectivos del modelo log-distance para una banda."""
 
@@ -45,8 +55,10 @@ class ModeloPropagacion:
     def __init__(
         self,
         parametros_por_banda: dict[str, ParametrosPropagacion] | None = None,
+        correcciones_espaciales: list[CorreccionEspacialRF] | None = None,
     ) -> None:
         self._parametros_por_banda = parametros_por_banda or {}
+        self._correcciones_espaciales = correcciones_espaciales or []
 
     def fspl(self, *, rssi_referencia: float = -42.0, distancia_m: float) -> float:
         distancia = max(distancia_m, 1.0)
@@ -80,16 +92,21 @@ class ModeloPropagacion:
         distancia_px: float,
         metros_por_pixel: float,
         banda: str,
+        punto_x: float | None = None,
+        punto_y: float | None = None,
         penalizacion_material_db: float = 0.0,
         potencia_dbm: float | None = None,
         ganancia_dbi: float = 2.14,
         perdida_cable_db: float = 0.0,
+        aplicar_correccion_espacial: bool = True,
     ) -> float:
         distancia_m = max(1.0, distancia_px * max(metros_por_pixel, 0.01))
         penalizacion_banda = self._penalizacion_banda(banda)
         parametros = self._parametros_por_banda.get(banda, ParametrosPropagacion())
         perdida = parametros.perdida_por_doble_distancia * math.log2(distancia_m)
-        if potencia_dbm is None:
+        if potencia_dbm is None or (
+            parametros.muestras >= 3 and not parametros.usa_potencia_tx
+        ):
             referencia = parametros.referencia_1m
         else:
             eirp = potencia_dbm + ganancia_dbi - perdida_cable_db
@@ -98,6 +115,11 @@ class ModeloPropagacion:
                 if parametros.usa_potencia_tx
                 else eirp - 40.0 - 12.0
             )
+        correccion_espacial = (
+            self._correccion_espacial(banda=banda, x_px=punto_x, y_px=punto_y)
+            if aplicar_correccion_espacial
+            else 0.0
+        )
         return round(
             max(
                 -120.0,
@@ -106,10 +128,41 @@ class ModeloPropagacion:
                     referencia
                     - perdida
                     - penalizacion_banda
-                    - penalizacion_material_db,
+                    - penalizacion_material_db
+                    + correccion_espacial,
                 ),
             ),
             2,
+        )
+
+    def con_correccion_espacial(
+        self,
+        correcciones: list[CorreccionEspacialRF],
+    ) -> ModeloPropagacion:
+        """Devuelve el mismo modelo físico con residuos locales acotados."""
+        por_banda: dict[str, list[CorreccionEspacialRF]] = defaultdict(list)
+        for correccion in correcciones:
+            if not math.isfinite(correccion.error_db):
+                continue
+            if not math.isfinite(correccion.x_px) or not math.isfinite(correccion.y_px):
+                continue
+            por_banda[correccion.banda].append(
+                CorreccionEspacialRF(
+                    x_px=correccion.x_px,
+                    y_px=correccion.y_px,
+                    banda=correccion.banda,
+                    error_db=max(-18.0, min(12.0, correccion.error_db)),
+                )
+            )
+        validas = [
+            item
+            for items in por_banda.values()
+            if len(items) >= 3
+            for item in items
+        ]
+        return ModeloPropagacion(
+            parametros_por_banda=self._parametros_por_banda,
+            correcciones_espaciales=validas,
         )
 
     def resumen_calibracion(self) -> dict:
@@ -129,10 +182,30 @@ class ModeloPropagacion:
             }
             for banda, params in sorted(self._parametros_por_banda.items())
         }
+        correccion_por_banda: dict[str, list[float]] = defaultdict(list)
+        for correccion in self._correcciones_espaciales:
+            correccion_por_banda[correccion.banda].append(correccion.error_db)
+        resumen_espacial = {
+            banda: {
+                "muestras": len(valores),
+                "correccion_promedio_db": round(sum(valores) / len(valores), 2),
+                "correccion_min_db": round(min(valores), 2),
+                "correccion_max_db": round(max(valores), 2),
+            }
+            for banda, valores in sorted(correccion_por_banda.items())
+            if valores
+        }
+        if resumen_espacial:
+            tipo = "calibracion_espacial_por_plano"
+        elif por_banda:
+            tipo = "calibracion_local_por_plano"
+        else:
+            tipo = "baseline_fspl"
         return {
-            "tipo": "calibracion_local_por_plano" if por_banda else "baseline_fspl",
+            "tipo": tipo,
             "bandas": por_banda,
             "muestras": sum(item["muestras"] for item in por_banda.values()),
+            "correccion_espacial": resumen_espacial,
         }
 
     @classmethod
@@ -215,6 +288,37 @@ class ModeloPropagacion:
     @classmethod
     def _penalizacion_banda(cls, banda: str) -> float:
         return cls._PENALIZACION_BANDA.get(banda, 6.4)
+
+    def _correccion_espacial(
+        self,
+        *,
+        banda: str,
+        x_px: float | None,
+        y_px: float | None,
+    ) -> float:
+        if x_px is None or y_px is None:
+            return 0.0
+        muestras = [
+            muestra
+            for muestra in self._correcciones_espaciales
+            if muestra.banda == banda
+        ]
+        if len(muestras) < 3:
+            return 0.0
+        numerador = 0.0
+        denominador = 0.0
+        for muestra in muestras:
+            dx = float(x_px) - muestra.x_px
+            dy = float(y_px) - muestra.y_px
+            distancia_cuadrado = dx * dx + dy * dy
+            if distancia_cuadrado < 1e-9:
+                return muestra.error_db
+            peso = 1 / distancia_cuadrado
+            numerador += peso * muestra.error_db
+            denominador += peso
+        if denominador <= 0:
+            return 0.0
+        return max(-18.0, min(12.0, numerador / denominador))
 
 
 def generar_dataset_sintetico(seed: int = 24) -> list[dict]:

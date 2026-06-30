@@ -265,6 +265,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
           required proposito,
           required bandaObjetivo,
           required bssids,
+          required configuracionesRadio,
         }) {
           context.read<HeatmapCubit>().crearConjunto(
                 planoId: widget.planoId,
@@ -273,6 +274,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
                 descripcion: null,
                 bandaObjetivo: bandaObjetivo,
                 bssids: bssids,
+                configuracionesRadio: configuracionesRadio,
               );
         },
       ),
@@ -292,6 +294,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
           required proposito,
           required bandaObjetivo,
           required bssids,
+          required configuracionesRadio,
         }) {
           context.read<HeatmapCubit>().actualizarConjunto(
                 conjuntoId: conjunto.id,
@@ -300,6 +303,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
                 descripcion: null,
                 bandaObjetivo: bandaObjetivo,
                 bssids: bssids,
+                configuracionesRadio: configuracionesRadio,
               );
         },
       ),
@@ -339,6 +343,7 @@ class _CrearConjuntoAPSheet extends StatefulWidget {
     required String proposito,
     required String bandaObjetivo,
     required List<String> bssids,
+    required List<Map<String, dynamic>> configuracionesRadio,
   }) onGuardar;
 
   const _CrearConjuntoAPSheet({
@@ -355,6 +360,7 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
   late final TextEditingController _nombreCtrl;
   late final TextEditingController _propositoCtrl;
   late final TextEditingController _filtroCtrl;
+  late final Map<String, TextEditingController> _potenciaCtrlPorBssid;
   late Set<String> _seleccionados;
   late String _bandaObjetivo;
 
@@ -373,6 +379,21 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
               if (_bandaAP(ap) == _bandaObjetivo) ap.bssid,
           }
         : {for (final ap in widget.conjunto!.items) ap.bssid};
+    final potenciaPorBssid = {
+      for (final ap in widget.conjunto?.items ?? const <APDisponible>[])
+        ap.bssid: ap.potenciaTxDbm,
+    };
+    final bssids = {
+      for (final ap in widget.aps) ap.bssid,
+      for (final ap in widget.conjunto?.items ?? const <APDisponible>[])
+        ap.bssid,
+    };
+    _potenciaCtrlPorBssid = {
+      for (final bssid in bssids)
+        bssid: TextEditingController(
+          text: _formatearPotencia(potenciaPorBssid[bssid]),
+        ),
+    };
   }
 
   @override
@@ -380,6 +401,9 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
     _nombreCtrl.dispose();
     _propositoCtrl.dispose();
     _filtroCtrl.dispose();
+    for (final ctrl in _potenciaCtrlPorBssid.values) {
+      ctrl.dispose();
+    }
     super.dispose();
   }
 
@@ -515,19 +539,40 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
             )
           else
             ...apsFiltrados.map(
-              (ap) => CheckboxListTile(
-                value: _seleccionados.contains(ap.bssid),
-                onChanged: (checked) {
-                  setState(() {
-                    if (checked ?? false) {
-                      _seleccionados.add(ap.bssid);
-                    } else {
-                      _seleccionados.remove(ap.bssid);
-                    }
-                  });
-                },
-                title: Text(ap.ssid.isEmpty ? 'SSID oculto' : ap.ssid),
-                subtitle: Text(_detalleAP(ap)),
+              (ap) => Column(
+                children: [
+                  CheckboxListTile(
+                    value: _seleccionados.contains(ap.bssid),
+                    onChanged: (checked) {
+                      setState(() {
+                        if (checked ?? false) {
+                          _seleccionados.add(ap.bssid);
+                        } else {
+                          _seleccionados.remove(ap.bssid);
+                        }
+                      });
+                    },
+                    title: Text(ap.ssid.isEmpty ? 'SSID oculto' : ap.ssid),
+                    subtitle: Text(_detalleAP(ap)),
+                  ),
+                  if (_seleccionados.contains(ap.bssid))
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(56, 0, 16, 10),
+                      child: TextField(
+                        controller: _potenciaCtrlPorBssid.putIfAbsent(
+                          ap.bssid,
+                          () => TextEditingController(),
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          labelText: 'TX Power dBm opcional',
+                          prefixIcon: Icon(Icons.power_settings_new),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           const SizedBox(height: 12),
@@ -554,11 +599,28 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
       _mostrarMensaje('Selecciona al menos un AP.');
       return;
     }
+    final configuracionesRadio = <Map<String, dynamic>>[];
+    for (final bssid in _seleccionados) {
+      final texto = _potenciaCtrlPorBssid[bssid]?.text.trim() ?? '';
+      if (texto.isEmpty) continue;
+      final potencia = double.tryParse(texto.replaceAll(',', '.'));
+      if (potencia == null || potencia < 0 || potencia > 30) {
+        _mostrarMensaje('TX Power debe estar entre 0 y 30 dBm.');
+        return;
+      }
+      configuracionesRadio.add({
+        'bssid': bssid,
+        'potencia_tx_dbm': potencia,
+        'fuente_potencia': 'manual',
+        'confianza_potencia': 'media',
+      });
+    }
     widget.onGuardar(
       nombre: nombre,
       proposito: proposito,
       bandaObjetivo: _bandaObjetivo,
       bssids: _seleccionados.toList(),
+      configuracionesRadio: configuracionesRadio,
     );
     Navigator.of(context).pop();
   }
@@ -567,6 +629,12 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(SnackBar(content: Text(mensaje)));
+  }
+
+  static String _formatearPotencia(double? valor) {
+    if (valor == null) return '';
+    if (valor == valor.roundToDouble()) return valor.toStringAsFixed(0);
+    return valor.toStringAsFixed(1);
   }
 }
 
@@ -1745,13 +1813,11 @@ class _HeatmapMatrixPainter extends CustomPainter {
   }
 
   Color _colorParaRssi(double rssi) {
-    if (rssi >= -60) return const Color(0xFF0B7A3B).withValues(alpha: 0.60);
-    if (rssi >= -67) return const Color(0xFF57B65A).withValues(alpha: 0.60);
-    if (rssi >= -70) return const Color(0xFFF4D35E).withValues(alpha: 0.60);
-    if (rssi >= -75) return const Color(0xFFF08A24).withValues(alpha: 0.60);
-    if (rssi >= -80) return const Color(0xFFD95D39).withValues(alpha: 0.60);
-    if (rssi >= -90) return const Color(0xFFB91C1C).withValues(alpha: 0.60);
-    return const Color(0xFFD7263D).withValues(alpha: 0.60);
+    if (rssi >= -70) return const Color(0xFFA7E84A).withValues(alpha: 0.60);
+    if (rssi >= -80) return const Color(0xFFF1E64A).withValues(alpha: 0.60);
+    if (rssi >= -85) return const Color(0xFFC7B84B).withValues(alpha: 0.60);
+    if (rssi >= -90) return const Color(0xFF7E8173).withValues(alpha: 0.60);
+    return const Color(0xFF1C1C1C).withValues(alpha: 0.60);
   }
 
   @override
@@ -1795,13 +1861,11 @@ class _PuntosLecturaPainter extends CustomPainter {
   }
 
   Color _colorParaRssi(double rssi) {
-    if (rssi >= -60) return const Color(0xFF0B7A3B);
-    if (rssi >= -67) return const Color(0xFF57B65A);
-    if (rssi >= -70) return const Color(0xFFF4D35E);
-    if (rssi >= -75) return const Color(0xFFF08A24);
-    if (rssi >= -80) return const Color(0xFFD95D39);
-    if (rssi >= -90) return const Color(0xFFB91C1C);
-    return const Color(0xFFD7263D);
+    if (rssi >= -70) return const Color(0xFFA7E84A);
+    if (rssi >= -80) return const Color(0xFFF1E64A);
+    if (rssi >= -85) return const Color(0xFFC7B84B);
+    if (rssi >= -90) return const Color(0xFF7E8173);
+    return const Color(0xFF1C1C1C);
   }
 
   @override

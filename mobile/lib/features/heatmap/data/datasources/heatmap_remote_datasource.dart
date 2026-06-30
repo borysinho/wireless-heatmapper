@@ -46,6 +46,7 @@ class HeatmapRemoteDatasource {
     String? descripcion,
     required String bandaObjetivo,
     required List<String> bssids,
+    List<Map<String, dynamic>> configuracionesRadio = const [],
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
@@ -56,6 +57,8 @@ class HeatmapRemoteDatasource {
           'descripcion': descripcion,
           'banda_objetivo': bandaObjetivo,
           'bssids': bssids,
+          if (configuracionesRadio.isNotEmpty)
+            'configuraciones_radio': configuracionesRadio,
         },
       );
       return ConjuntoAPModel.fromJson(response.data!);
@@ -74,6 +77,7 @@ class HeatmapRemoteDatasource {
     String? descripcion,
     required String bandaObjetivo,
     required List<String> bssids,
+    List<Map<String, dynamic>> configuracionesRadio = const [],
   }) async {
     try {
       final response = await _dio.patch<Map<String, dynamic>>(
@@ -84,6 +88,8 @@ class HeatmapRemoteDatasource {
           'descripcion': descripcion,
           'banda_objetivo': bandaObjetivo,
           'bssids': bssids,
+          if (configuracionesRadio.isNotEmpty)
+            'configuraciones_radio': configuracionesRadio,
         },
       );
       return ConjuntoAPModel.fromJson(response.data!);

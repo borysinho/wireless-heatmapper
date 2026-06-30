@@ -14,6 +14,8 @@ AlgoritmoHeatmap = Literal["IDW"]
 ResolucionHeatmap = Literal[64, 128, 256]
 ModoGeneracionHeatmap = Literal["INDIVIDUAL", "SUBCONJUNTO", "CONJUNTO_COMPLETO"]
 BandaWifi = Literal["2.4", "5"]
+FuentePotenciaTX = Literal["manual", "controlador", "estimada", "desconocida"]
+ConfianzaPotenciaTX = Literal["baja", "media", "alta"]
 
 
 class EscalaHeatmapItem(BaseModel):
@@ -28,6 +30,16 @@ class PuntoLecturaHeatmapOut(BaseModel):
     pos_x: float
     pos_y: float
     rssi: float
+    total_lecturas: int = 0
+    detalle_aps: list[PuntoLecturaAPOut] = Field(default_factory=list)
+
+
+class PuntoLecturaAPOut(BaseModel):
+    bssid: str
+    ssid: str | None = None
+    total_lecturas: int
+    lecturas_perdidas: int
+    rssi_promedio: float | None = None
 
 
 class PuntoPlanoOut(BaseModel):
@@ -113,6 +125,18 @@ class ConjuntoAPItemOut(BaseModel):
     modelo_ap: str | None = None
     costo_estimado: float | None = None
     radios: list[dict] | None = None
+    potencia_tx_dbm: float | None = None
+    fuente_potencia: FuentePotenciaTX | None = None
+    confianza_potencia: ConfianzaPotenciaTX | None = None
+
+
+class ConfiguracionRadioAPIn(BaseModel):
+    bssid: str = Field(..., min_length=17, max_length=17)
+    potencia_tx_dbm: float | None = Field(default=None, ge=0, le=30)
+    fuente_potencia: FuentePotenciaTX = "desconocida"
+    confianza_potencia: ConfianzaPotenciaTX = "baja"
+    ganancia_dbi: float | None = Field(default=None, ge=0, le=15)
+    perdida_cable_db: float | None = Field(default=None, ge=0, le=10)
 
 
 class ConjuntoAPBase(BaseModel):
@@ -122,6 +146,7 @@ class ConjuntoAPBase(BaseModel):
     es_principal: bool = False
     banda_objetivo: BandaWifi = "5"
     bssids: list[str] = Field(..., min_length=1)
+    configuraciones_radio: list[ConfiguracionRadioAPIn] = Field(default_factory=list)
 
 
 class ConjuntoAPCrearIn(ConjuntoAPBase):
@@ -135,6 +160,7 @@ class ConjuntoAPActualizarIn(BaseModel):
     es_principal: bool | None = None
     banda_objetivo: BandaWifi | None = None
     bssids: list[str] | None = Field(default=None, min_length=1)
+    configuraciones_radio: list[ConfiguracionRadioAPIn] | None = None
 
 
 class ConjuntoAPOut(BaseModel):

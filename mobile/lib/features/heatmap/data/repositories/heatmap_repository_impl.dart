@@ -29,6 +29,7 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
     String? descripcion,
     required String bandaObjetivo,
     required List<String> bssids,
+    List<Map<String, dynamic>> configuracionesRadio = const [],
   }) {
     return _datasource.crearConjuntoAP(
       planoId: planoId,
@@ -37,6 +38,7 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
       descripcion: descripcion,
       bandaObjetivo: bandaObjetivo,
       bssids: bssids,
+      configuracionesRadio: configuracionesRadio,
     );
   }
 
@@ -48,6 +50,7 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
     String? descripcion,
     required String bandaObjetivo,
     required List<String> bssids,
+    List<Map<String, dynamic>> configuracionesRadio = const [],
   }) {
     return _datasource.actualizarConjuntoAP(
       conjuntoId: conjuntoId,
@@ -56,6 +59,7 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
       descripcion: descripcion,
       bandaObjetivo: bandaObjetivo,
       bssids: bssids,
+      configuracionesRadio: configuracionesRadio,
     );
   }
 

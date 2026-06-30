@@ -14,6 +14,7 @@ abstract class HeatmapRepository {
     String? descripcion,
     required String bandaObjetivo,
     required List<String> bssids,
+    List<Map<String, dynamic>> configuracionesRadio = const [],
   });
 
   Future<ConjuntoAP> actualizarConjuntoAP({
@@ -23,6 +24,7 @@ abstract class HeatmapRepository {
     String? descripcion,
     required String bandaObjetivo,
     required List<String> bssids,
+    List<Map<String, dynamic>> configuracionesRadio = const [],
   });
 
   Future<void> eliminarConjuntoAP(int conjuntoId);

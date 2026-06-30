@@ -81,8 +81,8 @@ La IA no crea escenarios independientes. La IA crea uno o más conjuntos AP prop
 1. El portal cliente no accede al proyecto completo.
 2. El enlace cliente contiene únicamente `conjunto_ids` y `mapa_ids`.
 3. La selección de contenido en el enlace es la única regla de visibilidad para cliente.
-4. El cliente puede consultar conjuntos y generar heatmaps permitidos por el enlace.
-5. El cliente no crea, edita ni solicita generación IA.
+4. El cliente puede consultar conjuntos y mapas de calor incluidos explícitamente en el enlace.
+5. El cliente no crea, edita ni solicita generación de heatmaps o IA.
 6. No existe descarga de reporte PDF desde el portal.
 
 ---

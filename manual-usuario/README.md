@@ -1,7 +1,7 @@
 # Manual de usuario — Wireless HeatMapper
 
-SPA estatica del manual de usuario, basada en las funcionalidades implementadas
-en la web, app movil y backend del repositorio.
+SPA estatica del manual de usuario, basada en las funcionalidades de negocio
+visibles en la aplicacion web, la app movil y el portal cliente.
 
 ## Ejecucion local
 

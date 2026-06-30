@@ -64,6 +64,7 @@ export interface ProyectoListOut {
   ultima_actividad: string;
   cantidad_puntos: number;
   tecnico: TecnicoBasicoOut;
+  tecnicos: TecnicoBasicoOut[];
   created_at: string;
 }
 
@@ -90,6 +91,7 @@ export interface ProyectoAdminCreate {
   descripcion?: string | null;
   cliente_id?: number | null;
   tecnico_id: number;
+  tecnico_ids?: number[];
   estado: "nuevo" | "en_progreso" | "completado" | "archivado";
 }
 
@@ -262,7 +264,20 @@ export interface MapaCalorPortalOut {
   rssi_min: number;
   rssi_max: number;
   rssi_promedio: number;
-  puntos_lectura: Array<{ punto_id: number; pos_x: number; pos_y: number; rssi: number }>;
+  puntos_lectura: Array<{
+    punto_id: number;
+    pos_x: number;
+    pos_y: number;
+    rssi: number;
+    total_lecturas?: number;
+    detalle_aps?: Array<{
+      bssid: string;
+      ssid: string | null;
+      total_lecturas: number;
+      lecturas_perdidas: number;
+      rssi_promedio: number | null;
+    }>;
+  }>;
   poligono_interes: Array<{ x: number; y: number }>;
   advertencias: string[];
   created_at: string;

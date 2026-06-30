@@ -6,7 +6,11 @@ import tempfile
 import pytest
 from fastapi import HTTPException
 
-from app.ai.modelo_propagacion import ModeloPropagacion, MuestraCalibracionRF
+from app.ai.modelo_propagacion import (
+    CorreccionEspacialRF,
+    ModeloPropagacion,
+    MuestraCalibracionRF,
+)
 from app.ai.optimizador_ap_service import OptimizadorAPService
 from app.api.v1.escenarios import _limite_aps_derivado, generar_conjuntos_ia
 from app.api.v1.heatmaps import eliminar_conjunto_ap
@@ -212,6 +216,67 @@ def test_modelo_propagacion_calibra_parametros_locales_por_banda():
     assert prediccion == pytest.approx(-65.4, abs=0.5)
 
 
+def test_modelo_calibrado_sin_potencia_tx_no_sobreescribe_referencia_local():
+    muestras = [
+        MuestraCalibracionRF(
+            distancia_m=distancia,
+            banda="5",
+            rssi_dbm=-48 - 8 * math.log2(distancia) - 6.4,
+        )
+        for distancia in (1, 2, 4, 8, 16, 32)
+    ]
+
+    modelo = ModeloPropagacion.calibrar_desde_muestras(muestras)
+    sin_potencia = modelo.predecir_rssi(
+        distancia_px=80,
+        metros_por_pixel=0.1,
+        banda="5",
+    )
+    con_potencia = modelo.predecir_rssi(
+        distancia_px=80,
+        metros_por_pixel=0.1,
+        banda="5",
+        potencia_dbm=14,
+        ganancia_dbi=2.14,
+    )
+
+    assert modelo.resumen_calibracion()["bandas"]["5"]["usa_potencia_tx"] is False
+    assert con_potencia == sin_potencia
+
+
+def test_modelo_propagacion_aplica_correccion_espacial_por_banda():
+    modelo_base = ModeloPropagacion()
+    rssi_sin_correccion = modelo_base.predecir_rssi(
+        distancia_px=100,
+        metros_por_pixel=0.1,
+        banda="5",
+        punto_x=100,
+        punto_y=100,
+    )
+    modelo = modelo_base.con_correccion_espacial(
+        [
+            CorreccionEspacialRF(x_px=90, y_px=90, banda="5", error_db=-12),
+            CorreccionEspacialRF(x_px=110, y_px=90, banda="5", error_db=-10),
+            CorreccionEspacialRF(x_px=100, y_px=110, banda="5", error_db=-14),
+            CorreccionEspacialRF(x_px=100, y_px=100, banda="2.4", error_db=8),
+        ]
+    )
+
+    rssi_con_correccion = modelo.predecir_rssi(
+        distancia_px=100,
+        metros_por_pixel=0.1,
+        banda="5",
+        punto_x=100,
+        punto_y=100,
+    )
+    resumen = modelo.resumen_calibracion()
+
+    assert rssi_con_correccion < rssi_sin_correccion - 8
+    assert resumen["tipo"] == "calibracion_espacial_por_plano"
+    assert resumen["correccion_espacial"]["5"]["muestras"] == 3
+    assert "2.4" not in resumen["correccion_espacial"]
+
+
 def test_optimizador_dual_band_respeta_umbral_y_ap_fijo():
     puntos = [
         PuntoRSSI(i, x, y, -80)
@@ -274,9 +339,48 @@ def test_conjunto_tecnico_aporta_posiciones_para_calibracion_ia(
         )
 
     assert respuesta.conjuntos[0].metricas_ia["calibracion_modelo"]["tipo"] == (
-        "calibracion_local_por_plano"
+        "calibracion_espacial_por_plano"
     )
     assert respuesta.conjuntos[0].metricas_ia["calibracion_modelo"]["muestras"] == 5
+    assert respuesta.conjuntos[0].metricas_ia["calibracion_modelo"][
+        "correccion_espacial"
+    ]["5"]["muestras"] == 5
+
+
+def test_generacion_ia_usa_potencia_tx_declarada_confiable(
+    db_session, tecnico_usuario, admin_usuario, monkeypatch
+):
+    plano = _plano_con_mediciones(db_session, tecnico_usuario)
+    conjunto = _crear_conjunto_ap(db_session, plano=plano, admin=admin_usuario)
+    conjunto.items[0].radios = [
+        {
+            "banda": "5",
+            "potencia_dbm": 14,
+            "fuente_potencia": "manual",
+            "confianza_potencia": "media",
+            "ganancia_dbi": 2.14,
+        }
+    ]
+    db_session.commit()
+
+    with tempfile.TemporaryDirectory() as tmp:
+        monkeypatch.setattr(settings, "storage_root", tmp)
+        respuesta = generar_conjuntos_ia(
+            proyecto_id=plano.proyecto_id,
+            body=RestriccionesIAIn(
+                resolucion=32,
+                fuente_entrada={
+                    "tipo": "CONJUNTO_EXISTENTE",
+                    "conjunto_id": conjunto.id,
+                },
+            ),
+            request=None,
+            db=db_session,
+            current_user=admin_usuario,
+        )
+
+    calibracion = respuesta.conjuntos[0].metricas_ia["calibracion_modelo"]
+    assert calibracion["bandas"]["5"]["usa_potencia_tx"] is True
 
 
 def test_generacion_persiste_proyecciones_sin_alterar_mediciones(
@@ -331,9 +435,12 @@ def test_generacion_persiste_proyecciones_sin_alterar_mediciones(
         "aa:bb:cc:dd:ee:50",
     }
     assert conjunto_ia.metricas_ia["calibracion_modelo"]["tipo"] == (
-        "calibracion_local_por_plano"
+        "calibracion_espacial_por_plano"
     )
     assert conjunto_ia.metricas_ia["calibracion_modelo"]["muestras"] == 5
+    assert conjunto_ia.metricas_ia["calibracion_modelo"]["correccion_espacial"]["5"][
+        "muestras"
+    ] == 5
     assert "mapas_por_banda" not in conjunto_ia.metricas_ia
     assert "lecturas_estimadas" not in conjunto_ia.metricas_ia
     assert len(conjunto_ia.items[0].radios) == 1
@@ -411,8 +518,23 @@ def test_generacion_desde_conjunto_existente_conserva_fuente_y_bssids(
     segundo_conjunto_ia = segunda_respuesta.conjuntos[0]
     assert conjunto_ia.nombre == "Conjunto web 5 GHz · IA Propuesta 1"
     assert conjunto_ia.conjunto_origen_id == conjunto.id
-    assert segundo_conjunto_ia.nombre == "Conjunto web 5 GHz · IA Propuesta 1 (2)"
+    assert segundo_conjunto_ia.id == conjunto_ia.id
+    assert [item.id for item in segunda_respuesta.conjuntos] == [
+        item.id for item in respuesta.conjuntos
+    ]
+    assert len(segunda_respuesta.mapas_proyectados) == len(respuesta.mapas_proyectados)
+    assert (
+        db_session.query(ConjuntoAP)
+        .filter(
+            ConjuntoAP.plano_id == plano.id,
+            ConjuntoAP.origen == "ia",
+            ConjuntoAP.conjunto_origen_id == conjunto.id,
+        )
+        .count()
+        == len(respuesta.conjuntos)
+    )
     assert conjunto_ia.restricciones_ia["fuente_entrada"]["conjunto_id"] == conjunto.id
+    assert conjunto_ia.restricciones_ia["firma_solicitud"]
     mapa_actual = (
         db_session.query(MapaCalor).filter_by(id=respuesta.mapa_actual.id).one()
     )

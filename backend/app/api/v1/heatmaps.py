@@ -12,12 +12,14 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.ai.modelo_propagacion import ModeloPropagacion
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.heatmap import MapaCalor
+from app.models.share import TokenEnlaceCliente
 from app.models.usuario import Usuario
 from app.repositories.heatmap_repository import (
     ConjuntoAPRepository,
@@ -33,6 +35,7 @@ from app.repositories.proyecto_repository import ProyectoRepository
 from app.schemas.heatmap import (
     ActualizarUbicacionAPConjuntoIn,
     APDisponibleOut,
+    ConfiguracionRadioAPIn,
     ConjuntoAPActualizarIn,
     ConjuntoAPCrearIn,
     ConjuntoAPItemOut,
@@ -125,6 +128,7 @@ def _mapa_out(
     request: Request,
     *,
     puntos: list[PuntoRSSI] | None = None,
+    resumen_puntos: dict[int, dict] | None = None,
 ) -> MapaCalorOut:
     aps_interes = mapa.aps_interes or [
         {
@@ -170,6 +174,12 @@ def _mapa_out(
                 pos_x=punto.x,
                 pos_y=punto.y,
                 rssi=punto.rssi,
+                total_lecturas=(resumen_puntos or {})
+                .get(punto.punto_id, {})
+                .get("total_lecturas", 0),
+                detalle_aps=(resumen_puntos or {})
+                .get(punto.punto_id, {})
+                .get("detalle_aps", []),
             )
             for punto in puntos_lectura
         ],
@@ -378,7 +388,84 @@ def _resolver_aps_interes(
     return seleccionados
 
 
-def _resolver_items_conjunto(*, aps: list[dict], bssids: list[str]) -> list[dict]:
+def _normalizar_configuraciones_radio(
+    configuraciones: list[ConfiguracionRadioAPIn] | None,
+) -> dict[str, ConfiguracionRadioAPIn]:
+    return {
+        config.bssid.strip().lower(): config
+        for config in configuraciones or []
+    }
+
+
+def _radio_desde_configuracion(
+    *,
+    config: ConfiguracionRadioAPIn | None,
+    banda: str | None,
+) -> list[dict] | None:
+    if config is None or config.potencia_tx_dbm is None:
+        return None
+    radio = {
+        "banda": banda,
+        "potencia_dbm": float(config.potencia_tx_dbm),
+        "fuente_potencia": config.fuente_potencia,
+        "confianza_potencia": config.confianza_potencia,
+    }
+    if config.ganancia_dbi is not None:
+        radio["ganancia_dbi"] = float(config.ganancia_dbi)
+    if config.perdida_cable_db is not None:
+        radio["perdida_cable_db"] = float(config.perdida_cable_db)
+    return [radio]
+
+
+def _radio_tx_principal(radios) -> dict:
+    radio = _radio_principal(radios)
+    if not radio:
+        return {}
+    potencia = radio.get("potencia_dbm")
+    if potencia is None:
+        potencia = radio.get("potencia_tx_dbm")
+    if potencia is None:
+        return {}
+    fuente = str(radio.get("fuente_potencia") or "desconocida").lower()
+    confianza = str(radio.get("confianza_potencia") or "baja").lower()
+    radio_normalizada = {
+        **radio,
+        "potencia_dbm": float(potencia),
+        "fuente_potencia": fuente,
+        "confianza_potencia": confianza,
+    }
+    if fuente not in {"manual", "controlador"}:
+        return {}
+    if confianza not in {"media", "alta"}:
+        return {}
+    return radio_normalizada
+
+
+def _metadata_potencia_tx(radios) -> dict:
+    radio = _radio_principal(radios)
+    if not radio:
+        return {
+            "potencia_tx_dbm": None,
+            "fuente_potencia": None,
+            "confianza_potencia": None,
+        }
+    potencia = radio.get("potencia_dbm")
+    if potencia is None:
+        potencia = radio.get("potencia_tx_dbm")
+    return {
+        "potencia_tx_dbm": float(potencia) if potencia is not None else None,
+        "fuente_potencia": radio.get("fuente_potencia"),
+        "confianza_potencia": radio.get("confianza_potencia"),
+    }
+
+
+def _resolver_items_conjunto(
+    *,
+    aps: list[dict],
+    bssids: list[str],
+    configuraciones_radio: list[ConfiguracionRadioAPIn] | None = None,
+    items_existentes: list | None = None,
+) -> list[dict]:
     bssids_norm = _normalizar_bssids(bssids)
     if not bssids_norm:
         raise HTTPException(
@@ -392,6 +479,12 @@ def _resolver_items_conjunto(*, aps: list[dict], bssids: list[str]) -> list[dict
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Uno o más APs no existen en las mediciones del plano.",
         )
+    config_por_bssid = _normalizar_configuraciones_radio(configuraciones_radio)
+    radios_existentes = {
+        item.bssid.lower(): item.radios
+        for item in items_existentes or []
+        if getattr(item, "radios", None)
+    }
     return [
         {
             "bssid": bssid,
@@ -401,6 +494,11 @@ def _resolver_items_conjunto(*, aps: list[dict], bssids: list[str]) -> list[dict
             "pos_x": por_bssid[bssid]["pos_x"],
             "pos_y": por_bssid[bssid]["pos_y"],
             "banda": _banda_ap(por_bssid[bssid]),
+            "radios": _radio_desde_configuracion(
+                config=config_por_bssid.get(bssid),
+                banda=_banda_ap(por_bssid[bssid]),
+            )
+            or radios_existentes.get(bssid),
         }
         for bssid in bssids_norm
     ]
@@ -444,6 +542,84 @@ def _mapas_objetivo_conjunto(
     return [(bssids, modo_global)] + [([bssid], "INDIVIDUAL") for bssid in bssids]
 
 
+def _clave_publicacion_mapa(mapa: MapaCalor) -> tuple[str, tuple[str, ...]]:
+    bssids = mapa.bssids_generacion or [mapa.bssid]
+    return (mapa.algoritmo.upper(), _clave_bssids(bssids))
+
+
+def _actualizar_enlaces_cliente_por_reemplazo_mapas(
+    *,
+    db: Session,
+    proyecto_id: int,
+    reemplazos_mapa_id: dict[int, int],
+    conjunto_id: int | None = None,
+    nuevos_mapa_ids: list[int] | None = None,
+) -> None:
+    nuevos_mapa_ids = nuevos_mapa_ids or []
+    if not reemplazos_mapa_id and not nuevos_mapa_ids:
+        return
+
+    enlaces = (
+        db.query(TokenEnlaceCliente)
+        .filter(TokenEnlaceCliente.proyecto_id == proyecto_id)
+        .all()
+    )
+    hubo_cambios = False
+    for enlace in enlaces:
+        contenido = dict(enlace.contenido or {})
+        mapa_ids = contenido.get("mapa_ids") or []
+        conjunto_ids = contenido.get("conjunto_ids") or []
+        if not isinstance(mapa_ids, list):
+            continue
+        if not isinstance(conjunto_ids, list):
+            conjunto_ids = []
+
+        actualizados: list[int] = []
+        cambio_en_enlace = False
+        for mapa_id in mapa_ids:
+            try:
+                mapa_id_int = int(mapa_id)
+            except (TypeError, ValueError):
+                continue
+
+            nuevo_mapa_id = reemplazos_mapa_id.get(mapa_id_int)
+            if nuevo_mapa_id is not None:
+                actualizados.append(nuevo_mapa_id)
+                cambio_en_enlace = True
+            else:
+                actualizados.append(mapa_id_int)
+
+        conjunto_ids_norm = [
+            item_int
+            for item in conjunto_ids
+            if (item_int := _entero_o_none(item)) is not None
+        ]
+        comparte_conjunto = conjunto_id is not None and conjunto_id in conjunto_ids_norm
+        if comparte_conjunto:
+            for mapa_id in nuevos_mapa_ids:
+                if mapa_id not in actualizados:
+                    actualizados.append(mapa_id)
+                    cambio_en_enlace = True
+
+        if not cambio_en_enlace:
+            continue
+
+        contenido["mapa_ids"] = list(dict.fromkeys(actualizados))
+        enlace.contenido = contenido
+        flag_modified(enlace, "contenido")
+        hubo_cambios = True
+
+    if hubo_cambios:
+        db.commit()
+
+
+def _entero_o_none(valor: object) -> int | None:
+    try:
+        return int(valor)
+    except (TypeError, ValueError):
+        return None
+
+
 def _algoritmos_faltantes(body: GenerarHeatmapsFaltantesIn) -> list[str]:
     solicitados = body.algoritmos
     if solicitados is None:
@@ -478,7 +654,7 @@ def _lecturas_metricas_ia(conjunto, bssids_requeridos: set[str]) -> list[dict]:
                 "rssi": rssi,
                 "canal": lectura.get("canal"),
                 "frecuencia_mhz": lectura.get("frecuencia_mhz"),
-                "modelo_origen": lectura.get("modelo_origen") or "rf-hibrido-1.1",
+                "modelo_origen": lectura.get("modelo_origen") or "rf-hibrido-1.2",
                 "incertidumbre_db": lectura.get("incertidumbre_db") or 6.0,
             }
         )
@@ -513,6 +689,7 @@ def _lecturas_proyectadas_ia_desde_items(conjunto, db: Session) -> list[dict]:
                 banda=banda,
                 potencia_dbm=radio_principal.get("potencia_dbm"),
                 ganancia_dbi=radio_principal.get("ganancia_dbi", 2.14),
+                perdida_cable_db=radio_principal.get("perdida_cable_db", 0.0),
             )
             lecturas.append(
                 {
@@ -522,7 +699,7 @@ def _lecturas_proyectadas_ia_desde_items(conjunto, db: Session) -> list[dict]:
                     "rssi": rssi,
                     "canal": item.canal_snapshot,
                     "frecuencia_mhz": 2412 if banda == "2.4" else 5180,
-                    "modelo_origen": "rf-hibrido-1.1",
+                    "modelo_origen": "rf-hibrido-1.2",
                     "incertidumbre_db": 6.0,
                 }
             )
@@ -608,6 +785,7 @@ def _conjunto_out(conjunto) -> ConjuntoAPOut:
             modelo_ap=item.modelo_ap,
             costo_estimado=item.costo_estimado,
             radios=item.radios,
+            **_metadata_potencia_tx(item.radios),
         )
         for item in conjunto.items
     ]
@@ -662,7 +840,7 @@ def _firma_aps_interes(
     modo_generacion: str = "SUBCONJUNTO",
 ) -> str:
     payload = {
-        "modelo": "aps-interes-mediciones-v9-no-deteccion",
+        "modelo": "aps-interes-mediciones-v11-paleta-ekahau",
         "firma_base": firma_base,
         "conjunto_ap_id": conjunto_ap_id,
         "modo_generacion": modo_generacion,
@@ -963,7 +1141,11 @@ def crear_conjunto_ap(
             detail="Ya existe un conjunto de APs con ese nombre en el plano.",
         )
     aps = MedicionRepository(db).listar_aps_por_plano(plano_id=plano_id)
-    items = _resolver_items_conjunto(aps=aps, bssids=body.bssids)
+    items = _resolver_items_conjunto(
+        aps=aps,
+        bssids=body.bssids,
+        configuraciones_radio=body.configuraciones_radio,
+    )
     _validar_banda_items(items=items, banda_objetivo=body.banda_objetivo)
     conjunto = repo.crear(
         plano_id=plano_id,
@@ -1027,7 +1209,20 @@ def actualizar_conjunto_ap(
     items = None
     if body.bssids is not None:
         aps = MedicionRepository(db).listar_aps_por_plano(plano_id=conjunto.plano_id)
-        items = _resolver_items_conjunto(aps=aps, bssids=body.bssids)
+        items = _resolver_items_conjunto(
+            aps=aps,
+            bssids=body.bssids,
+            configuraciones_radio=body.configuraciones_radio,
+            items_existentes=list(conjunto.items),
+        )
+    elif body.configuraciones_radio is not None:
+        aps = MedicionRepository(db).listar_aps_por_plano(plano_id=conjunto.plano_id)
+        items = _resolver_items_conjunto(
+            aps=aps,
+            bssids=[item.bssid for item in conjunto.items],
+            configuraciones_radio=body.configuraciones_radio,
+            items_existentes=list(conjunto.items),
+        )
     banda_objetivo = body.banda_objetivo or conjunto.banda_objetivo
     items_validacion = items or [
         {"bssid": item.bssid, "banda": item.banda} for item in conjunto.items
@@ -1245,10 +1440,16 @@ def generar_heatmaps_faltantes_conjunto(
     mapas_existentes = MapaCalorRepository(db).listar_recientes_por_plano(
         plano_id=conjunto.plano_id,
     )
+    mapas_reemplazados_por_clave: dict[tuple[str, tuple[str, ...]], list[int]] = {}
+    reemplazos_mapa_id: dict[int, int] = {}
     if body.reemplazar_existentes:
         for mapa_existente in [
             mapa for mapa in mapas_existentes if mapa.conjunto_ap_id == conjunto.id
         ]:
+            clave_publicacion = _clave_publicacion_mapa(mapa_existente)
+            mapas_reemplazados_por_clave.setdefault(clave_publicacion, []).append(
+                mapa_existente.id
+            )
             db.delete(mapa_existente)
         db.commit()
         mapas_existentes = [
@@ -1283,6 +1484,11 @@ def generar_heatmaps_faltantes_conjunto(
                     and _clave_bssids(mapa.bssids_generacion or [mapa.bssid])
                     == clave_mapa
                 ]:
+                    clave_publicacion = _clave_publicacion_mapa(mapa_existente)
+                    mapas_reemplazados_por_clave.setdefault(
+                        clave_publicacion,
+                        [],
+                    ).append(mapa_existente.id)
                     db.delete(mapa_existente)
                 db.commit()
             ap_pos_x = [
@@ -1313,7 +1519,21 @@ def generar_heatmaps_faltantes_conjunto(
                 origen_lecturas=origen_lecturas,
                 conjunto_lecturas_id=conjunto_lecturas_id,
             )
+            clave_generada = _clave_publicacion_mapa(mapa)
+            for mapa_reemplazado_id in mapas_reemplazados_por_clave.get(
+                clave_generada,
+                [],
+            ):
+                reemplazos_mapa_id[mapa_reemplazado_id] = mapa.id
             mapas_generados.append(_mapa_resumen_desde_out(mapa))
+    if reemplazos_mapa_id or mapas_generados:
+        _actualizar_enlaces_cliente_por_reemplazo_mapas(
+            db=db,
+            proyecto_id=conjunto.plano.proyecto_id,
+            reemplazos_mapa_id=reemplazos_mapa_id,
+            conjunto_id=conjunto.id,
+            nuevos_mapa_ids=[mapa.id for mapa in mapas_generados],
+        )
     return mapas_generados
 
 
