@@ -1,0 +1,15 @@
+stateDiagram-v2
+  [*] --> Inactiva
+  Inactiva --> Loading: iniciarSesion
+  Loading --> Activa: puntos cargados
+  Activa --> Enviando: marcarPunto
+  Enviando --> Activa: lote persistido
+  Activa --> Throttling: limite alcanzado
+  Throttling --> Activa: tiempo liberado
+  Activa --> Pausada: sin conectividad
+  Pausada --> Activa: reanudar
+  Activa --> PuntoDetalle: abrirDetallePunto
+  PuntoDetalle --> Activa: cerrarDetalle
+  Enviando --> Error: fallo de envio
+  Error --> Activa: reintentar
+  Activa --> Inactiva: detenerSesion

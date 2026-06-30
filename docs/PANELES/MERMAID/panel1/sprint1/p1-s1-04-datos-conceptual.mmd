@@ -1,0 +1,28 @@
+classDiagram
+  class Usuario {
+    nombre string
+    apellido string
+    correo string
+    contrasena_hash string
+    rol enum
+    activo bool
+    fecha_creacion datetime
+  }
+  class Organizacion {
+    nombre string
+    direccion string
+    contacto string
+    activo bool
+    fecha_creacion datetime
+  }
+  class Proyecto {
+    nombre string
+    descripcion string
+    estado enum
+    fecha_inicio date
+    fecha_fin date
+    fecha_creacion datetime
+  }
+
+  Usuario "1" -- "0..*" Proyecto : gestiona
+  Organizacion "1" -- "0..*" Proyecto : tiene

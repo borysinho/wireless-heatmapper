@@ -1,0 +1,116 @@
+' ============================================================
+' SECCIÓN DEL DOCUMENTO: § 9. Modelos de Diseño › § 9.3 Modelo de Datos › § 9.3.c Diseño Físico (Tablas PostgreSQL)
+' Archivo: docs/ONLINE/PRESENTACION/presentacion-scrum-s0-s1.md
+' Perspectiva de diseño: (b) Diseño de Datos — Diseño Físico — Sprint 1
+' Representa el esquema exacto generado por Alembic (migraciones 0001 y 0002)
+' ============================================================
+
+@startuml
+title Diseño de Datos — Diseño Físico (Tablas PostgreSQL 15)\nSprint 1 — Wireless HeatMapper\nMigraciones: 0001_initial · 0002_cliente_y_proyecto
+skinparam classBackgroundColor #EBF5FB
+skinparam classBorderColor #2980B9
+skinparam classHeaderBackgroundColor #2980B9
+skinparam classHeaderFontColor white
+skinparam arrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+hide circle
+
+' ─── Migración 0001: usuario + refresh_token ─────────────────
+
+class "usuario" <<PostgreSQL table>> {
+  id               SERIAL          NOT NULL  «PK»
+  --
+  nombre           VARCHAR(120)    NOT NULL
+  email            VARCHAR(255)    NOT NULL  «UNIQUE» «INDEX»
+  password_hash    VARCHAR(255)    NOT NULL
+  rol              VARCHAR(30)     NOT NULL  DEFAULT 'tecnico'
+  activo           BOOLEAN         NOT NULL  DEFAULT TRUE
+  ultimo_acceso    TIMESTAMPTZ     NULL
+  created_at       TIMESTAMPTZ     NOT NULL  DEFAULT now()
+  --
+  «CHECK» rol IN ('tecnico','admin')
+}
+
+class "refresh_token" <<PostgreSQL table>> {
+  id               SERIAL          NOT NULL  «PK»
+  --
+  token            VARCHAR(64)     NOT NULL  «UNIQUE»
+  expires_at       TIMESTAMPTZ     NOT NULL
+  created_at       TIMESTAMPTZ     NOT NULL  DEFAULT now()
+  usuario_id       INTEGER         NOT NULL  «FK» «INDEX»
+  --
+  «FK» usuario_id → usuario(id) ON DELETE CASCADE
+}
+
+' ─── Migración 0002: cliente + proyecto + ENUM ───────────────
+
+class "estado_proyecto" <<PostgreSQL ENUM>> {
+  'nuevo'
+  'en_progreso'
+  'completado'
+  'archivado'
+}
+
+class "cliente" <<PostgreSQL table>> {
+  id               SERIAL          NOT NULL  «PK»
+  --
+  nombre           VARCHAR(100)    NOT NULL  «UNIQUE»
+  activo           BOOLEAN         NOT NULL  DEFAULT TRUE
+  created_at       TIMESTAMPTZ     NOT NULL  DEFAULT now()
+}
+
+class "proyecto" <<PostgreSQL table>> {
+  id               SERIAL          NOT NULL  «PK»
+  --
+  nombre           VARCHAR(200)    NOT NULL
+  descripcion      VARCHAR(500)    NULL
+  estado           estado_proyecto NOT NULL  DEFAULT 'nuevo'
+  ultima_actividad TIMESTAMPTZ     NOT NULL  DEFAULT now()
+  cantidad_puntos  INTEGER         NOT NULL  DEFAULT 0
+  created_at       TIMESTAMPTZ     NOT NULL  DEFAULT now()
+  tecnico_id       INTEGER         NOT NULL  «FK» «INDEX»
+  cliente_id       INTEGER         NULL      «FK» «INDEX»
+  --
+  «FK» tecnico_id → usuario(id)
+  «FK» cliente_id → cliente(id)
+}
+
+' ─── Relaciones FK ───────────────────────────────────────────
+"usuario" "1" -right-> "0..*" "refresh_token" : FK usuario_id\nON DELETE CASCADE
+"usuario" "1" -down-> "0..*" "proyecto" : FK tecnico_id
+"cliente" "1" -down-> "0..*" "proyecto" : FK cliente_id (NULLABLE)
+"proyecto" -right-> "estado_proyecto" : tipo ENUM
+
+' ─── Índices definidos ───────────────────────────────────────
+note bottom of "usuario"
+  Índices:
+  · ix_usuario_id (PRIMARY KEY)
+  · ix_usuario_email (UNIQUE)
+  Alembic: 0001_initial_usuario_refresh_token
+end note
+
+note bottom of "refresh_token"
+  Índices:
+  · ix_refresh_token_id (PRIMARY KEY)
+  · ix_refresh_token_token (UNIQUE)
+  · ix_refresh_token_usuario_id (INDEX)
+  Alembic: 0001_initial_usuario_refresh_token
+end note
+
+note bottom of "proyecto"
+  Índices:
+  · ix_proyecto_id (PRIMARY KEY)
+  · ix_proyecto_tecnico_id (INDEX)
+  · ix_proyecto_cliente_id (INDEX)
+  Alembic: 0002_cliente_y_proyecto
+  ENUM estado_proyecto creado por separado
+  antes de CREATE TABLE proyecto.
+end note
+
+note right of "cliente"
+  Índice:
+  · ix_cliente_id (PRIMARY KEY)
+  · nombre UNIQUE constraint
+  Alembic: 0002_cliente_y_proyecto
+end note
+@enduml

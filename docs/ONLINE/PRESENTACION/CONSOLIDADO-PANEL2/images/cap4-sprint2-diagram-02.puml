@@ -1,0 +1,44 @@
+@startuml
+title Arquitectura del Sprint 2 — Componentes añadidos
+skinparam componentBackgroundColor #EBF5FB
+skinparam componentBorderColor #2980B9
+skinparam arrowColor #5D6D7E
+skinparam noteBackgroundColor #FFFDE7
+
+package "App Móvil (Flutter)" {
+  [PlanoEditorPage\n(Canvas + InteractiveViewer)] as planPage
+  [PlanosCubit\n(estado: cargando / lista / editando / calibrando)] as planosCubit
+  [PlanosRepository\n(Dio multipart upload)] as planosRepo
+  [file_picker] as fp
+}
+
+package "Backend (FastAPI)" {
+  [PlanoRouter\n(/api/proyectos/{id}/planos\n/api/planos/{id}/calibracion)] as planoRouter
+  [PlanoService\n(validaciones + storage)] as planoService
+  [PlanoRepository\n(SQLAlchemy)] as planoDB
+  [StorageService\n(filesystem / S3 interface)] as storage
+  [PyMuPDF\n(PDF → PNG primera página)] as pymupdf
+}
+
+database "PostgreSQL\n(tabla plano)" as db
+storage "Storage Volume\n(Docker bind mount)" as vol
+
+planPage --> planosCubit
+planosCubit --> planosRepo
+fp --> planPage
+planosRepo --> planoRouter : multipart/form-data
+planoRouter --> planoService
+planoService --> pymupdf : PDF input
+planoService --> storage : save file
+planoService --> planoDB
+planoDB --> db
+storage --> vol
+
+note right of planoService
+  Validaciones:
+  · Formato PNG/JPG/PDF
+  · Tamaño ≤ 20 MB
+  · Ownership proyecto
+  · Sin puntos para re-calibrar
+end note
+@enduml

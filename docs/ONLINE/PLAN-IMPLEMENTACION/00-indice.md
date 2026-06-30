@@ -38,7 +38,7 @@ Este directorio contiene la documentación operativa del proceso Scrum aplicado 
 | 09  | [09-sprint-2-proyectos-y-planos.md](09-sprint-2-proyectos-y-planos.md)               | Sprint 2: gestión de proyectos en línea, importación y calibración de planos            |
 | 10  | [10-sprint-3-captura-online.md](10-sprint-3-captura-online.md)                       | Sprint 3: captura WiFi con ingesta REST y marcado de puntos                             |
 | 11  | [11-sprint-4-heatmap-y-analisis.md](11-sprint-4-heatmap-y-analisis.md)               | Sprint 4: conjuntos de APs y motor de interpolación                                    |
-| 12  | [12-sprint-5-ia-comparacion-y-reportes.md](12-sprint-5-ia-comparacion-y-reportes.md) | Sprint 5: módulo IA con conjuntos AP derivados                                         |
+| 12  | [12-sprint-5-ia-comparacion-y-reportes.md](12-sprint-5-ia-comparacion-y-reportes.md) | Sprint 5: módulo IA y comparación con conjuntos AP derivados                           |
 | 13  | [13-sprint-6-portal-cliente.md](13-sprint-6-portal-cliente.md)                       | Sprint 6: portal de cliente, enlace único y supervisión organizacional                  |
 | 14  | [14-trazabilidad-rp-hu.md](14-trazabilidad-rp-hu.md)                                 | Matriz de trazabilidad RP ↔ HU ↔ Sprint ↔ UC                                            |
 | 15  | [15-gestion-riesgos.md](15-gestion-riesgos.md)                                       | Riesgos del plan de implementación y plan de mitigación por sprint                      |
@@ -46,6 +46,7 @@ Este directorio contiene la documentación operativa del proceso Scrum aplicado 
 | 18  | [18-reglas-gobernanza-conjuntos-ap-heatmaps.md](18-reglas-gobernanza-conjuntos-ap-heatmaps.md) | Reglas de gobierno para conjuntos de APs, heatmaps, IA y publicación por enlace        |
 | 19  | [19-modelo-base-datos-implementado.md](19-modelo-base-datos-implementado.md)         | Diagrama físico implementado de base de datos PostgreSQL con relaciones y flujos        |
 | 20  | [20-criterios-fspl-heatmap-ia.md](20-criterios-fspl-heatmap-ia.md)                   | Criterios de uso de IDW, FSPL/log-distance, calibración local e IA                      |
+| 21  | [21-auditoria-implementacion-vs-plan.md](21-auditoria-implementacion-vs-plan.md)     | Contraste de la implementación real contra el plan Scrum y referencias CWNA             |
 
 ---
 
@@ -59,7 +60,7 @@ Este directorio contiene la documentación operativa del proceso Scrum aplicado 
 | **Sprint 3** | 2 semanas · 12–25 may 2026     | PB-03, PB-04                             | Captura de señal WiFi en línea con ingesta REST                      | Mediciones en vivo persistidas en PostgreSQL                                   | ✅ Implementado |
 | **Sprint 4** | 2 semanas · 26 may–8 jun 2026  | PB-20, PB-05                             | Conjuntos de APs + heatmap backend                                  | Técnico genera heatmaps por propósito, AP individual o subconjunto             | ✅ Implementado |
 | **Sprint 5** | 2 semanas · 9–22 jun 2026      | PB-07, PB-12                             | IA como conjuntos AP derivados                                      | Propuestas IA trazables desde conjuntos técnicos                               | ✅ Implementado |
-| **Sprint 6** | 2 semanas · 23 jun–6 jul 2026  | PB-15, PB-16, PB-17                      | Portal de cliente + enlace único                                     | Cliente accede a conjuntos y heatmaps seleccionados por enlace                 | ⏳ Planificado  |
+| **Sprint 6** | 2 semanas · 23 jun–6 jul 2026  | PB-15, PB-16, PB-17                      | Portal de cliente + enlace único                                     | Cliente accede a conjuntos y heatmaps seleccionados por enlace                 | ✅ Implementado |
 
 > **Nota sobre PB-14:** la Historia de Usuario "Sincronizar proyecto al servidor" del backlog original **se elimina** en esta modalidad, dado que toda operación de dominio ya se ejecuta en línea contra el backend desde el Sprint 1. El cierre del proyecto y la generación del enlace público se cubren con PB-15 en el Sprint 6.
 
@@ -76,9 +77,9 @@ Este directorio contiene la documentación operativa del proceso Scrum aplicado 
 - **RP1 — Captura de señal WiFi (en línea):** Sprint 3 (PB-03)
 - **RP2 — Mapeo sobre plano:** Sprint 2 (PB-02, PB-11) + Sprint 3 (PB-04)
 - **RP3 — Generación de heatmap (en backend):** Sprint 4 (PB-20, PB-05)
-- **RP4 — Análisis de cobertura:** fuera de alcance vigente (PB-06 eliminada)
+- **RP4 — Análisis de cobertura:** fuera de alcance vigente como diagnóstico persistido (PB-06 eliminada); las métricas operativas se calculan desde `mapa_calor`
 - **RP5 — Optimización IA:** Sprint 5 (PB-07, PB-12), como conjuntos AP derivados
-- **RP6 — Generación de reportes:** fuera de alcance vigente (PB-08 eliminada)
+- **RP6 — Generación de reportes:** fuera de alcance vigente (PB-08 eliminada; portal cliente reemplaza la entrega por PDF)
 - **RP7 — Administración de usuarios:** Sprint 1 (PB-13, PB-19, PB-18)
 - **RP8 — Persistencia centralizada en línea:** Sprint 1 (PB-09, PB-01, PB-10) y transversal en sprints siguientes
 - **RP9 — Portal de cliente:** Sprint 6 (PB-15, PB-16, PB-17)
@@ -95,8 +96,9 @@ Detalle completo en [14-trazabilidad-rp-hu.md](14-trazabilidad-rp-hu.md).
 - **Formatos:** F3 (Product Backlog), F4 (Historia de Usuario), F5 (Sprint Backlog).
 - **Diagramas:** PlantUML embebido en bloques ` ```plantuml ` (compatible con StarUML 2.5+ y extensiones de VS Code). Paleta visual: `#EBF5FB` (fondo), `#2980B9` (bordes), `#FFFDE7` (notas).
 - **Idioma:** español (es-BO) en toda la documentación, identificadores de negocio y comentarios.
-- **Umbrales técnicos CWNA-107 preservados:**
+- **Umbrales técnicos y referencias preservadas:**
   - RSSI < −90 dBm = zona muerta
   - Objetivo de diseño ≥ −70 dBm
-  - Throttling Android ≥ 8.0 = 4 escaneos cada 2 minutos
+  - Throttling Android ≥ 8.0 = 4 escaneos cada 2 minutos (restricción de plataforma Android, no del libro CWNA)
   - Potencia recomendada de AP = 1/4 a 1/3 de su máximo
+  - Referencias del libro: [Certified Wireless Network Administrator - Official Study Guide Markdown](../../Certified%20Wireless%20Network%20Administrator%20-%20Official%20Study%20Guide%20Markdown/index.md)

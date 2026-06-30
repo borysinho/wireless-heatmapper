@@ -1,0 +1,66 @@
+flowchart TB
+  subgraph SG_MOBILE["App Movil Flutter"]
+    subgraph SG_MOBILE_PRESENTATION["presentation"]
+      LOGIN_SCREEN["LoginScreen"]
+      DASHBOARD_SCREEN["DashboardScreen"]
+      AUTH_BLOC["auth_bloc"]
+    end
+    subgraph SG_MOBILE_DOMAIN["domain"]
+      AUTH_USE_CASE["AuthUseCase"]
+      USER_ENTITY["UserEntity"]
+    end
+    subgraph SG_MOBILE_DATA["data"]
+      AUTH_REMOTE_DS["AuthRemoteDataSource"]
+      AUTH_REPOSITORY["AuthRepository"]
+    end
+  end
+
+  subgraph SG_BACKEND["Backend FastAPI"]
+    subgraph SG_API_V1["api/v1"]
+      AUTH_ROUTER["auth_router"]
+      USERS_ROUTER["users_router"]
+      ORGANIZATIONS_ROUTER["organizations_router"]
+      PROJECTS_ROUTER["projects_router"]
+    end
+    subgraph SG_SCHEMAS["schemas"]
+      USER_SCHEMA["UserSchema"]
+      ORGANIZATION_SCHEMA["OrganizationSchema"]
+      PROJECT_SCHEMA["ProjectSchema"]
+      TOKEN_SCHEMA["TokenSchema"]
+    end
+    subgraph SG_SERVICES["services"]
+      AUTH_SERVICE["AuthService"]
+      USER_SERVICE["UserService"]
+      ORGANIZATION_SERVICE["OrganizationService"]
+      PROJECT_SERVICE["ProjectService"]
+    end
+    subgraph SG_MODELS["models"]
+      USER_MODEL["UserModel"]
+      ORGANIZATION_MODEL["OrganizationModel"]
+      PROJECT_MODEL["ProjectModel"]
+    end
+  end
+
+  subgraph SG_WEB["Web Admin React"]
+    subgraph SG_WEB_PAGES["pages"]
+      LOGIN_PAGE["LoginPage"]
+      DASHBOARD_PAGE["DashboardPage"]
+      USERS_PAGE["UsersPage"]
+      ORGANIZATIONS_PAGE["OrganizationsPage"]
+      PROJECTS_PAGE["ProjectsPage"]
+    end
+    subgraph SG_WEB_SERVICES["services"]
+      API_CLIENT["apiClient"]
+      AUTH_SERVICE_WEB["authService"]
+    end
+  end
+
+  subgraph SG_DB["Base de Datos PostgreSQL"]
+    DB_USUARIOS["usuarios"]
+    DB_ORGANIZACIONES["organizaciones"]
+    DB_PROYECTOS["proyectos"]
+  end
+
+  SG_MOBILE -- "JWT / REST" --> SG_BACKEND
+  SG_WEB -- "JWT / REST" --> SG_BACKEND
+  SG_BACKEND -- "SQLAlchemy" --> SG_DB

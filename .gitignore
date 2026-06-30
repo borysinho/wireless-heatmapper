@@ -76,7 +76,7 @@ Thumbs.db
 # Documentación interna y configuración IA
 # ─────────────────────────────────────────
 AGENTS.md
-docs/
+# docs/
 .github/instructions/
 .github/skills/
 docs.7z

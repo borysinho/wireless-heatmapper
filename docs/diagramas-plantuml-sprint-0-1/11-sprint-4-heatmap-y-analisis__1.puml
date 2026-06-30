@@ -1,0 +1,26 @@
+@startuml
+title PB-05 — Generación de heatmap (interpolación en backend)
+skinparam sequenceArrowColor #2980B9
+skinparam participantBackgroundColor #EBF5FB
+
+actor "Técnico" as tech
+participant "App Móvil\n(HeatmapPage)" as app
+participant "ApiClient" as api
+participant "Backend\n/api/planos/{id}/heatmap" as be
+participant "InterpolacionService\n(IDW / Kriging)" as svc
+database "PostgreSQL" as db
+participant "ImageService\n(matplotlib + PIL)" as img
+
+tech -> app : abrir "Ver Heatmap"
+app -> api : GET /planos/{id}/heatmap?algoritmo=IDW&resolucion=128
+api -> be : HTTPS
+be -> db : SELECT puntos + mediciones agregadas (peor RSSI por punto)
+db --> be : List<Punto + RSSI>
+be -> svc : interpolar(puntos, ancho_px, alto_px, resolucion)
+svc --> be : Matriz NxM de RSSI estimado
+be -> img : render PNG colorizado (verde→rojo)
+img --> be : bytes PNG
+be -> db : INSERT mapa_calor (datos JSONB + ref imagen)
+be --> app : 200 {urlImagen, matriz, escala}
+app -> tech : superpone heatmap traslúcido sobre el plano
+@enduml

@@ -1,0 +1,73 @@
+@startuml
+title Modelo de Datos — Sprint 1 (entidades implementadas)\nWireless HeatMapper
+skinparam classBackgroundColor #EBF5FB
+skinparam classBorderColor #2980B9
+skinparam classHeaderBackgroundColor #2980B9
+skinparam classHeaderFontColor white
+skinparam arrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+hide circle
+
+enum RolUsuario {
+  ADMIN
+  TECNICO
+}
+
+enum EstadoProyecto {
+  NUEVO
+  EN_PROGRESO
+  COMPLETADO
+  ARCHIVADO
+}
+
+class Usuario {
+  +id : Integer
+  +email : String
+  +passwordHash : String
+  +nombre : String
+  +rol : RolUsuario
+  +activo : Boolean
+  +createdAt : DateTime
+  +ultimoAcceso : DateTime
+}
+
+class RefreshToken {
+  +id : Integer
+  +token : String
+  +expiresAt : DateTime
+  +createdAt : DateTime
+}
+
+class Cliente {
+  +id : Integer
+  +nombre : String
+  +activo : Boolean
+  +createdAt : DateTime
+}
+
+class Proyecto {
+  +id : Integer
+  +nombre : String
+  +descripcion : String
+  +estado : EstadoProyecto
+  +ultimaActividad : DateTime
+  +cantidadPuntos : Integer
+  +createdAt : DateTime
+}
+
+Usuario "1" --> "0..*" RefreshToken : tiene >
+Usuario "1" --> "0..*" Proyecto : gestiona >
+Cliente "1" --> "0..*" Proyecto : tiene >
+
+note bottom of RefreshToken
+  Eliminado físicamente en logout (PB-09 CA4)
+  JWT: 15 min access + 7 días refresh
+end note
+
+note right of Proyecto
+  Aislamiento por tecnico_id:
+  un técnico solo ve sus proyectos.
+  El admin ve todos vía
+  GET /api/admin/proyectos
+end note
+@enduml

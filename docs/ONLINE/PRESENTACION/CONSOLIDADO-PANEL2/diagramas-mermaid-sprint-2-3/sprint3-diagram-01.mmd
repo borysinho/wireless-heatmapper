@@ -1,0 +1,20 @@
+---
+title: HU del Sprint 3 — Captura WiFi en línea
+---
+flowchart LR
+    tech(["Técnico\nautenticado"])
+
+    subgraph S2["Sprint 2 — base"]
+        UC_PLANO["PB-02 / PB-11\nPlano calibrado\nen el backend"]
+    end
+
+    subgraph S3["Sprint 3 — Captura WiFi"]
+        UC_CAP["PB-03\nCapturar Señales\nWiFi en línea"]
+        UC_MARK["PB-04\nMarcar Puntos de\nMedición sobre el Plano"]
+    end
+
+    tech --> UC_CAP
+    tech --> UC_MARK
+    UC_CAP  -. "requiere\nplano calibrado" .-> UC_PLANO
+    UC_MARK -. "requiere\nplano calibrado" .-> UC_PLANO
+    UC_MARK -. include .-> UC_CAP

@@ -1,0 +1,20 @@
+---
+title: CapturaCubit — Estados de la sesión de captura WiFi
+---
+stateDiagram-v2
+    [*] --> Inactiva
+
+    Inactiva    --> Activa     : iniciar captura\n(plano calibrado)
+
+    Activa      --> Throttling : 4 escaneos / 2 min alcanzados
+    Throttling  --> Activa     : ventana de throttling liberada
+
+    Activa      --> Enviando   : marcar punto → lote de mediciones
+    Enviando    --> Activa     : 201 OK — punto registrado en BD
+    Enviando    --> Pausada    : red caída tras 3 reintentos fallidos
+
+    Activa      --> Pausada    : ConnectivityMonitor → red caída
+    Pausada     --> Activa     : red restablecida + confirmación del técnico
+
+    Activa      --> Inactiva   : detener captura
+    Pausada     --> Inactiva   : detener captura

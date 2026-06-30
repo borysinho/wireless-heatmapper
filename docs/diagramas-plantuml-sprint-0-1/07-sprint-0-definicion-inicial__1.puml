@@ -1,0 +1,50 @@
+@startuml
+title Sprint 0 — Actividades de Definición Inicial (R-1)\nWireless HeatMapper (modalidad 100 % en línea)
+skinparam activityBackgroundColor #EBF5FB
+skinparam activityBorderColor #2980B9
+skinparam arrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+
+start
+
+:Definir equipo Scrum y roles;
+note right: SM: Jhasmany · PO: Borys
+
+:Confirmar objetivo del producto y del proyecto;
+
+:Refinar y aprobar Product Backlog (F3) — modalidad online;
+note right: Eliminar PB-14, reubicar PB-13 al Sprint 1
+
+:Aprobar Definition of Done;
+
+fork
+  :Modelo de Contexto\n(UC01–UC18);
+fork again
+  :Modelo de Arquitectura\n(paquetes + despliegue);
+fork again
+  :Modelo de Datos\n(clases + lógico + Alembic plan);
+end fork
+
+:Configurar repositorio GitHub (monorepo);
+
+fork
+  :Backend FastAPI mínimo\n+ /api/health\n+ Alembic;
+fork again
+  :App móvil Flutter inicializada\n(BLoC + Dio + go_router);
+fork again
+  :Web React + Vite + TS\n+ TanStack Query;
+fork again
+  :Nginx + Docker Compose\n(db + backend + web + nginx);
+end fork
+
+:Pipeline CI/CD GitHub Actions\n(lint + tests + build + push imagen);
+
+:Pre-commit hooks\n(ruff/black/prettier/eslint);
+
+:Documentar guía de ejecución local\nen README de cada componente;
+
+:Sprint 0 completado;
+note right: El equipo está listo para R-2 del Sprint 1
+
+stop
+@enduml

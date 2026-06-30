@@ -1,0 +1,118 @@
+@startuml
+!pragma layout smetana
+title Tipos de Relaciones entre Clases — Referencia PlantUML\nWireless HeatMapper
+
+skinparam classBackgroundColor #EBF5FB
+skinparam classBorderColor #2980B9
+skinparam classHeaderBackgroundColor #2980B9
+skinparam classHeaderFontColor white
+skinparam arrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteFontColor #1A252F
+hide circle
+hide members
+
+' ── 1. Herencia (Extensión) ──────────────────────────────────────
+class "ClaseHija" as H1
+class "ClasePadre" as P1
+H1 <|-- P1
+note right of P1
+  **Herencia / Extensión**
+  Símbolo: <|--
+  La ClaseHija especializa a ClasePadre.
+  Relación "es-un" (is-a).
+end note
+
+' ── 2. Realización (Implementación) ─────────────────────────────
+class "ClaseConcreta" as H2
+class "<<interface>>\nInterfaz" as P2
+H2 <|.. P2
+note right of P2
+  **Realización / Implementación**
+  Símbolo: <|..
+  La ClaseConcreta implementa la Interfaz.
+  Línea punteada + triángulo hueco.
+end note
+
+' ── 3. Composición ───────────────────────────────────────────────
+class "Todo" as H3
+class "Parte" as P3
+H3 *-- P3
+note right of P3
+  **Composición**
+  Símbolo: *--
+  La Parte **no puede existir** sin el Todo.
+  Si el Todo se elimina, la Parte también.
+  Rombo relleno en el lado del Todo.
+end note
+
+' ── 4. Agregación ────────────────────────────────────────────────
+class "Contenedor" as H4
+class "Elemento" as P4
+H4 o-- P4
+note right of P4
+  **Agregación**
+  Símbolo: o--
+  El Elemento puede existir
+  **independientemente** del Contenedor.
+  Rombo hueco en el lado del Contenedor.
+end note
+
+' ── 5. Dependencia (uso) ─────────────────────────────────────────
+class "Cliente" as H5
+class "Servicio" as P5
+H5 --> P5
+note right of P5
+  **Dependencia (uso)**
+  Símbolo: -->
+  El Cliente **usa** al Servicio.
+  Flecha sólida; relación transitoria.
+end note
+
+' ── 6. Dependencia débil (uso punteado) ──────────────────────────
+class "Llamador" as H6
+class "Auxiliar" as P6
+H6 ..> P6
+note right of P6
+  **Dependencia débil**
+  Símbolo: ..>
+  Forma más débil de dependencia.
+  Línea punteada con flecha abierta.
+end note
+
+' ── 7. Asociación simple ─────────────────────────────────────────
+class "ClaseA" as H7
+class "ClaseB" as P7
+H7 -- P7
+note right of P7
+  **Asociación simple**
+  Símbolo: --
+  Relación estructural sin sentido
+  de propiedad; bidireccional por defecto.
+end note
+
+' ── 8. Asociación dirigida ───────────────────────────────────────
+class "Origen" as H8
+class "Destino" as P8
+H8 --> P8
+note right of P8
+  **Asociación dirigida**
+  Símbolo: -->
+  Igual que dependencia de uso pero
+  representa una referencia persistente
+  (atributo). Contexto define el tipo.
+end note
+
+note as GENERAL
+  **Regla de dirección de lectura:**
+  A -- B      línea sólida, sin dirección
+  A --> B     línea sólida, A conoce a B
+  A ..> B     línea punteada, A usa B
+  A <|-- B    B hereda de A
+  A <|.. B    B implementa A
+  A *-- B     composición (rombo relleno en A)
+  A o-- B     agregación (rombo hueco en A)
+  Reemplazar -- por .. convierte cualquier
+  relación en su variante punteada.
+end note
+@enduml

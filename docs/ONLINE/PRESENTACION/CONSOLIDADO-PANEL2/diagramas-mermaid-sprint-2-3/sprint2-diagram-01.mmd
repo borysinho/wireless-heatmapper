@@ -1,0 +1,19 @@
+---
+title: HU del Sprint 2 — Planos en línea
+---
+flowchart LR
+    tech(["Técnico\nautenticado"])
+
+    subgraph S1["Sprint 1 — base"]
+        UC_PROY["PB-01\nGestionar Proyecto"]
+    end
+
+    subgraph S2["Sprint 2 — Planos en línea"]
+        UC_PLANO["PB-02\nImportar Plano\nsubida al backend"]
+        UC_ESC["PB-11\nCalibrar Escala\ndel Plano"]
+    end
+
+    tech --> UC_PLANO
+    tech --> UC_ESC
+    UC_PLANO -. "requiere\nproyecto creado en S1" .-> UC_PROY
+    UC_ESC -. extend .-> UC_PLANO
