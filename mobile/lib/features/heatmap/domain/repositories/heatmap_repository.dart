@@ -17,6 +17,11 @@ abstract class HeatmapRepository {
     List<Map<String, dynamic>> configuracionesRadio = const [],
   });
 
+  Future<void> prepararConjuntoIA({
+    required int proyectoId,
+    required int conjuntoId,
+  });
+
   Future<ConjuntoAP> actualizarConjuntoAP({
     required int conjuntoId,
     required String nombre,

@@ -11,6 +11,7 @@ import '../cubit/heatmap_state.dart';
 
 /// Pantalla de heatmap. Sprint 4 — PB-05.
 class HeatmapPage extends StatefulWidget {
+  final int proyectoId;
   final int planoId;
   final String imagenUrl;
   final double anchoPlanoPx;
@@ -18,6 +19,7 @@ class HeatmapPage extends StatefulWidget {
 
   const HeatmapPage({
     super.key,
+    required this.proyectoId,
     required this.planoId,
     required this.imagenUrl,
     required this.anchoPlanoPx,
@@ -268,6 +270,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
           required configuracionesRadio,
         }) {
           context.read<HeatmapCubit>().crearConjunto(
+                proyectoId: widget.proyectoId,
                 planoId: widget.planoId,
                 nombre: nombre,
                 proposito: proposito,

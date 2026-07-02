@@ -3,7 +3,7 @@
  * Una propuesta IA nace siempre desde datos relevados en campo.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -29,6 +29,7 @@ import {
   useGenerarConjuntosIAProyecto,
   useMapasPorPlanos,
   usePlanosProyecto,
+  usePrepararConjuntoIAProyecto,
 } from "../hooks/useProyectosOrg";
 import type {
   ConjuntoAPOut,
@@ -60,6 +61,7 @@ export default function EscenariosProyecto() {
   );
   const [vistaPrevia, setVistaPrevia] = useState<ConjuntoAPOut | null>(null);
   const [verificandoGeneracion, setVerificandoGeneracion] = useState(false);
+  const preparacionesSolicitadasRef = useRef(new Set<string>());
 
   const {
     data: planos,
@@ -139,6 +141,8 @@ export default function EscenariosProyecto() {
 
   const { mutateAsync: generar, isPending: generando } =
     useGenerarConjuntosIAProyecto(proyectoId);
+  const { mutateAsync: prepararConjuntoIA } =
+    usePrepararConjuntoIAProyecto(proyectoId);
   const { mutateAsync: eliminarConjunto, isPending: eliminandoPropuestas } =
     useEliminarConjuntoAP();
   const puedeGenerar =
@@ -146,6 +150,14 @@ export default function EscenariosProyecto() {
     conjuntoFuente !== null &&
     !generando &&
     !verificandoGeneracion;
+
+  useEffect(() => {
+    if (!planoSeleccionado?.calibrado || !conjuntoFuente || proyectoId <= 0) return;
+    const clave = `${proyectoId}:${planoSeleccionado.id}:${conjuntoFuente.id}:${conjuntoFuente.updated_at}`;
+    if (preparacionesSolicitadasRef.current.has(clave)) return;
+    preparacionesSolicitadasRef.current.add(clave);
+    prepararConjuntoIA(conjuntoFuente.id).catch(() => undefined);
+  }, [conjuntoFuente, planoSeleccionado, prepararConjuntoIA, proyectoId]);
 
   const handleGenerar = async (event: React.FormEvent) => {
     event.preventDefault();

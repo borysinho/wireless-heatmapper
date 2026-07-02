@@ -70,6 +70,22 @@ class HeatmapRemoteDatasource {
     }
   }
 
+  Future<void> prepararConjuntoIA({
+    required int proyectoId,
+    required int conjuntoId,
+  }) async {
+    try {
+      await _dio.post<void>(
+        '/proyectos/$proyectoId/conjuntos-ap/$conjuntoId/preparacion-ia',
+      );
+    } on DioException catch (e) {
+      throw HeatmapApiException(
+        _mensajeDesdeError(e),
+        statusCode: e.response?.statusCode,
+      );
+    }
+  }
+
   Future<ConjuntoAPModel> actualizarConjuntoAP({
     required int conjuntoId,
     required String nombre,

@@ -30,6 +30,7 @@ import {
   listarEnlacesCliente,
   listarMapasPlano,
   obtenerProyectoAdmin,
+  prepararConjuntoIAProyecto,
   listarAPsPlano,
   listarPlanosProyecto,
   listarProyectosOrg,
@@ -210,6 +211,13 @@ export function useGenerarConjuntosIAProyecto(proyectoId: number) {
         queryKey: ["admin", "proyectos", proyectoId, "enlaces-cliente"],
       });
     },
+  });
+}
+
+export function usePrepararConjuntoIAProyecto(proyectoId: number) {
+  return useMutation({
+    mutationFn: (conjuntoId: number) =>
+      prepararConjuntoIAProyecto(proyectoId, conjuntoId),
   });
 }
 

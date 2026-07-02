@@ -203,6 +203,14 @@ export interface ConjuntosIAGeneradosOut {
   mapas_proyectados: MapaCalorResumenOut[];
 }
 
+export interface PreparacionIAOut {
+  plano_id: number;
+  conjunto_id: number;
+  mapa_actual_id: number;
+  cantidad_puntos: number;
+  preparado: boolean;
+}
+
 export interface ContenidoEnlaceIn {
   conjunto_ids?: number[];
   mapa_ids?: number[];

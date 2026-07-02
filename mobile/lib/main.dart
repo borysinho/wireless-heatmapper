@@ -245,6 +245,9 @@ void _initDependencias() {
   sl.registerFactory<ActualizarConjuntoAPUseCase>(
     () => ActualizarConjuntoAPUseCase(sl<HeatmapRepository>()),
   );
+  sl.registerFactory<PrepararConjuntoIAUseCase>(
+    () => PrepararConjuntoIAUseCase(sl<HeatmapRepository>()),
+  );
   sl.registerFactory<EliminarConjuntoAPUseCase>(
     () => EliminarConjuntoAPUseCase(sl<HeatmapRepository>()),
   );
@@ -260,6 +263,7 @@ void _initDependencias() {
       listarConjuntos: sl<ListarConjuntosAPUseCase>(),
       crearConjunto: sl<CrearConjuntoAPUseCase>(),
       actualizarConjunto: sl<ActualizarConjuntoAPUseCase>(),
+      prepararConjuntoIA: sl<PrepararConjuntoIAUseCase>(),
       eliminarConjunto: sl<EliminarConjuntoAPUseCase>(),
       generarHeatmap: sl<GenerarHeatmapUseCase>(),
       generarHeatmapDesdeConjunto: sl<GenerarHeatmapDesdeConjuntoUseCase>(),

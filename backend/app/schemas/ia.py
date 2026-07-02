@@ -12,6 +12,7 @@ from app.schemas.heatmap import (
     MapaCalorResumenOut,
 )
 
+
 class FuenteEntradaIAIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -36,3 +37,11 @@ class ConjuntosIAGeneradosOut(BaseModel):
     mapa_actual: MapaCalorResumenOut
     conjuntos: list[ConjuntoAPOut]
     mapas_proyectados: list[MapaCalorResumenOut]
+
+
+class PreparacionIAOut(BaseModel):
+    plano_id: int
+    conjunto_id: int
+    mapa_actual_id: int
+    cantidad_puntos: int
+    preparado: bool = True

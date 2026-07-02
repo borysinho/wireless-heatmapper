@@ -74,6 +74,21 @@ class ActualizarConjuntoAPUseCase {
   }
 }
 
+class PrepararConjuntoIAUseCase {
+  final HeatmapRepository _repo;
+  const PrepararConjuntoIAUseCase(this._repo);
+
+  Future<void> call({
+    required int proyectoId,
+    required int conjuntoId,
+  }) {
+    return _repo.prepararConjuntoIA(
+      proyectoId: proyectoId,
+      conjuntoId: conjuntoId,
+    );
+  }
+}
+
 class EliminarConjuntoAPUseCase {
   final HeatmapRepository _repo;
   const EliminarConjuntoAPUseCase(this._repo);

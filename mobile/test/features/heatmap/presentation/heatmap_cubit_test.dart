@@ -69,6 +69,7 @@ HeatmapCubit _crearCubit(HeatmapRepository repo) => HeatmapCubit(
       listarConjuntos: ListarConjuntosAPUseCase(repo),
       crearConjunto: CrearConjuntoAPUseCase(repo),
       actualizarConjunto: ActualizarConjuntoAPUseCase(repo),
+      prepararConjuntoIA: PrepararConjuntoIAUseCase(repo),
       eliminarConjunto: EliminarConjuntoAPUseCase(repo),
       generarHeatmap: GenerarHeatmapUseCase(repo),
       generarHeatmapDesdeConjunto: GenerarHeatmapDesdeConjuntoUseCase(repo),
@@ -163,5 +164,40 @@ void main() {
         posY: any(named: 'posY'),
       ),
     );
+  });
+
+  test('prepara IA en segundo plano luego de crear un conjunto', () async {
+    final conjunto = _conjunto(id: 12, nombre: 'Conjunto nuevo');
+    when(
+      () => repo.crearConjuntoAP(
+        planoId: any(named: 'planoId'),
+        nombre: any(named: 'nombre'),
+        proposito: any(named: 'proposito'),
+        descripcion: any(named: 'descripcion'),
+        bandaObjetivo: any(named: 'bandaObjetivo'),
+        bssids: any(named: 'bssids'),
+        configuracionesRadio: any(named: 'configuracionesRadio'),
+      ),
+    ).thenAnswer((_) async => conjunto);
+    when(() => repo.prepararConjuntoIA(proyectoId: 5, conjuntoId: 12))
+        .thenAnswer((_) async {});
+    when(() => repo.listarConjuntosAP(37)).thenAnswer((_) async => [conjunto]);
+    when(() => repo.listarAPsDisponibles(37))
+        .thenAnswer((_) async => const [_apPrincipal, _apSecundario]);
+
+    await cubit.crearConjunto(
+      proyectoId: 5,
+      planoId: 37,
+      nombre: 'Conjunto nuevo',
+      proposito: 'Preparar propuestas IA',
+      bandaObjetivo: '2.4',
+      bssids: [_apPrincipal.bssid],
+    );
+
+    await untilCalled(
+      () => repo.prepararConjuntoIA(proyectoId: 5, conjuntoId: 12),
+    );
+    verify(() => repo.prepararConjuntoIA(proyectoId: 5, conjuntoId: 12))
+        .called(1);
   });
 }

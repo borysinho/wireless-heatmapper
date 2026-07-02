@@ -1018,25 +1018,46 @@ def _generar_heatmap_core(
     )
     _storage().save(png, ruta)
 
-    mapa = mapa_repo.crear(
-        plano_id=plano_id,
-        conjunto_ap_id=conjunto_ap_id,
-        modo_generacion=modo_norm,
-        algoritmo=algoritmo_norm,
-        resolucion=resolucion,
-        bssid=ap_principal["bssid"],
-        ssid=ap_principal["ssid"],
-        ap_pos_x=ap_principal["pos_x"],
-        ap_pos_y=ap_principal["pos_y"],
-        aps_interes=aps_interes,
-        bssids_generacion=bssids_norm,
-        matriz=matriz,
-        escala=ESCALA_CWNA,
-        ruta_imagen=ruta,
-        cantidad_puntos=len(puntos),
-        rssi_min=min(p.rssi for p in puntos),
-        rssi_max=max(p.rssi for p in puntos),
-        firma_mediciones=firma,
+    mapas_misma_clave = (
+        mapa_repo.listar_por_clave_conjunto(
+            conjunto_ap_id=conjunto_ap_id,
+            modo_generacion=modo_norm,
+            algoritmo=algoritmo_norm,
+            resolucion=resolucion,
+            bssids=bssids_norm,
+        )
+        if conjunto_ap_id is not None
+        else []
+    )
+    for mapa_duplicado in mapas_misma_clave[1:]:
+        db.delete(mapa_duplicado)
+
+    datos_mapa = {
+        "modo_generacion": modo_norm,
+        "algoritmo": algoritmo_norm,
+        "resolucion": resolucion,
+        "bssid": ap_principal["bssid"],
+        "ssid": ap_principal["ssid"],
+        "ap_pos_x": ap_principal["pos_x"],
+        "ap_pos_y": ap_principal["pos_y"],
+        "aps_interes": aps_interes,
+        "bssids_generacion": bssids_norm,
+        "matriz": matriz,
+        "escala": ESCALA_CWNA,
+        "ruta_imagen": ruta,
+        "cantidad_puntos": len(puntos),
+        "rssi_min": min(p.rssi for p in puntos),
+        "rssi_max": max(p.rssi for p in puntos),
+        "firma_mediciones": firma,
+    }
+    mapa = (
+        mapa_repo.actualizar_resultado(mapa=mapas_misma_clave[0], **datos_mapa)
+        if mapas_misma_clave
+        else mapa_repo.crear(
+            plano_id=plano_id,
+            conjunto_ap_id=conjunto_ap_id,
+            **datos_mapa,
+        )
     )
     return _mapa_out(mapa, request, puntos=puntos)
 

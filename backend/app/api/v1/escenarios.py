@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import secrets
+from dataclasses import dataclass
 from itertools import combinations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -26,7 +27,7 @@ from app.api.v1.heatmaps import (
 )
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.security import require_admin
+from app.core.security import get_current_user, require_admin
 from app.models.heatmap import ConjuntoAP, MapaCalor
 from app.models.medicion import LecturaRSSI, PuntoMedicion
 from app.models.plano import Plano
@@ -42,7 +43,7 @@ from app.repositories.medicion_repository import (
     MedicionRepository,
 )
 from app.repositories.proyecto_repository import ProyectoRepository
-from app.schemas.ia import ConjuntosIAGeneradosOut, RestriccionesIAIn
+from app.schemas.ia import ConjuntosIAGeneradosOut, PreparacionIAOut, RestriccionesIAIn
 from app.services.geometria_service import mascara_poligono
 from app.services.interpolacion_service import (
     ESCALA_CWNA,
@@ -54,6 +55,20 @@ from app.storage import LocalFilesystemStorage
 
 router_proyectos_escenarios = APIRouter(prefix="/proyectos", tags=["ia"])
 VERSION_MOTOR_IA = "rf-hibrido-1.2"
+_MAX_PREPARACIONES_IA = 64
+
+
+@dataclass(frozen=True)
+class ContextoIAPreparado:
+    firma_preparacion: str
+    mapa_actual_id: int
+    puntos: list[PuntoRSSI]
+    modelo_propagacion: ModeloPropagacion
+    aps_existentes: list[dict]
+    poligono_interes: list[dict]
+
+
+_PREPARACIONES_IA: dict[tuple[int, int], ContextoIAPreparado] = {}
 
 
 def _storage() -> LocalFilesystemStorage:
@@ -84,6 +99,184 @@ def _payload_solicitud_ia(
 def _firma_solicitud_ia(payload: dict) -> str:
     serializado = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha1(serializado.encode(), usedforsecurity=False).hexdigest()
+
+
+def _payload_preparacion_ia(
+    *,
+    plano: Plano,
+    conjunto: ConjuntoAP,
+    bssids_seleccionados: list[str],
+    db: Session,
+) -> dict:
+    items = [
+        {
+            "bssid": item.bssid.lower(),
+            "pos_x": item.pos_x,
+            "pos_y": item.pos_y,
+            "banda": item.banda,
+            "radios": item.radios or [],
+        }
+        for item in sorted(conjunto.items, key=lambda item: item.bssid.lower())
+    ]
+    return {
+        "version_motor_ia": VERSION_MOTOR_IA,
+        "plano_id": plano.id,
+        "conjunto_id": conjunto.id,
+        "banda_objetivo": conjunto.banda_objetivo,
+        "bssids": sorted(bssids_seleccionados),
+        "items": items,
+        "poligono_interes": plano.poligono_interes or [],
+        "firma_mediciones": MedicionRepository(db).firma_mediciones_plano(
+            plano_id=plano.id,
+        ),
+    }
+
+
+def _firma_preparacion_ia(
+    *,
+    plano: Plano,
+    conjunto: ConjuntoAP,
+    bssids_seleccionados: list[str],
+    db: Session,
+) -> str:
+    return _firma_solicitud_ia(
+        _payload_preparacion_ia(
+            plano=plano,
+            conjunto=conjunto,
+            bssids_seleccionados=bssids_seleccionados,
+            db=db,
+        )
+    )
+
+
+def _recordar_contexto_ia(
+    *,
+    plano_id: int,
+    conjunto_id: int,
+    contexto: ContextoIAPreparado,
+) -> ContextoIAPreparado:
+    if len(_PREPARACIONES_IA) >= _MAX_PREPARACIONES_IA:
+        primera_clave = next(iter(_PREPARACIONES_IA))
+        _PREPARACIONES_IA.pop(primera_clave, None)
+    _PREPARACIONES_IA[(plano_id, conjunto_id)] = contexto
+    return contexto
+
+
+def _contexto_ia_preparado(
+    *,
+    plano: Plano,
+    conjunto: ConjuntoAP,
+    bssids_seleccionados: list[str],
+    db: Session,
+) -> ContextoIAPreparado | None:
+    contexto = _PREPARACIONES_IA.get((plano.id, conjunto.id))
+    if contexto is None:
+        return None
+    firma = _firma_preparacion_ia(
+        plano=plano,
+        conjunto=conjunto,
+        bssids_seleccionados=bssids_seleccionados,
+        db=db,
+    )
+    if contexto.firma_preparacion != firma:
+        _PREPARACIONES_IA.pop((plano.id, conjunto.id), None)
+        return None
+    mapa_actual_existe = (
+        db.query(MapaCalor.id)
+        .filter(MapaCalor.id == contexto.mapa_actual_id)
+        .first()
+        is not None
+    )
+    if not mapa_actual_existe:
+        _PREPARACIONES_IA.pop((plano.id, conjunto.id), None)
+        return None
+    return contexto
+
+
+def _preparar_contexto_ia(
+    *,
+    plano: Plano,
+    conjunto: ConjuntoAP,
+    bssids_seleccionados: list[str],
+    db: Session,
+) -> ContextoIAPreparado:
+    contexto = _contexto_ia_preparado(
+        plano=plano,
+        conjunto=conjunto,
+        bssids_seleccionados=bssids_seleccionados,
+        db=db,
+    )
+    if contexto is not None:
+        return contexto
+
+    mapa_actual, puntos = _mapa_actual(
+        plano=plano,
+        db=db,
+        bssids_seleccionados=bssids_seleccionados,
+        conjunto_ap_id=conjunto.id,
+    )
+    contexto = ContextoIAPreparado(
+        firma_preparacion=_firma_preparacion_ia(
+            plano=plano,
+            conjunto=conjunto,
+            bssids_seleccionados=bssids_seleccionados,
+            db=db,
+        ),
+        mapa_actual_id=mapa_actual.id,
+        puntos=puntos,
+        modelo_propagacion=_modelo_calibrado_para_plano(
+            plano=plano,
+            db=db,
+            conjunto=conjunto,
+            bssids_seleccionados=bssids_seleccionados,
+        ),
+        aps_existentes=_aps_fuente_para_ia(conjunto=conjunto),
+        poligono_interes=_requerir_poligono_interes(plano),
+    )
+    return _recordar_contexto_ia(
+        plano_id=plano.id,
+        conjunto_id=conjunto.id,
+        contexto=contexto,
+    )
+
+
+def preparar_contexto_ia(
+    *,
+    plano_id: int,
+    conjunto_id: int,
+    db: Session,
+) -> ContextoIAPreparado:
+    plano = db.query(Plano).filter(Plano.id == plano_id).first()
+    if plano is None:
+        raise HTTPException(status_code=404, detail="Plano no encontrado.")
+    if not plano.calibrado:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El plano seleccionado debe estar calibrado.",
+        )
+    conjunto = (
+        db.query(ConjuntoAP)
+        .filter(ConjuntoAP.id == conjunto_id, ConjuntoAP.plano_id == plano.id)
+        .first()
+    )
+    if conjunto is None:
+        raise HTTPException(status_code=404, detail="Conjunto AP no encontrado.")
+    if conjunto.origen == "ia":
+        raise HTTPException(
+            status_code=422,
+            detail="La preparación IA debe partir de un conjunto técnico.",
+        )
+    bssids_seleccionados = _requerir_bssids_medidos(
+        plano=plano,
+        conjunto=conjunto,
+        db=db,
+    )
+    return _preparar_contexto_ia(
+        plano=plano,
+        conjunto=conjunto,
+        bssids_seleccionados=bssids_seleccionados,
+        db=db,
+    )
 
 
 def _clave_bloqueo_ia(*, plano_id: int, conjunto_id: int) -> int:
@@ -246,6 +439,25 @@ def _proyecto_admin(
             detail="La generación IA está restringida al panel web admin.",
         )
     proyecto = ProyectoRepository(db).obtener_por_id_admin(proyecto_id=proyecto_id)
+    if proyecto is None:
+        raise HTTPException(status_code=404, detail="Proyecto no encontrado.")
+    return proyecto
+
+
+def _proyecto_preparacion_ia(
+    *,
+    proyecto_id: int,
+    current_user: Usuario,
+    db: Session,
+) -> Proyecto:
+    repo = ProyectoRepository(db)
+    if current_user.rol == "admin":
+        proyecto = repo.obtener_por_id_admin(proyecto_id=proyecto_id)
+    else:
+        proyecto = repo.obtener_por_id(
+            proyecto_id=proyecto_id,
+            tecnico_id=current_user.id,
+        )
     if proyecto is None:
         raise HTTPException(status_code=404, detail="Proyecto no encontrado.")
     return proyecto
@@ -667,6 +879,43 @@ def _modo_mapa_ia(*, cantidad_items: int, total_items: int) -> str:
 
 
 @router_proyectos_escenarios.post(
+    "/{proyecto_id}/conjuntos-ap/{conjunto_id}/preparacion-ia",
+    response_model=PreparacionIAOut,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def preparar_conjunto_ia(
+    proyecto_id: int,
+    conjunto_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user),
+) -> PreparacionIAOut:
+    proyecto = _proyecto_preparacion_ia(
+        proyecto_id=proyecto_id,
+        current_user=current_user,
+        db=db,
+    )
+    conjunto = (
+        db.query(ConjuntoAP)
+        .join(Plano, ConjuntoAP.plano_id == Plano.id)
+        .filter(ConjuntoAP.id == conjunto_id, Plano.proyecto_id == proyecto.id)
+        .first()
+    )
+    if conjunto is None:
+        raise HTTPException(status_code=404, detail="Conjunto AP no encontrado.")
+    contexto = preparar_contexto_ia(
+        plano_id=conjunto.plano_id,
+        conjunto_id=conjunto.id,
+        db=db,
+    )
+    return PreparacionIAOut(
+        plano_id=conjunto.plano_id,
+        conjunto_id=conjunto.id,
+        mapa_actual_id=contexto.mapa_actual_id,
+        cantidad_puntos=len(contexto.puntos),
+    )
+
+
+@router_proyectos_escenarios.post(
     "/{proyecto_id}/conjuntos-ap/recomendaciones-ia",
     response_model=ConjuntosIAGeneradosOut,
     status_code=status.HTTP_201_CREATED,
@@ -732,12 +981,29 @@ def _generar_conjuntos_ia_bloqueado(
     db: Session,
     current_user: Usuario,
 ) -> ConjuntosIAGeneradosOut:
-    mapa_actual, puntos = _mapa_actual(
+    contexto_preparado = _contexto_ia_preparado(
         plano=plano,
-        db=db,
+        conjunto=conjunto_fuente,
         bssids_seleccionados=bssids_seleccionados,
-        conjunto_ap_id=conjunto_fuente.id,
+        db=db,
     )
+    if contexto_preparado is not None:
+        mapa_actual = db.get(MapaCalor, contexto_preparado.mapa_actual_id)
+        puntos = contexto_preparado.puntos
+    else:
+        mapa_actual, puntos = _mapa_actual(
+            plano=plano,
+            db=db,
+            bssids_seleccionados=bssids_seleccionados,
+            conjunto_ap_id=conjunto_fuente.id,
+        )
+    if mapa_actual is None:
+        mapa_actual, puntos = _mapa_actual(
+            plano=plano,
+            db=db,
+            bssids_seleccionados=bssids_seleccionados,
+            conjunto_ap_id=conjunto_fuente.id,
+        )
     respuesta_existente = _respuesta_ia_existente(
         db=db,
         request=request,
@@ -749,16 +1015,18 @@ def _generar_conjuntos_ia_bloqueado(
     if respuesta_existente is not None:
         return respuesta_existente
 
-    modelo_propagacion = _modelo_calibrado_para_plano(
-        plano=plano,
-        db=db,
-        conjunto=conjunto_fuente,
-        bssids_seleccionados=bssids_seleccionados,
-    )
-    aps_existentes = _aps_fuente_para_ia(conjunto=conjunto_fuente)
+    if contexto_preparado is None:
+        contexto_preparado = _preparar_contexto_ia(
+            plano=plano,
+            conjunto=conjunto_fuente,
+            bssids_seleccionados=bssids_seleccionados,
+            db=db,
+        )
+    modelo_propagacion = contexto_preparado.modelo_propagacion
+    aps_existentes = contexto_preparado.aps_existentes
     limite_aps = body.cantidad_aps_propuestos
     banda_objetivo = conjunto_fuente.banda_objetivo
-    poligono_interes = _requerir_poligono_interes(plano)
+    poligono_interes = contexto_preparado.poligono_interes
     alternativas = OptimizadorAPService(modelo=modelo_propagacion).optimizar(
         puntos_actuales=puntos,
         matriz_actual=mapa_actual.matriz,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/datasources/heatmap_remote_datasource.dart';
@@ -11,6 +13,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
   final ListarConjuntosAPUseCase _listarConjuntos;
   final CrearConjuntoAPUseCase _crearConjunto;
   final ActualizarConjuntoAPUseCase _actualizarConjunto;
+  final PrepararConjuntoIAUseCase _prepararConjuntoIA;
   final EliminarConjuntoAPUseCase _eliminarConjunto;
   final GenerarHeatmapUseCase _generarHeatmap;
   final GenerarHeatmapDesdeConjuntoUseCase _generarHeatmapDesdeConjunto;
@@ -22,6 +25,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
     required ListarConjuntosAPUseCase listarConjuntos,
     required CrearConjuntoAPUseCase crearConjunto,
     required ActualizarConjuntoAPUseCase actualizarConjunto,
+    required PrepararConjuntoIAUseCase prepararConjuntoIA,
     required EliminarConjuntoAPUseCase eliminarConjunto,
     required GenerarHeatmapUseCase generarHeatmap,
     required GenerarHeatmapDesdeConjuntoUseCase generarHeatmapDesdeConjunto,
@@ -30,6 +34,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
         _listarConjuntos = listarConjuntos,
         _crearConjunto = crearConjunto,
         _actualizarConjunto = actualizarConjunto,
+        _prepararConjuntoIA = prepararConjuntoIA,
         _eliminarConjunto = eliminarConjunto,
         _generarHeatmap = generarHeatmap,
         _generarHeatmapDesdeConjunto = generarHeatmapDesdeConjunto,
@@ -88,6 +93,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
   }
 
   Future<void> crearConjunto({
+    required int proyectoId,
     required int planoId,
     required String nombre,
     required String proposito,
@@ -100,7 +106,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
     final aps = actual is HeatmapConjuntos ? actual.aps : <APDisponible>[];
     emit(const HeatmapLoading(mensaje: 'Guardando conjunto de APs…'));
     try {
-      await _crearConjunto(
+      final conjuntoCreado = await _crearConjunto(
         planoId: planoId,
         nombre: nombre,
         proposito: proposito,
@@ -109,6 +115,10 @@ class HeatmapCubit extends Cubit<HeatmapState> {
         bssids: bssids,
         configuracionesRadio: configuracionesRadio,
       );
+      unawaited(_prepararConjuntoIADespuesDeCrear(
+        proyectoId: proyectoId,
+        conjuntoId: conjuntoCreado.id,
+      ));
       final conjuntos = await _listarConjuntos(planoId);
       emit(HeatmapConjuntos(
         aps: aps.isEmpty ? await _listarAPs(planoId) : aps,
@@ -127,6 +137,22 @@ class HeatmapCubit extends Cubit<HeatmapState> {
         conjuntos: actual is HeatmapConjuntos ? actual.conjuntos : const [],
         mensaje: 'No se pudo crear el conjunto.',
       ));
+    }
+  }
+
+  Future<void> _prepararConjuntoIADespuesDeCrear({
+    required int proyectoId,
+    required int conjuntoId,
+  }) async {
+    if (proyectoId <= 0) return;
+    try {
+      await _prepararConjuntoIA(
+        proyectoId: proyectoId,
+        conjuntoId: conjuntoId,
+      );
+    } catch (_) {
+      // La preparación IA es una optimización de backend; no debe bloquear
+      // el flujo de campo si falla o si aún faltan prerequisitos del plano.
     }
   }
 

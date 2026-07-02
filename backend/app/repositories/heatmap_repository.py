@@ -51,6 +51,39 @@ class MapaCalorRepository:
             .all()
         )
 
+    def listar_por_clave_conjunto(
+        self,
+        *,
+        conjunto_ap_id: int,
+        modo_generacion: str,
+        algoritmo: str,
+        resolucion: int,
+        bssids: list[str],
+    ) -> list[MapaCalor]:
+        clave_bssids = tuple(sorted(bssid.lower() for bssid in bssids))
+        candidatos = (
+            self._db.query(MapaCalor)
+            .filter(
+                MapaCalor.conjunto_ap_id == conjunto_ap_id,
+                MapaCalor.modo_generacion == modo_generacion,
+                MapaCalor.algoritmo == algoritmo,
+                MapaCalor.resolucion == resolucion,
+            )
+            .order_by(MapaCalor.created_at.desc(), MapaCalor.id.desc())
+            .all()
+        )
+        return [
+            mapa
+            for mapa in candidatos
+            if tuple(
+                sorted(
+                    bssid.lower()
+                    for bssid in (mapa.bssids_generacion or [mapa.bssid])
+                )
+            )
+            == clave_bssids
+        ]
+
     def crear(
         self,
         *,
@@ -94,6 +127,47 @@ class MapaCalorRepository:
             firma_mediciones=firma_mediciones,
         )
         self._db.add(mapa)
+        self._db.commit()
+        self._db.refresh(mapa)
+        return mapa
+
+    def actualizar_resultado(
+        self,
+        *,
+        mapa: MapaCalor,
+        modo_generacion: str,
+        algoritmo: str,
+        resolucion: int,
+        bssid: str,
+        ssid: str,
+        ap_pos_x: float,
+        ap_pos_y: float,
+        aps_interes: list[dict],
+        bssids_generacion: list[str],
+        matriz: list[list[float]],
+        escala: list[dict],
+        ruta_imagen: str,
+        cantidad_puntos: int,
+        rssi_min: float,
+        rssi_max: float,
+        firma_mediciones: str,
+    ) -> MapaCalor:
+        mapa.modo_generacion = modo_generacion
+        mapa.algoritmo = algoritmo
+        mapa.resolucion = resolucion
+        mapa.bssid = bssid
+        mapa.ssid = ssid
+        mapa.ap_pos_x = ap_pos_x
+        mapa.ap_pos_y = ap_pos_y
+        mapa.aps_interes = aps_interes
+        mapa.bssids_generacion = bssids_generacion
+        mapa.matriz = matriz
+        mapa.escala = escala
+        mapa.ruta_imagen = ruta_imagen
+        mapa.cantidad_puntos = cantidad_puntos
+        mapa.rssi_min = rssi_min
+        mapa.rssi_max = rssi_max
+        mapa.firma_mediciones = firma_mediciones
         self._db.commit()
         self._db.refresh(mapa)
         return mapa

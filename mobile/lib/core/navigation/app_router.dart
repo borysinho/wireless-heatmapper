@@ -161,6 +161,10 @@ class AppRouter {
                       return BlocProvider<HeatmapCubit>(
                         create: (_) => sl<HeatmapCubit>(),
                         child: HeatmapPage(
+                          proyectoId: int.tryParse(
+                                routeState.pathParameters['id'] ?? '',
+                              ) ??
+                              0,
                           planoId: extra['planoId'] as int,
                           imagenUrl: extra['imagenUrl'] as String,
                           anchoPlanoPx:

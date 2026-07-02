@@ -12,6 +12,7 @@ import type {
   MapaCalorOut,
   MapaCalorResumenOut,
   PlanoOut,
+  PreparacionIAOut,
   ProyectoListOut,
   ProyectoAdminCreate,
   ProyectoAdminUpdate,
@@ -206,6 +207,16 @@ export async function generarConjuntosIAProyecto(
   const { data } = await apiClient.post<ConjuntosIAGeneradosOut>(
     `/proyectos/${proyectoId}/conjuntos-ap/recomendaciones-ia`,
     body,
+  );
+  return data;
+}
+
+export async function prepararConjuntoIAProyecto(
+  proyectoId: number,
+  conjuntoId: number,
+): Promise<PreparacionIAOut> {
+  const { data } = await apiClient.post<PreparacionIAOut>(
+    `/proyectos/${proyectoId}/conjuntos-ap/${conjuntoId}/preparacion-ia`,
   );
   return data;
 }

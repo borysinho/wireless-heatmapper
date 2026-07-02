@@ -43,6 +43,17 @@ class HeatmapRepositoryImpl implements HeatmapRepository {
   }
 
   @override
+  Future<void> prepararConjuntoIA({
+    required int proyectoId,
+    required int conjuntoId,
+  }) {
+    return _datasource.prepararConjuntoIA(
+      proyectoId: proyectoId,
+      conjuntoId: conjuntoId,
+    );
+  }
+
+  @override
   Future<ConjuntoAP> actualizarConjuntoAP({
     required int conjuntoId,
     required String nombre,

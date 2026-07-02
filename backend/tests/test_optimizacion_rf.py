@@ -12,7 +12,11 @@ from app.ai.modelo_propagacion import (
     MuestraCalibracionRF,
 )
 from app.ai.optimizador_ap_service import OptimizadorAPService
-from app.api.v1.escenarios import _limite_aps_derivado, generar_conjuntos_ia
+from app.api.v1.escenarios import (
+    _limite_aps_derivado,
+    generar_conjuntos_ia,
+    preparar_contexto_ia,
+)
 from app.api.v1.heatmaps import eliminar_conjunto_ap
 from app.core.config import settings
 from app.models.heatmap import ConjuntoAP, ConjuntoAPItem, MapaCalor
@@ -420,7 +424,9 @@ def test_generacion_persiste_proyecciones_sin_alterar_mediciones(
     assert len(respuesta.mapas_proyectados) == 2
     conjunto_ia = respuesta.conjuntos[0]
     mapas_conjunto_ia = [
-        mapa for mapa in respuesta.mapas_proyectados if mapa.conjunto_ap_id == conjunto_ia.id
+        mapa
+        for mapa in respuesta.mapas_proyectados
+        if mapa.conjunto_ap_id == conjunto_ia.id
     ]
     assert len(mapas_conjunto_ia) == 1
     assert {mapa.modo_generacion for mapa in mapas_conjunto_ia} == {"PROYECTADO"}
@@ -470,6 +476,51 @@ def test_generacion_persiste_proyecciones_sin_alterar_mediciones(
     } == originales
     conjunto_ia_db = db_session.query(ConjuntoAP).filter_by(id=conjunto_ia.id).one()
     assert len(conjunto_ia_db.metricas_ia["mapas_por_banda"]["5"]) == 32
+
+
+def test_generacion_ia_reutiliza_contexto_preparado(
+    db_session, tecnico_usuario, admin_usuario, monkeypatch
+):
+    plano = _plano_con_mediciones(db_session, tecnico_usuario)
+    conjunto = _crear_conjunto_ap(
+        db_session,
+        plano=plano,
+        admin=admin_usuario,
+        nombre="Conjunto preparado",
+        proposito="Validar cache previo al clic",
+    )
+
+    with tempfile.TemporaryDirectory() as tmp:
+        monkeypatch.setattr(settings, "storage_root", tmp)
+        contexto = preparar_contexto_ia(
+            plano_id=plano.id,
+            conjunto_id=conjunto.id,
+            db=db_session,
+        )
+
+        def _fallar_recalibracion(**_kwargs):
+            raise AssertionError("No debe recalibrar si el contexto IA está preparado.")
+
+        monkeypatch.setattr(
+            "app.api.v1.escenarios._modelo_calibrado_para_plano",
+            _fallar_recalibracion,
+        )
+        respuesta = generar_conjuntos_ia(
+            proyecto_id=plano.proyecto_id,
+            body=RestriccionesIAIn(
+                resolucion=32,
+                fuente_entrada={
+                    "tipo": "CONJUNTO_EXISTENTE",
+                    "conjunto_id": conjunto.id,
+                },
+            ),
+            request=None,
+            db=db_session,
+            current_user=admin_usuario,
+        )
+
+    assert respuesta.mapa_actual.id == contexto.mapa_actual_id
+    assert len(respuesta.conjuntos) == 2
 
 
 def test_generacion_desde_conjunto_existente_conserva_fuente_y_bssids(

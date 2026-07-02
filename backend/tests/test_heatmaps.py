@@ -384,6 +384,67 @@ def test_crear_conjunto_ap_y_generar_heatmaps_por_modo(
     assert mapa_subconjunto.bssids_generacion == ["aa:bb:cc:dd:ee:02"]
 
 
+def test_regenerar_heatmap_conjunto_reemplaza_mapa_previo(
+    db_session,
+    tecnico_usuario,
+):
+    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
+    _insertar_puntos_sinteticos(db_session, plano_id, cantidad=5)
+    conjunto = crear_conjunto_ap(
+        plano_id=plano_id,
+        body=ConjuntoAPCrearIn(
+            nombre="Cobertura reubicada",
+            proposito="Validar reemplazo al mover APs desde móvil.",
+            banda_objetivo="2.4",
+            bssids=["aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"],
+        ),
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    mapa_inicial = generar_heatmap_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapConjuntoIn(
+            modo="CONJUNTO_COMPLETO",
+            resolucion=64,
+        ),
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    actualizar_ubicacion_ap_conjunto(
+        conjunto_id=conjunto.id,
+        body=ActualizarUbicacionAPConjuntoIn(
+            bssid="aa:bb:cc:dd:ee:01",
+            pos_x=180,
+            pos_y=110,
+        ),
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    mapa_regenerado = generar_heatmap_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapConjuntoIn(
+            modo="CONJUNTO_COMPLETO",
+            resolucion=64,
+        ),
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    mapas = (
+        db_session.query(MapaCalor)
+        .filter(MapaCalor.conjunto_ap_id == conjunto.id)
+        .all()
+    )
+
+    assert mapa_regenerado.id == mapa_inicial.id
+    assert len(mapas) == 1
+    assert mapas[0].aps_interes[0]["pos_x"] == 180
+    assert mapas[0].aps_interes[0]["pos_y"] == 110
+
+
 def test_generar_heatmaps_faltantes_actualiza_idw(
     db_session,
     tecnico_usuario,
