@@ -53,8 +53,8 @@ class APDisponibleOut(BaseModel):
     canal: int | None
     frecuencia_mhz: int | None
     rssi_promedio: float
-    pos_x: float
-    pos_y: float
+    pos_x: float | None
+    pos_y: float | None
     cantidad_puntos: int
     seleccionado: bool = False
 

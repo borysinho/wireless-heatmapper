@@ -329,6 +329,8 @@ def _resolver_aps_interes(
     bssids: list[str],
     ap_pos_x: list[float] | None,
     ap_pos_y: list[float] | None,
+    posiciones_por_bssid: dict[str, tuple[float | None, float | None]] | None = None,
+    usar_posiciones_estimadas: bool = True,
 ) -> list[dict]:
     if (ap_pos_x is None) != (ap_pos_y is None):
         raise HTTPException(
@@ -373,6 +375,14 @@ def _resolver_aps_interes(
     seleccionados: list[dict] = []
     for idx, bssid in enumerate(bssids):
         ap = por_bssid[bssid]
+        pos_x = ap_pos_x[idx] if ap_pos_x is not None else None
+        pos_y = ap_pos_y[idx] if ap_pos_y is not None else None
+        if posiciones_por_bssid is not None:
+            pos_x, pos_y = posiciones_por_bssid.get(bssid, (None, None))
+        if pos_x is None and usar_posiciones_estimadas:
+            pos_x = ap["pos_x"]
+        if pos_y is None and usar_posiciones_estimadas:
+            pos_y = ap["pos_y"]
         seleccionados.append(
             {
                 "bssid": bssid,
@@ -380,8 +390,8 @@ def _resolver_aps_interes(
                 "canal": ap["canal"],
                 "frecuencia_mhz": ap["frecuencia_mhz"],
                 "rssi_promedio": ap["rssi_promedio"],
-                "pos_x": ap_pos_x[idx] if ap_pos_x is not None else ap["pos_x"],
-                "pos_y": ap_pos_y[idx] if ap_pos_y is not None else ap["pos_y"],
+                "pos_x": pos_x,
+                "pos_y": pos_y,
                 "cantidad_puntos": ap["cantidad_puntos"],
             }
         )
@@ -485,14 +495,20 @@ def _resolver_items_conjunto(
         for item in items_existentes or []
         if getattr(item, "radios", None)
     }
+    posiciones_existentes = {
+        item.bssid.lower(): (item.pos_x, item.pos_y)
+        for item in items_existentes or []
+        if getattr(item, "pos_x", None) is not None
+        and getattr(item, "pos_y", None) is not None
+    }
     return [
         {
             "bssid": bssid,
             "ssid_snapshot": por_bssid[bssid]["ssid"],
             "canal_snapshot": por_bssid[bssid]["canal"],
             "rssi_promedio_snapshot": por_bssid[bssid]["rssi_promedio"],
-            "pos_x": por_bssid[bssid]["pos_x"],
-            "pos_y": por_bssid[bssid]["pos_y"],
+            "pos_x": posiciones_existentes.get(bssid, (None, None))[0],
+            "pos_y": posiciones_existentes.get(bssid, (None, None))[1],
             "banda": _banda_ap(por_bssid[bssid]),
             "radios": _radio_desde_configuracion(
                 config=config_por_bssid.get(bssid),
@@ -848,8 +864,12 @@ def _firma_aps_interes(
         "aps": [
             {
                 "bssid": ap["bssid"],
-                "pos_x": round(float(ap["pos_x"]), 2),
-                "pos_y": round(float(ap["pos_y"]), 2),
+                "pos_x": round(float(ap["pos_x"]), 2)
+                if ap.get("pos_x") is not None
+                else None,
+                "pos_y": round(float(ap["pos_y"]), 2)
+                if ap.get("pos_y") is not None
+                else None,
             }
             for ap in aps_interes
         ],
@@ -926,6 +946,8 @@ def _generar_heatmap_core(
     modo_generacion: str | None = None,
     origen_lecturas: str = ORIGEN_CAMPO,
     conjunto_lecturas_id: int | None = None,
+    posiciones_por_bssid: dict[str, tuple[float | None, float | None]] | None = None,
+    usar_posiciones_estimadas: bool = True,
 ) -> MapaCalorOut:
     plano = _verificar_ownership_plano(
         plano_id=plano_id,
@@ -956,6 +978,8 @@ def _generar_heatmap_core(
         bssids=bssids_norm,
         ap_pos_x=ap_pos_x,
         ap_pos_y=ap_pos_y,
+        posiciones_por_bssid=posiciones_por_bssid,
+        usar_posiciones_estimadas=usar_posiciones_estimadas,
     )
 
     puntos = med_repo.listar_puntos_rssi_heatmap(
@@ -1037,8 +1061,12 @@ def _generar_heatmap_core(
         "resolucion": resolucion,
         "bssid": ap_principal["bssid"],
         "ssid": ap_principal["ssid"],
-        "ap_pos_x": ap_principal["pos_x"],
-        "ap_pos_y": ap_principal["pos_y"],
+        "ap_pos_x": ap_principal["pos_x"]
+        if ap_principal["pos_x"] is not None
+        else 0.0,
+        "ap_pos_y": ap_principal["pos_y"]
+        if ap_principal["pos_y"] is not None
+        else 0.0,
         "aps_interes": aps_interes,
         "bssids_generacion": bssids_norm,
         "matriz": matriz,
@@ -1381,24 +1409,14 @@ def generar_heatmap_conjunto(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="La cantidad de coordenadas no coincide con los APs seleccionados.",
         )
-    if posiciones_request_completas:
-        ap_pos_x = body.ap_pos_x
-        ap_pos_y = body.ap_pos_y
-    else:
-        items_por_bssid = {item.bssid: item for item in conjunto.items}
-        ap_pos_x = [
-            items_por_bssid[bssid].pos_x
-            for bssid in bssids_generacion
-            if items_por_bssid[bssid].pos_x is not None
-        ]
-        ap_pos_y = [
-            items_por_bssid[bssid].pos_y
-            for bssid in bssids_generacion
-            if items_por_bssid[bssid].pos_y is not None
-        ]
-    posiciones_completas = len(ap_pos_x) == len(bssids_generacion) and len(
-        ap_pos_y
-    ) == len(bssids_generacion)
+    items_por_bssid = {item.bssid: item for item in conjunto.items}
+    posiciones_confirmadas = {
+        bssid: (
+            items_por_bssid[bssid].pos_x,
+            items_por_bssid[bssid].pos_y,
+        )
+        for bssid in bssids_generacion
+    }
 
     origen_lecturas = ORIGEN_IA_ESTIMADA if conjunto.origen == "ia" else ORIGEN_CAMPO
     conjunto_lecturas_id = conjunto.id if conjunto.origen == "ia" else None
@@ -1407,8 +1425,8 @@ def generar_heatmap_conjunto(
         plano_id=conjunto.plano_id,
         request=request,
         bssid=bssids_generacion,
-        ap_pos_x=ap_pos_x if posiciones_completas else None,
-        ap_pos_y=ap_pos_y if posiciones_completas else None,
+        ap_pos_x=None,
+        ap_pos_y=None,
         algoritmo=body.algoritmo,
         resolucion=body.resolucion,
         db=db,
@@ -1417,6 +1435,8 @@ def generar_heatmap_conjunto(
         modo_generacion=body.modo,
         origen_lecturas=origen_lecturas,
         conjunto_lecturas_id=conjunto_lecturas_id,
+        posiciones_por_bssid=posiciones_confirmadas,
+        usar_posiciones_estimadas=False,
     )
 
 
@@ -1511,25 +1531,19 @@ def generar_heatmaps_faltantes_conjunto(
                     ).append(mapa_existente.id)
                     db.delete(mapa_existente)
                 db.commit()
-            ap_pos_x = [
-                float(items_por_bssid[bssid].pos_x)
+            posiciones_confirmadas = {
+                bssid: (
+                    items_por_bssid[bssid].pos_x,
+                    items_por_bssid[bssid].pos_y,
+                )
                 for bssid in bssids_mapa
-                if items_por_bssid[bssid].pos_x is not None
-            ]
-            ap_pos_y = [
-                float(items_por_bssid[bssid].pos_y)
-                for bssid in bssids_mapa
-                if items_por_bssid[bssid].pos_y is not None
-            ]
-            posiciones_completas = len(ap_pos_x) == len(bssids_mapa) and len(
-                ap_pos_y
-            ) == len(bssids_mapa)
+            }
             mapa = _generar_heatmap_core(
                 plano_id=conjunto.plano_id,
                 request=request,
                 bssid=bssids_mapa,
-                ap_pos_x=ap_pos_x if posiciones_completas else None,
-                ap_pos_y=ap_pos_y if posiciones_completas else None,
+                ap_pos_x=None,
+                ap_pos_y=None,
                 algoritmo=algoritmo_norm,
                 resolucion=body.resolucion,
                 db=db,
@@ -1538,6 +1552,8 @@ def generar_heatmaps_faltantes_conjunto(
                 modo_generacion=modo_mapa,
                 origen_lecturas=origen_lecturas,
                 conjunto_lecturas_id=conjunto_lecturas_id,
+                posiciones_por_bssid=posiciones_confirmadas,
+                usar_posiciones_estimadas=False,
             )
             clave_generada = _clave_publicacion_mapa(mapa)
             for mapa_reemplazado_id in mapas_reemplazados_por_clave.get(

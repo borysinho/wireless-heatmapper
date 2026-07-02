@@ -1006,6 +1006,50 @@ def test_ubicacion_ap_conjunto_persiste_y_se_usa_en_heatmap(
     assert mapa.ap_pos_y == 123
 
 
+def test_crear_conjunto_no_persiste_posicion_estimada_de_ap(
+    db_session,
+    tecnico_usuario,
+):
+    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
+    _insertar_puntos_sinteticos(db_session, plano_id, cantidad=5)
+    aps = listar_aps_disponibles(
+        plano_id=plano_id,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    assert aps[0].pos_x is not None
+    assert aps[0].pos_y is not None
+
+    conjunto = crear_conjunto_ap(
+        plano_id=plano_id,
+        body=ConjuntoAPCrearIn(
+            nombre="AP sin ubicación confirmada",
+            proposito="No debe heredar centroides estimados.",
+            banda_objetivo="2.4",
+            bssids=["aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"],
+        ),
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    assert [item.pos_x for item in conjunto.items] == [None, None]
+    assert [item.pos_y for item in conjunto.items] == [None, None]
+
+    mapa = generar_heatmap_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapConjuntoIn(
+            modo="CONJUNTO_COMPLETO",
+            resolucion=64,
+        ),
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    assert [ap.pos_x for ap in mapa.aps_interes] == [None, None]
+    assert [ap.pos_y for ap in mapa.aps_interes] == [None, None]
+
+
 def test_conjunto_ap_persiste_potencia_tx_declarada(
     db_session,
     tecnico_usuario,

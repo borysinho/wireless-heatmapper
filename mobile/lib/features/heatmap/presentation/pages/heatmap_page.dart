@@ -366,6 +366,8 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
   late final Map<String, TextEditingController> _potenciaCtrlPorBssid;
   late Set<String> _seleccionados;
   late String _bandaObjetivo;
+  String? _nombreError;
+  String? _apsError;
 
   @override
   void initState() {
@@ -444,8 +446,15 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
           const SizedBox(height: 12),
           TextField(
             controller: _nombreCtrl,
-            decoration: const InputDecoration(labelText: 'Nombre'),
+            decoration: InputDecoration(
+              labelText: 'Nombre',
+              errorText: _nombreError,
+            ),
             textInputAction: TextInputAction.next,
+            onChanged: (valor) {
+              if (_nombreError == null || valor.trim().isEmpty) return;
+              setState(() => _nombreError = null);
+            },
           ),
           const SizedBox(height: 8),
           TextField(
@@ -476,6 +485,7 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
                   for (final ap in widget.aps)
                     if (_bandaAP(ap) == banda) ap.bssid,
                 };
+                _apsError = null;
               });
             },
           ),
@@ -498,6 +508,7 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
                         ..clear()
                         ..addAll(apsDeBanda.map((ap) => ap.bssid));
                     }
+                    if (_seleccionados.isNotEmpty) _apsError = null;
                   });
                 },
                 icon: Icon(
@@ -511,6 +522,15 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
               ),
             ],
           ),
+          if (_apsError != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              _apsError!,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+            ),
+          ],
           const SizedBox(height: 8),
           TextField(
             controller: _filtroCtrl,
@@ -553,6 +573,7 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
                         } else {
                           _seleccionados.remove(ap.bssid);
                         }
+                        if (_seleccionados.isNotEmpty) _apsError = null;
                       });
                     },
                     title: Text(ap.ssid.isEmpty ? 'SSID oculto' : ap.ssid),
@@ -578,6 +599,37 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
                 ],
               ),
             ),
+          if (_nombreError != null || _apsError != null) ...[
+            const SizedBox(height: 12),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_nombreError != null)
+                      Text(
+                        _nombreError!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                        ),
+                      ),
+                    if (_apsError != null)
+                      Text(
+                        _apsError!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onErrorContainer,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: _guardar,
@@ -594,12 +646,15 @@ class _CrearConjuntoAPSheetState extends State<_CrearConjuntoAPSheet> {
   void _guardar() {
     final nombre = _nombreCtrl.text.trim();
     final proposito = _propositoCtrl.text.trim();
-    if (nombre.isEmpty) {
-      _mostrarMensaje('El nombre es obligatorio.');
-      return;
-    }
-    if (_seleccionados.isEmpty) {
-      _mostrarMensaje('Selecciona al menos un AP.');
+    final nombreError = nombre.isEmpty ? 'El nombre es obligatorio.' : null;
+    final apsError =
+        _seleccionados.isEmpty ? 'Selecciona al menos un AP.' : null;
+    if (nombreError != null || apsError != null) {
+      setState(() {
+        _nombreError = nombreError;
+        _apsError = apsError;
+      });
+      _mostrarMensaje(nombreError ?? apsError!);
       return;
     }
     final configuracionesRadio = <Map<String, dynamic>>[];

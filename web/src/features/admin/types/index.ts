@@ -121,8 +121,8 @@ export interface APDisponibleOut {
   canal: number | null;
   frecuencia_mhz: number | null;
   rssi_promedio: number;
-  pos_x: number;
-  pos_y: number;
+  pos_x: number | null;
+  pos_y: number | null;
   cantidad_puntos: number;
   seleccionado: boolean;
 }
