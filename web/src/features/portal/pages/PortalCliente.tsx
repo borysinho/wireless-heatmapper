@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -477,6 +478,7 @@ function HeatmapCanvas({
   verHeatmap: boolean;
   verPuntos: boolean;
 }) {
+  const visorRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ x: number; y: number } | null>(null);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -493,6 +495,20 @@ function HeatmapCanvas({
     aspectRatio: `${anchoReferencia} / ${altoReferencia}`,
     width: `min(100%, calc(64vh * ${proporcionMapa}))`,
   } satisfies CSSProperties;
+  const estiloContenido = {
+    transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
+  } satisfies CSSProperties;
+  const radioPunto = Math.max(anchoReferencia, altoReferencia) * 0.006 / zoom;
+
+  useEffect(() => {
+    const rect = visorRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setOffset((prev) => limitarOffsetMapa(prev, zoom, rect.width, rect.height));
+  }, [zoom, anchoReferencia, altoReferencia]);
+
+  const cambiarZoom = (delta: number) => {
+    setZoom((prev) => limitar(Math.round((prev + delta) * 10) / 10, 0.6, 2.6));
+  };
 
   const actualizarTooltip = (event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -567,128 +583,136 @@ function HeatmapCanvas({
           </button>
         </div>
         <div className={styles.toolbarMapa}>
-          <button type="button" onClick={() => setZoom((prev) => Math.max(prev - 0.2, 0.6))}>
+          <button
+            type="button"
+            aria-label="Alejar mapa"
+            onClick={() => cambiarZoom(-0.2)}
+          >
             <Minus size={16} aria-hidden="true" />
           </button>
           <span>{Math.round(zoom * 100)}%</span>
-          <button type="button" onClick={() => setZoom((prev) => Math.min(prev + 0.2, 2.6))}>
+          <button
+            type="button"
+            aria-label="Acercar mapa"
+            onClick={() => cambiarZoom(0.2)}
+          >
             <Plus size={16} aria-hidden="true" />
           </button>
         </div>
       </div>
       <div
+        ref={visorRef}
         className={styles.heatmapImagen}
         style={estiloVisor}
+        role="region"
+        aria-label="Mapa de calor interactivo"
         onPointerDown={(event) => {
+          if (typeof event.button === "number" && event.button !== 0) return;
           dragRef.current = { x: event.clientX, y: event.clientY };
-          event.currentTarget.setPointerCapture(event.pointerId);
+          event.currentTarget.setPointerCapture?.(event.pointerId);
+          setHint(null);
         }}
         onPointerLeave={() => setHint(null)}
         onPointerMove={(event) => {
           if (dragRef.current) {
-            setOffset((prev) => ({
-              x: prev.x + event.clientX - dragRef.current!.x,
-              y: prev.y + event.clientY - dragRef.current!.y,
-            }));
+            const rect = event.currentTarget.getBoundingClientRect();
+            const deltaX = event.clientX - dragRef.current.x;
+            const deltaY = event.clientY - dragRef.current.y;
+            setOffset((prev) =>
+              limitarOffsetMapa(
+                { x: prev.x + deltaX, y: prev.y + deltaY },
+                zoom,
+                rect.width,
+                rect.height,
+              ),
+            );
             dragRef.current = { x: event.clientX, y: event.clientY };
+            setHint(null);
+            return;
           }
-          if (!dragRef.current) actualizarTooltip(event);
+          actualizarTooltip(event);
         }}
         onPointerUp={(event) => {
           dragRef.current = null;
-          event.currentTarget.releasePointerCapture(event.pointerId);
+          event.currentTarget.releasePointerCapture?.(event.pointerId);
         }}
         onPointerCancel={() => {
           dragRef.current = null;
         }}
       >
-        {plano && (
-          <img
-            className={styles.planoHeatmap}
-            src={resolverUrlApi(plano.url_firmada)}
-            alt={`Plano ${plano.nombre}`}
-            draggable={false}
-            style={{
-              transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
-            }}
-          />
-        )}
-        {verHeatmap && (
-          <img
-            className={styles.capaHeatmap}
-            src={resolverUrlApi(mapa.url_imagen)}
-            alt="Heatmap generado"
-            draggable={false}
-            style={{
-              transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
-            }}
-          />
-        )}
-        <svg
-          className={styles.puntosLectura}
-          viewBox={`0 0 ${anchoReferencia} ${altoReferencia}`}
-          preserveAspectRatio="none"
-          style={{
-            transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
-          }}
-        >
-          {verPuntos &&
-            mapa.puntos_lectura.map((punto) => (
-              <circle
-                key={punto.punto_id}
-                className={styles.puntoLectura}
-                cx={limitar(punto.pos_x, 0, anchoReferencia)}
-                cy={limitar(punto.pos_y, 0, altoReferencia)}
-                r={Math.max(anchoReferencia, altoReferencia) * 0.006}
-                fill={colorRssi(punto.rssi)}
-                onPointerDown={(event) => event.stopPropagation()}
-                onPointerMove={(event) => {
-                  event.stopPropagation();
-                  mostrarHint(
-                    event,
-                    "Punto de lectura de datos",
-                    lineasHintPunto(punto, mapa),
-                  );
-                }}
-                onPointerLeave={() => setHint(null)}
-              />
-            ))}
-        </svg>
-        {verAps && (
-          <div
-            className={styles.capaApsMapa}
-            style={{
-              transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
-            }}
-            aria-label="Ubicación de APs"
+        <div className={styles.contenidoMapa} style={estiloContenido}>
+          {plano && (
+            <img
+              className={styles.planoHeatmap}
+              src={resolverUrlApi(plano.url_firmada)}
+              alt={`Plano ${plano.nombre}`}
+              draggable={false}
+            />
+          )}
+          {verHeatmap && (
+            <img
+              className={styles.capaHeatmap}
+              src={resolverUrlApi(mapa.url_imagen)}
+              alt="Heatmap generado"
+              draggable={false}
+            />
+          )}
+          <svg
+            className={styles.puntosLectura}
+            viewBox={`0 0 ${anchoReferencia} ${altoReferencia}`}
+            preserveAspectRatio="none"
           >
-            {mapa.aps_interes.map((ap, indice) => (
-              <button
-                key={ap.bssid}
-                type="button"
-                className={styles.marcadorApMapa}
-                style={{
-                  left: `${(limitar(ap.pos_x, 0, anchoReferencia) / anchoReferencia) * 100}%`,
-                  top: `${(limitar(ap.pos_y, 0, altoReferencia) / altoReferencia) * 100}%`,
-                }}
-                aria-label={`AP ${indice + 1}: ${ap.ssid || "SSID oculto"}`}
-                onPointerDown={(event) => event.stopPropagation()}
-                onPointerMove={(event) => {
-                  event.stopPropagation();
-                  mostrarHint(event, `AP ${indice + 1} · ${ap.ssid || "SSID oculto"}`, [
-                    `BSSID: ${ap.bssid}`,
-                    `Señal promedio: ${ap.rssi_promedio.toFixed(1)} dBm · ${nivelCobertura(ap.rssi_promedio)}`,
-                    `Lecturas asociadas: ${ap.cantidad_puntos}`,
-                    _canalFrecuencia(ap),
-                  ]);
-                }}
-                onPointerLeave={() => setHint(null)}
-              >
-                {indice + 1}
-              </button>
-            ))}
-          </div>
-        )}
+            {verPuntos &&
+              mapa.puntos_lectura.map((punto) => (
+                <circle
+                  key={punto.punto_id}
+                  className={styles.puntoLectura}
+                  cx={limitar(punto.pos_x, 0, anchoReferencia)}
+                  cy={limitar(punto.pos_y, 0, altoReferencia)}
+                  r={radioPunto}
+                  fill={colorRssi(punto.rssi)}
+                  onPointerMove={(event) => {
+                    event.stopPropagation();
+                    mostrarHint(
+                      event,
+                      "Punto de lectura de datos",
+                      lineasHintPunto(punto, mapa),
+                    );
+                  }}
+                  onPointerLeave={() => setHint(null)}
+                />
+              ))}
+          </svg>
+          {verAps && (
+            <div className={styles.capaApsMapa} aria-label="Ubicación de APs">
+              {mapa.aps_interes.map((ap, indice) => (
+                <button
+                  key={ap.bssid}
+                  type="button"
+                  className={styles.marcadorApMapa}
+                  style={{
+                    left: `${(limitar(ap.pos_x, 0, anchoReferencia) / anchoReferencia) * 100}%`,
+                    top: `${(limitar(ap.pos_y, 0, altoReferencia) / altoReferencia) * 100}%`,
+                    transform: `translate(-50%, -50%) scale(${1 / zoom})`,
+                  }}
+                  aria-label={`AP ${indice + 1}: ${ap.ssid || "SSID oculto"}`}
+                  onPointerMove={(event) => {
+                    event.stopPropagation();
+                    mostrarHint(event, `AP ${indice + 1} · ${ap.ssid || "SSID oculto"}`, [
+                      `BSSID: ${ap.bssid}`,
+                      `Señal promedio: ${ap.rssi_promedio.toFixed(1)} dBm · ${nivelCobertura(ap.rssi_promedio)}`,
+                      `Lecturas asociadas: ${ap.cantidad_puntos}`,
+                      _canalFrecuencia(ap),
+                    ]);
+                  }}
+                  onPointerLeave={() => setHint(null)}
+                >
+                  {indice + 1}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {hint && (
           <div className={styles.tooltip} style={{ left: hint.x + 12, top: hint.y + 12 }}>
             <strong>{hint.titulo}</strong>
@@ -769,8 +793,20 @@ function dibujarPuntosLectura(
   ancho: number,
   alto: number,
 ) {
-  const radio = Math.max(4, Math.min(9, Math.max(ancho, alto) * 0.006));
+  const radio = Math.max(6, Math.max(ancho, alto) * 0.006);
+  const halo = Math.max(2, radio * 0.32);
   for (const punto of mapa.puntos_lectura) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(
+      limitar(punto.pos_x, 0, ancho),
+      limitar(punto.pos_y, 0, alto),
+      radio + halo,
+      0,
+      Math.PI * 2,
+    );
+    ctx.fillStyle = "rgba(15, 23, 42, 0.58)";
+    ctx.fill();
     ctx.beginPath();
     ctx.arc(
       limitar(punto.pos_x, 0, ancho),
@@ -780,12 +816,13 @@ function dibujarPuntosLectura(
       Math.PI * 2,
     );
     ctx.fillStyle = colorRssi(punto.rssi);
-    ctx.globalAlpha = 0.78;
+    ctx.globalAlpha = 0.94;
     ctx.fill();
     ctx.globalAlpha = 1;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = Math.max(2, radio * 0.22);
     ctx.strokeStyle = "#ffffff";
     ctx.stroke();
+    ctx.restore();
   }
 }
 
@@ -991,4 +1028,25 @@ function porcentajeLecturas(cantidad: number, total?: number): string {
 
 function limitar(valor: number, minimo: number, maximo: number): number {
   return Math.min(maximo, Math.max(minimo, valor));
+}
+
+function limitarOffsetMapa(
+  offset: { x: number; y: number },
+  zoom: number,
+  anchoVisor: number,
+  altoVisor: number,
+) {
+  return {
+    x: limitarOffsetEje(offset.x, anchoVisor, zoom),
+    y: limitarOffsetEje(offset.y, altoVisor, zoom),
+  };
+}
+
+function limitarOffsetEje(offset: number, dimensionVisor: number, zoom: number): number {
+  if (dimensionVisor <= 0) return 0;
+  const dimensionEscalada = dimensionVisor * zoom;
+  if (dimensionEscalada <= dimensionVisor) {
+    return (dimensionVisor - dimensionEscalada) / 2;
+  }
+  return limitar(offset, dimensionVisor - dimensionEscalada, 0);
 }

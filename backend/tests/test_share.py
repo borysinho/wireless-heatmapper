@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from app.core.config import settings
 from app.models.cliente import Cliente
 from app.models.heatmap import ConjuntoAP, ConjuntoAPItem, MapaCalor
+from app.models.medicion import PuntoMedicion
 from app.models.plano import Plano
 from app.models.proyecto import Proyecto
 from app.models.share import TokenEnlaceCliente
@@ -198,6 +199,120 @@ def test_portal_cliente_incluye_puntos_de_lectura_del_mapa(
             "rssi_promedio": puntos[0]["rssi"],
         }
     ]
+
+
+def test_portal_cliente_incluye_puntos_de_lectura_ia(
+    client,
+    db_session,
+    admin_token,
+    tecnico_usuario,
+):
+    proyecto, _mapa_campo = _crear_proyecto_publicable(db_session, tecnico_usuario)
+    _crear_conjunto_con_mediciones(db_session, proyecto)
+    plano = proyecto.planos[0]
+    puntos = (
+        db_session.query(PuntoMedicion)
+        .filter(PuntoMedicion.plano_id == plano.id)
+        .order_by(PuntoMedicion.id.asc())
+        .all()
+    )
+    conjunto_ia = ConjuntoAP(
+        plano_id=plano.id,
+        nombre="Propuesta IA portal",
+        proposito="Validar puntos exportables para IA.",
+        origen="ia",
+        creado_por_id=tecnico_usuario.id,
+    )
+    db_session.add(conjunto_ia)
+    db_session.flush()
+    db_session.add(
+        ConjuntoAPItem(
+            conjunto_ap_id=conjunto_ia.id,
+            bssid="ia:bb:cc:dd:ee:01",
+            ssid_snapshot="IA Bulldog",
+            canal_snapshot=11,
+            rssi_promedio_snapshot=-66,
+            pos_x=180,
+            pos_y=140,
+        )
+    )
+    db_session.commit()
+
+    MedicionRepository(db_session).reemplazar_lecturas_estimadas(
+        conjunto_ap_id=conjunto_ia.id,
+        lecturas=[
+            {
+                "punto_id": punto.id,
+                "ssid": "IA Bulldog",
+                "bssid": "ia:bb:cc:dd:ee:01",
+                "rssi": -58 - indice,
+                "canal": 11,
+                "frecuencia_mhz": 2462,
+                "modelo_origen": "test-portal-ia",
+                "incertidumbre_db": 6.0,
+            }
+            for indice, punto in enumerate(puntos)
+        ],
+    )
+    mapa_ia = MapaCalor(
+        plano_id=plano.id,
+        conjunto_ap_id=conjunto_ia.id,
+        modo_generacion="PROYECTADO",
+        algoritmo="IDW",
+        resolucion=32,
+        bssid="ia:bb:cc:dd:ee:01",
+        ssid="IA Bulldog",
+        ap_pos_x=180,
+        ap_pos_y=140,
+        aps_interes=[
+            {
+                "bssid": "ia:bb:cc:dd:ee:01",
+                "ssid": "IA Bulldog",
+                "canal": 11,
+                "frecuencia_mhz": 2462,
+                "rssi_promedio": -66,
+                "pos_x": 180,
+                "pos_y": 140,
+                "cantidad_puntos": len(puntos),
+            }
+        ],
+        bssids_generacion=["ia:bb:cc:dd:ee:01"],
+        matriz=[[-66.0 for _ in range(32)] for _ in range(32)],
+        escala=[{"desde": -70, "hasta": -60, "color": "#2ecc71", "etiqueta": "Buena"}],
+        ruta_imagen=f"heatmaps/{plano.id}/portal-ia.png",
+        cantidad_puntos=len(puntos),
+        rssi_min=-72,
+        rssi_max=-58,
+        firma_mediciones="portal-ia-test",
+    )
+    db_session.add(mapa_ia)
+    db_session.commit()
+
+    respuesta = client.post(
+        f"/share/proyectos/{proyecto.id}/enlaces",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "expira_en_dias": 7,
+            "contenido": {
+                "conjunto_ids": [conjunto_ia.id],
+                "mapa_ids": [mapa_ia.id],
+            },
+        },
+    )
+    token = respuesta.json()["url_publica"].removeprefix("/portal/")
+
+    portal = client.get(f"/share/{token}")
+
+    assert portal.status_code == 200
+    puntos_portal = portal.json()["heatmaps"][0]["puntos_lectura"]
+    assert len(puntos_portal) == len(puntos)
+    assert {punto["punto_id"] for punto in puntos_portal} == {
+        punto.id for punto in puntos
+    }
+    assert all(
+        punto["detalle_aps"][0]["bssid"] == "ia:bb:cc:dd:ee:01"
+        for punto in puntos_portal
+    )
 
 
 def test_enlace_cliente_envia_correo_al_cliente_seleccionado(

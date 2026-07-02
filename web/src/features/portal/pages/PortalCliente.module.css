@@ -368,14 +368,18 @@
   cursor: grabbing;
 }
 
+.contenidoMapa,
 .planoHeatmap,
 .capaHeatmap,
 .puntosLectura {
   height: 100%;
   inset: 0;
   position: absolute;
-  transform-origin: 0 0;
   width: 100%;
+}
+
+.contenidoMapa {
+  transform-origin: 0 0;
 }
 
 .planoHeatmap,
@@ -415,7 +419,6 @@
   inset: 0;
   pointer-events: none;
   position: absolute;
-  transform-origin: center;
   width: 100%;
 }
 
