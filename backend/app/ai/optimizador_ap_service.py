@@ -12,6 +12,10 @@ from app.services.geometria_service import (
 )
 from app.services.interpolacion_service import PuntoRSSI
 
+MatrizRSSI = list[list[float]]
+MascaraPoligono = list[list[bool]] | None
+ClaveMatrizAP = tuple[str, int, tuple[tuple[float, float], ...]]
+
 
 @dataclass(frozen=True)
 class AlternativaOptimizada:
@@ -62,15 +66,23 @@ class OptimizadorAPService:
         bandas_objetivo = list(dict.fromkeys(bandas or [banda]))
         if banda not in bandas_objetivo:
             banda = "5" if "5" in bandas_objetivo else bandas_objetivo[0]
+        mascaras_por_resolucion: dict[int, MascaraPoligono] = {}
+        matrices_por_aps: dict[ClaveMatrizAP, MatrizRSSI] = {}
+
+        def mascara_para(resolucion_mascara: int) -> MascaraPoligono:
+            if resolucion_mascara not in mascaras_por_resolucion:
+                mascaras_por_resolucion[resolucion_mascara] = mascara_poligono(
+                    poligono=poligono_interes,
+                    ancho_px=ancho_px,
+                    alto_px=alto_px,
+                    resolucion=resolucion_mascara,
+                )
+            return mascaras_por_resolucion[resolucion_mascara]
+
         pct_actual = self._pct_cobertura(
             matriz_actual,
             umbral_objetivo_dbm=umbral_objetivo_dbm,
-            mascara=mascara_poligono(
-                poligono=poligono_interes,
-                ancho_px=ancho_px,
-                alto_px=alto_px,
-                resolucion=len(matriz_actual),
-            ),
+            mascara=mascara_para(len(matriz_actual)),
         )
         candidatos = self._candidatos(
             puntos=puntos_actuales,
@@ -93,7 +105,8 @@ class OptimizadorAPService:
                 banda=banda,
                 resolucion=resolucion_busqueda,
                 umbral_objetivo_dbm=umbral_objetivo_dbm,
-                poligono_interes=poligono_interes,
+                mascara=mascara_para(resolucion_busqueda),
+                matriz_cache=matrices_por_aps,
             )
             seleccionados = self._busqueda_local(
                 seleccionados=seleccionados,
@@ -104,6 +117,8 @@ class OptimizadorAPService:
                 resolucion=resolucion_busqueda,
                 umbral_objetivo_dbm=umbral_objetivo_dbm,
                 poligono_interes=poligono_interes,
+                mascara=mascara_para(resolucion_busqueda),
+                matriz_cache=matrices_por_aps,
             )
             clave = tuple(sorted((round(x, 1), round(y, 1)) for x, y in seleccionados))
             if clave in vistos:
@@ -117,20 +132,16 @@ class OptimizadorAPService:
                 )
                 if ap.get("restriccion_movimiento") == "FIJO" and ap_dentro:
                     seleccionados[indice] = (float(ap["coord_x"]), float(ap["coord_y"]))
-            mascara = mascara_poligono(
-                poligono=poligono_interes,
-                ancho_px=ancho_px,
-                alto_px=alto_px,
-                resolucion=resolucion,
-            )
+            mascara = mascara_para(resolucion)
             mapas_por_banda = {
-                banda_actual: self._matriz_desde_aps(
+                banda_actual: self._matriz_desde_aps_cacheada(
                     aps=seleccionados,
                     ancho_px=ancho_px,
                     alto_px=alto_px,
                     metros_por_pixel=metros_por_pixel,
                     banda=banda_actual,
                     resolucion=resolucion,
+                    matriz_cache=matrices_por_aps,
                 )
                 for banda_actual in bandas_objetivo
             }
@@ -272,7 +283,13 @@ class OptimizadorAPService:
             banda=banda,
             resolucion=resolucion,
             umbral_objetivo_dbm=umbral_objetivo_dbm,
-            poligono_interes=poligono_interes,
+            mascara=mascara_poligono(
+                poligono=poligono_interes,
+                ancho_px=ancho_px,
+                alto_px=alto_px,
+                resolucion=resolucion,
+            ),
+            matriz_cache={},
         )
 
     def _greedy_desde(
@@ -287,7 +304,8 @@ class OptimizadorAPService:
         banda: str,
         resolucion: int,
         umbral_objetivo_dbm: int,
-        poligono_interes: list[dict] | None = None,
+        mascara: MascaraPoligono,
+        matriz_cache: dict[ClaveMatrizAP, MatrizRSSI],
     ) -> list[tuple[float, float]]:
         seleccionados = iniciales[:cantidad]
         restantes = [
@@ -297,21 +315,17 @@ class OptimizadorAPService:
             mejor = max(
                 restantes,
                 key=lambda c: self._pct_cobertura(
-                    self._matriz_desde_aps(
+                    self._matriz_desde_aps_cacheada(
                         aps=[*seleccionados, c],
                         ancho_px=ancho_px,
                         alto_px=alto_px,
                         metros_por_pixel=metros_por_pixel,
                         banda=banda,
                         resolucion=resolucion,
+                        matriz_cache=matriz_cache,
                     ),
                     umbral_objetivo_dbm=umbral_objetivo_dbm,
-                    mascara=mascara_poligono(
-                        poligono=poligono_interes,
-                        ancho_px=ancho_px,
-                        alto_px=alto_px,
-                        resolucion=resolucion,
-                    ),
+                    mascara=mascara,
                 ),
             )
             seleccionados.append(mejor)
@@ -329,7 +343,18 @@ class OptimizadorAPService:
         resolucion: int,
         umbral_objetivo_dbm: int,
         poligono_interes: list[dict] | None = None,
+        mascara: MascaraPoligono = None,
+        matriz_cache: dict[ClaveMatrizAP, MatrizRSSI] | None = None,
     ) -> list[tuple[float, float]]:
+        if mascara is None:
+            mascara = mascara_poligono(
+                poligono=poligono_interes,
+                ancho_px=ancho_px,
+                alto_px=alto_px,
+                resolucion=resolucion,
+            )
+        if matriz_cache is None:
+            matriz_cache = {}
         paso = max(20.0, min(ancho_px, alto_px) * 0.08)
         actuales = seleccionados[:]
         for idx, (x, y) in enumerate(actuales):
@@ -357,24 +382,49 @@ class OptimizadorAPService:
             actuales[idx] = max(
                 vecinos,
                 key=lambda c: self._pct_cobertura(
-                    self._matriz_desde_aps(
+                    self._matriz_desde_aps_cacheada(
                         aps=[*actuales[:idx], c, *actuales[idx + 1 :]],
                         ancho_px=ancho_px,
                         alto_px=alto_px,
                         metros_por_pixel=metros_por_pixel,
                         banda=banda,
                         resolucion=resolucion,
+                        matriz_cache=matriz_cache,
                     ),
                     umbral_objetivo_dbm=umbral_objetivo_dbm,
-                    mascara=mascara_poligono(
-                        poligono=poligono_interes,
-                        ancho_px=ancho_px,
-                        alto_px=alto_px,
-                        resolucion=resolucion,
-                    ),
+                    mascara=mascara,
                 ),
             )
         return actuales
+
+    def _matriz_desde_aps_cacheada(
+        self,
+        *,
+        aps: list[tuple[float, float]],
+        ancho_px: int,
+        alto_px: int,
+        metros_por_pixel: float,
+        banda: str,
+        resolucion: int,
+        matriz_cache: dict[ClaveMatrizAP, MatrizRSSI],
+    ) -> MatrizRSSI:
+        clave = (
+            banda,
+            resolucion,
+            tuple(sorted((float(x), float(y)) for x, y in aps)),
+        )
+        matriz = matriz_cache.get(clave)
+        if matriz is None:
+            matriz = self._matriz_desde_aps(
+                aps=aps,
+                ancho_px=ancho_px,
+                alto_px=alto_px,
+                metros_por_pixel=metros_por_pixel,
+                banda=banda,
+                resolucion=resolucion,
+            )
+            matriz_cache[clave] = matriz
+        return matriz
 
     def _matriz_desde_aps(
         self,

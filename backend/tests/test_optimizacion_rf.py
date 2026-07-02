@@ -30,6 +30,7 @@ from app.repositories.medicion_repository import (
 )
 from app.schemas.ia import RestriccionesIAIn
 from app.schemas.medicion import MedicionItemIn
+from app.services.geometria_service import mascara_poligono as mascara_poligono_real
 from app.services.interpolacion_service import PuntoRSSI
 
 
@@ -191,6 +192,75 @@ def test_optimizador_respeta_cantidad_de_mejores_recomendaciones():
     )
 
     assert len(alternativas) == 2
+
+
+def test_optimizador_reutiliza_mascaras_por_resolucion(monkeypatch):
+    puntos = [
+        PuntoRSSI(i, x, y, -82)
+        for i, (x, y) in enumerate(
+            ((20, 20), (380, 20), (20, 280), (380, 280), (200, 150), (120, 80)),
+            start=1,
+        )
+    ]
+    llamadas: list[int] = []
+
+    def mascara_contada(**kwargs):
+        llamadas.append(kwargs["resolucion"])
+        return mascara_poligono_real(**kwargs)
+
+    monkeypatch.setattr(
+        "app.ai.optimizador_ap_service.mascara_poligono",
+        mascara_contada,
+    )
+
+    OptimizadorAPService().optimizar(
+        puntos_actuales=puntos,
+        matriz_actual=[[-85.0] * 16 for _ in range(16)],
+        ancho_px=400,
+        alto_px=300,
+        metros_por_pixel=0.1,
+        max_aps=3,
+        banda="5",
+        bandas=["5"],
+        resolucion=16,
+        umbral_objetivo_dbm=-70,
+        cantidad_recomendaciones=2,
+        poligono_interes=[
+            {"x": 0, "y": 0},
+            {"x": 400, "y": 0},
+            {"x": 400, "y": 300},
+            {"x": 0, "y": 300},
+        ],
+    )
+
+    assert llamadas == [16]
+
+
+def test_matriz_desde_aps_cacheada_reutiliza_combinacion_sin_importar_orden():
+    servicio = OptimizadorAPService()
+    cache = {}
+
+    matriz = servicio._matriz_desde_aps_cacheada(
+        aps=[(20, 20), (120, 80)],
+        ancho_px=400,
+        alto_px=300,
+        metros_por_pixel=0.1,
+        banda="5",
+        resolucion=16,
+        matriz_cache=cache,
+    )
+    matriz_reutilizada = servicio._matriz_desde_aps_cacheada(
+        aps=[(120, 80), (20, 20)],
+        ancho_px=400,
+        alto_px=300,
+        metros_por_pixel=0.1,
+        banda="5",
+        resolucion=16,
+        matriz_cache=cache,
+    )
+
+    assert matriz_reutilizada is matriz
+    assert len(cache) == 1
 
 
 def test_modelo_propagacion_calibra_parametros_locales_por_banda():

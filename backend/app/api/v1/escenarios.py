@@ -1056,6 +1056,12 @@ def _generar_conjuntos_ia_bloqueado(
     restricciones["cantidad_aps_propuestos"] = limite_aps
     restricciones["firma_solicitud"] = firma_solicitud
     restricciones["version_motor_ia"] = VERSION_MOTOR_IA
+    mascara_mapa = mascara_poligono(
+        poligono=poligono_interes,
+        ancho_px=plano.ancho_px,
+        alto_px=plano.alto_px,
+        resolucion=body.resolucion,
+    )
     for idx, alternativa in enumerate(alternativas, start=1):
         items = _items_conjunto_ia(
             indice=idx,
@@ -1113,12 +1119,6 @@ def _generar_conjuntos_ia_bloqueado(
         }
         db.commit()
         db.refresh(conjunto_ia)
-        mascara_mapa = mascara_poligono(
-            poligono=poligono_interes,
-            ancho_px=plano.ancho_px,
-            alto_px=plano.alto_px,
-            resolucion=body.resolucion,
-        )
         for combo_idx, items_combo in enumerate([items], start=1):
             bssids_combo = [item["bssid"] for item in items_combo]
             puntos_combo = med_repo.listar_puntos_rssi_heatmap(
