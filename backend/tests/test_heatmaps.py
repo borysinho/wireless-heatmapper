@@ -445,6 +445,68 @@ def test_regenerar_heatmap_conjunto_reemplaza_mapa_previo(
     assert mapas[0].aps_interes[0]["pos_y"] == 110
 
 
+def test_regenerar_heatmap_conjunto_reemplaza_previsualizacion_web(
+    db_session,
+    tecnico_usuario,
+):
+    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
+    _insertar_puntos_sinteticos(db_session, plano_id, cantidad=5)
+    conjunto = crear_conjunto_ap(
+        plano_id=plano_id,
+        body=ConjuntoAPCrearIn(
+            nombre="Cobertura con previsualización",
+            proposito="Validar reemplazo entre web y móvil.",
+            banda_objetivo="2.4",
+            bssids=["aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"],
+        ),
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    mapa_web = generar_heatmap_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapConjuntoIn(
+            modo="CONJUNTO_COMPLETO",
+            resolucion=64,
+        ),
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    actualizar_ubicacion_ap_conjunto(
+        conjunto_id=conjunto.id,
+        body=ActualizarUbicacionAPConjuntoIn(
+            bssid="aa:bb:cc:dd:ee:01",
+            pos_x=190,
+            pos_y=115,
+        ),
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    mapa_movil = generar_heatmap_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapConjuntoIn(
+            modo="CONJUNTO_COMPLETO",
+            resolucion=128,
+        ),
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    mapas = (
+        db_session.query(MapaCalor)
+        .filter(MapaCalor.conjunto_ap_id == conjunto.id)
+        .all()
+    )
+
+    assert mapa_movil.id == mapa_web.id
+    assert len(mapas) == 1
+    assert mapas[0].resolucion == 128
+    assert mapas[0].aps_interes[0]["pos_x"] == 190
+    assert mapas[0].aps_interes[0]["pos_y"] == 115
+
+
 def test_generar_heatmaps_faltantes_actualiza_idw(
     db_session,
     tecnico_usuario,

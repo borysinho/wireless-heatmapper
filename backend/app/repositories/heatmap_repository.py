@@ -57,7 +57,6 @@ class MapaCalorRepository:
         conjunto_ap_id: int,
         modo_generacion: str,
         algoritmo: str,
-        resolucion: int,
         bssids: list[str],
     ) -> list[MapaCalor]:
         clave_bssids = tuple(sorted(bssid.lower() for bssid in bssids))
@@ -67,7 +66,6 @@ class MapaCalorRepository:
                 MapaCalor.conjunto_ap_id == conjunto_ap_id,
                 MapaCalor.modo_generacion == modo_generacion,
                 MapaCalor.algoritmo == algoritmo,
-                MapaCalor.resolucion == resolucion,
             )
             .order_by(MapaCalor.created_at.desc(), MapaCalor.id.desc())
             .all()

@@ -1023,7 +1023,6 @@ def _generar_heatmap_core(
             conjunto_ap_id=conjunto_ap_id,
             modo_generacion=modo_norm,
             algoritmo=algoritmo_norm,
-            resolucion=resolucion,
             bssids=bssids_norm,
         )
         if conjunto_ap_id is not None
