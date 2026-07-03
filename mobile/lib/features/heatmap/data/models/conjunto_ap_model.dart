@@ -27,6 +27,7 @@ class ConjuntoAPModel extends ConjuntoAP {
     final items = (json['items'] as List<dynamic>? ?? const [])
         .map((item) {
           final data = item as Map<String, dynamic>;
+          final tienePosicion = data['pos_x'] is num && data['pos_y'] is num;
           return APDisponibleModel(
             bssid: data['bssid'] as String,
             ssid: data['ssid'] as String? ?? '',
@@ -41,6 +42,7 @@ class ConjuntoAPModel extends ConjuntoAP {
             fuentePotencia: data['fuente_potencia'] as String?,
             confianzaPotencia: data['confianza_potencia'] as String?,
             radios: _listaMapas(data['radios']),
+            ubicacionConfirmada: tienePosicion,
           );
         })
         .cast<APDisponibleModel>()

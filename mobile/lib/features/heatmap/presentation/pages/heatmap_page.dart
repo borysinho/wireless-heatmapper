@@ -220,11 +220,15 @@ class _HeatmapPageState extends State<HeatmapPage> {
                       bssidActivo: listo.bssidActivo,
                       apPosXPorBssid: {
                         for (final ap in apsInteresListo)
-                          ap.bssid: listo.apPosXPorBssid[ap.bssid] ?? ap.posX,
+                          if (listo.apPosXPorBssid[ap.bssid] != null ||
+                              ap.ubicacionConfirmada)
+                            ap.bssid: listo.apPosXPorBssid[ap.bssid] ?? ap.posX,
                       },
                       apPosYPorBssid: {
                         for (final ap in apsInteresListo)
-                          ap.bssid: listo.apPosYPorBssid[ap.bssid] ?? ap.posY,
+                          if (listo.apPosYPorBssid[ap.bssid] != null ||
+                              ap.ubicacionConfirmada)
+                            ap.bssid: listo.apPosYPorBssid[ap.bssid] ?? ap.posY,
                       },
                       onTapPlano: (_) => _limpiarFiltroAP(),
                       onTapAPInteres: _alternarFiltroAP,
@@ -980,20 +984,22 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
                         ),
                       ),
                     ...widget.apsInteres.map((ap) {
+                      final posicion = _posicionAP(ap);
+                      if (posicion == null) return const SizedBox.shrink();
                       final escalaMarcador =
                           _zoomEscala <= 0 ? 1.0 : 1.0 / _zoomEscala;
-                      final posX = widget.apPosXPorBssid[ap.bssid] ?? ap.posX;
-                      final posY = widget.apPosYPorBssid[ap.bssid] ?? ap.posY;
                       final activo = ap.bssid == widget.bssidActivo ||
                           ap.bssid == _bssidArrastrado;
-                      final left = ((posX / widget.tamanoPlano.width) * w -
-                              _apMarkerHalf)
-                          .clamp(0, w - _apMarkerSize)
-                          .toDouble();
-                      final top = ((posY / widget.tamanoPlano.height) * h -
-                              _apMarkerHalf)
-                          .clamp(0, h - _apMarkerSize)
-                          .toDouble();
+                      final left =
+                          ((posicion.dx / widget.tamanoPlano.width) * w -
+                                  _apMarkerHalf)
+                              .clamp(0, w - _apMarkerSize)
+                              .toDouble();
+                      final top =
+                          ((posicion.dy / widget.tamanoPlano.height) * h -
+                                  _apMarkerHalf)
+                              .clamp(0, h - _apMarkerSize)
+                              .toDouble();
                       return Positioned(
                         left: left,
                         top: top,
@@ -1072,14 +1078,22 @@ class _HeatmapCanvasState extends State<_HeatmapCanvas> {
     required double h,
   }) {
     for (final ap in widget.apsInteres.reversed) {
-      final posX = widget.apPosXPorBssid[ap.bssid] ?? ap.posX;
-      final posY = widget.apPosYPorBssid[ap.bssid] ?? ap.posY;
+      final posicion = _posicionAP(ap);
+      if (posicion == null) continue;
       final pantalla = Offset(
-        (posX / widget.tamanoPlano.width) * w,
-        (posY / widget.tamanoPlano.height) * h,
+        (posicion.dx / widget.tamanoPlano.width) * w,
+        (posicion.dy / widget.tamanoPlano.height) * h,
       );
       if ((local - pantalla).distance <= _hitRadioPx) return ap;
     }
+    return null;
+  }
+
+  Offset? _posicionAP(APDisponible ap) {
+    final posX = widget.apPosXPorBssid[ap.bssid];
+    final posY = widget.apPosYPorBssid[ap.bssid];
+    if (posX != null && posY != null) return Offset(posX, posY);
+    if (ap.ubicacionConfirmada) return Offset(ap.posX, ap.posY);
     return null;
   }
 

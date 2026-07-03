@@ -685,33 +685,31 @@ function HeatmapCanvas({
           </svg>
           {verAps && (
             <div className={styles.capaApsMapa} aria-label="Ubicación de APs">
-              {mapa.aps_interes
-                .filter((ap) => typeof ap.pos_x === "number" && typeof ap.pos_y === "number")
-                .map((ap, indice) => (
-                  <button
-                    key={ap.bssid}
-                    type="button"
-                    className={styles.marcadorApMapa}
-                    style={{
-                      left: `${(limitar(ap.pos_x ?? 0, 0, anchoReferencia) / anchoReferencia) * 100}%`,
-                      top: `${(limitar(ap.pos_y ?? 0, 0, altoReferencia) / altoReferencia) * 100}%`,
-                      transform: `translate(-50%, -50%) scale(${1 / zoom})`,
-                    }}
-                    aria-label={`AP ${indice + 1}: ${ap.ssid || "SSID oculto"}`}
-                    onPointerMove={(event) => {
-                      event.stopPropagation();
-                      mostrarHint(event, `AP ${indice + 1} · ${ap.ssid || "SSID oculto"}`, [
-                        `BSSID: ${ap.bssid}`,
-                        `Señal promedio: ${ap.rssi_promedio.toFixed(1)} dBm · ${nivelCobertura(ap.rssi_promedio)}`,
-                        `Lecturas asociadas: ${ap.cantidad_puntos}`,
-                        _canalFrecuencia(ap),
-                      ]);
-                    }}
-                    onPointerLeave={() => setHint(null)}
-                  >
-                    {indice + 1}
-                  </button>
-                ))}
+              {mapa.aps_interes.map((ap, indice) => (
+                <button
+                  key={ap.bssid}
+                  type="button"
+                  className={styles.marcadorApMapa}
+                  style={{
+                    left: `${(limitar(ap.pos_x, 0, anchoReferencia) / anchoReferencia) * 100}%`,
+                    top: `${(limitar(ap.pos_y, 0, altoReferencia) / altoReferencia) * 100}%`,
+                    transform: `translate(-50%, -50%) scale(${1 / zoom})`,
+                  }}
+                  aria-label={`AP ${indice + 1}: ${ap.ssid || "SSID oculto"}`}
+                  onPointerMove={(event) => {
+                    event.stopPropagation();
+                    mostrarHint(event, `AP ${indice + 1} · ${ap.ssid || "SSID oculto"}`, [
+                      `BSSID: ${ap.bssid}`,
+                      `Señal promedio: ${ap.rssi_promedio.toFixed(1)} dBm · ${nivelCobertura(ap.rssi_promedio)}`,
+                      `Lecturas asociadas: ${ap.cantidad_puntos}`,
+                      _canalFrecuencia(ap),
+                    ]);
+                  }}
+                  onPointerLeave={() => setHint(null)}
+                >
+                  {indice + 1}
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -836,7 +834,6 @@ function dibujarAps(
 ) {
   const radio = Math.max(14, Math.min(24, Math.max(ancho, alto) * 0.018));
   mapa.aps_interes.forEach((ap, indice) => {
-    if (typeof ap.pos_x !== "number" || typeof ap.pos_y !== "number") return;
     const x = limitar(ap.pos_x, 0, ancho);
     const y = limitar(ap.pos_y, 0, alto);
     ctx.beginPath();

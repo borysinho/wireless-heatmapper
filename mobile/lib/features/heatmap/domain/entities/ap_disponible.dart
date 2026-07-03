@@ -15,6 +15,7 @@ class APDisponible extends Equatable {
   final String? fuentePotencia;
   final String? confianzaPotencia;
   final List<Map<String, dynamic>>? radios;
+  final bool ubicacionConfirmada;
 
   const APDisponible({
     required this.bssid,
@@ -30,6 +31,7 @@ class APDisponible extends Equatable {
     this.fuentePotencia,
     this.confianzaPotencia,
     this.radios,
+    this.ubicacionConfirmada = true,
   });
 
   @override
@@ -47,5 +49,6 @@ class APDisponible extends Equatable {
         fuentePotencia,
         confianzaPotencia,
         radios,
+        ubicacionConfirmada,
       ];
 }

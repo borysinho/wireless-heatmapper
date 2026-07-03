@@ -74,6 +74,10 @@ class HeatmapSeleccionAP extends HeatmapState {
   List<APDisponible> get apsSeleccionados =>
       aps.where((ap) => bssidsSeleccionados.contains(ap.bssid)).toList();
 
+  bool tienePosicionDe(APDisponible ap) =>
+      apPosXPorBssid.containsKey(ap.bssid) &&
+      apPosYPorBssid.containsKey(ap.bssid);
+
   double posXDe(APDisponible ap) => apPosXPorBssid[ap.bssid] ?? ap.posX;
 
   double posYDe(APDisponible ap) => apPosYPorBssid[ap.bssid] ?? ap.posY;

@@ -195,9 +195,7 @@ export function MapaCalorInteractivo({
           </svg>
           {verAps && (
             <div className={styles.capaAps} aria-label="Ubicación de APs">
-              {mapa.aps_interes
-                .filter((ap) => typeof ap.pos_x === "number" && typeof ap.pos_y === "number")
-                .map((ap, indice) => {
+              {mapa.aps_interes.map((ap, indice) => {
                 const hint = apHints?.[indice];
                 const detalleAp = hint
                   ? `${hint.titulo} · ${hint.resumen}`
@@ -209,8 +207,8 @@ export function MapaCalorInteractivo({
                     type="button"
                     className={styles.marcadorAp}
                     style={{
-                      left: `${((ap.pos_x ?? 0) / plano.ancho_px) * 100}%`,
-                      top: `${((ap.pos_y ?? 0) / plano.alto_px) * 100}%`,
+                      left: `${(ap.pos_x / plano.ancho_px) * 100}%`,
+                      top: `${(ap.pos_y / plano.alto_px) * 100}%`,
                     }}
                     title={detalleAp}
                     aria-label={`AP ${indice + 1}: ${ap.ssid || "SSID oculto"}`}
@@ -218,7 +216,7 @@ export function MapaCalorInteractivo({
                     onPointerMove={(event) => event.stopPropagation()}
                     onPointerEnter={() => {
                       if (!hint) return;
-                      setHintAp({ ...hint, x: ap.pos_x ?? 0, y: ap.pos_y ?? 0 });
+                      setHintAp({ ...hint, x: ap.pos_x, y: ap.pos_y });
                     }}
                     onPointerLeave={() => setHintAp(null)}
                     onClick={(event) => {
