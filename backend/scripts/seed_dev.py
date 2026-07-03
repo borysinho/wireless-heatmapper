@@ -32,6 +32,7 @@ import bcrypt
 from app.core.config import settings  # noqa: E402
 from app.core.database import SessionLocal  # noqa: E402
 from app.models.cliente import Cliente  # noqa: E402
+from app.models.heatmap import ConjuntoAP  # noqa: E402
 from app.models.medicion import (  # noqa: E402
     LecturaRSSI,
     PuntoMedicion,
@@ -208,6 +209,12 @@ def _seed_campo_villamontes(db, tecnico: Usuario) -> None:
         else:
             plano.proyecto_id = proyecto.id
             MapaCalorRepository(db).invalidar_plano(plano_id=plano.id)
+            for conjunto in (
+                db.query(ConjuntoAP)
+                .filter(ConjuntoAP.plano_id == plano.id)
+                .all()
+            ):
+                db.delete(conjunto)
             for punto in list(plano.puntos_medicion):
                 db.delete(punto)
             db.flush()
