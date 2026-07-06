@@ -19,7 +19,6 @@ class HeatmapCubit extends Cubit<HeatmapState> {
   final GenerarHeatmapDesdeConjuntoUseCase _generarHeatmapDesdeConjunto;
   final ActualizarUbicacionAPConjuntoUseCase _actualizarUbicacionAPConjunto;
   int? _planoId;
-  final Map<String, Future<void>> _persistenciasUbicacionPendientes = {};
 
   HeatmapCubit({
     required ListarAPsDisponiblesUseCase listarAPs,
@@ -83,14 +82,8 @@ class HeatmapCubit extends Cubit<HeatmapState> {
       aps: apsConjunto,
       bssidsSeleccionados: seleccionados,
       bssidActivo: null,
-      apPosXPorBssid: {
-        for (final item in apsConjunto)
-          if (item.ubicacionConfirmada) item.bssid: item.posX,
-      },
-      apPosYPorBssid: {
-        for (final item in apsConjunto)
-          if (item.ubicacionConfirmada) item.bssid: item.posY,
-      },
+      apPosXPorBssid: {for (final item in apsConjunto) item.bssid: item.posX},
+      apPosYPorBssid: {for (final item in apsConjunto) item.bssid: item.posY},
     ));
   }
 
@@ -255,15 +248,10 @@ class HeatmapCubit extends Cubit<HeatmapState> {
             canal: porBssid[item.bssid]!.canal,
             frecuenciaMhz: porBssid[item.bssid]!.frecuenciaMhz,
             rssiPromedio: porBssid[item.bssid]!.rssiPromedio,
-            posX: item.posX,
-            posY: item.posY,
+            posX: item.posX == 0 ? porBssid[item.bssid]!.posX : item.posX,
+            posY: item.posY == 0 ? porBssid[item.bssid]!.posY : item.posY,
             cantidadPuntos: porBssid[item.bssid]!.cantidadPuntos,
             seleccionado: porBssid[item.bssid]!.seleccionado,
-            potenciaTxDbm: item.potenciaTxDbm,
-            fuentePotencia: item.fuentePotencia,
-            confianzaPotencia: item.confianzaPotencia,
-            radios: item.radios,
-            ubicacionConfirmada: item.ubicacionConfirmada,
           ),
     ];
   }
@@ -365,23 +353,12 @@ class HeatmapCubit extends Cubit<HeatmapState> {
       ));
       final conjunto = actual.conjunto;
       if (conjunto != null && persistir) {
-        final clavePendiente = _clavePersistenciaUbicacion(
-          conjuntoId: conjunto.id,
-          bssid: bssidObjetivo,
-        );
-        late final Future<void> persistencia;
-        persistencia = _persistirUbicacionAPConjunto(
+        _persistirUbicacionAPConjunto(
           conjuntoId: conjunto.id,
           bssid: bssidObjetivo,
           posX: posX,
           posY: posY,
-        ).whenComplete(() {
-          if (_persistenciasUbicacionPendientes[clavePendiente] ==
-              persistencia) {
-            _persistenciasUbicacionPendientes.remove(clavePendiente);
-          }
-        });
-        _persistenciasUbicacionPendientes[clavePendiente] = persistencia;
+        );
       }
     }
   }
@@ -436,24 +413,10 @@ class HeatmapCubit extends Cubit<HeatmapState> {
       emit(contexto.copyWith(mensaje: 'Selecciona al menos un AP de interés.'));
       return;
     }
-    final bssids = seleccionados.map((ap) => ap.bssid).toList();
-    final conjunto = contexto.conjunto;
-    if (conjunto != null) {
-      await _esperarPersistenciasUbicacion(
-        conjuntoId: conjunto.id,
-        bssids: bssids,
-      );
-    }
     emit(const HeatmapLoading(mensaje: 'Generando heatmap de APs…'));
     try {
-      final tieneUbicacionesSeleccionadas =
-          seleccionados.every(contexto.tienePosicionDe);
-      final apPosX = tieneUbicacionesSeleccionadas
-          ? seleccionados.map(contexto.posXDe).toList()
-          : null;
-      final apPosY = tieneUbicacionesSeleccionadas
-          ? seleccionados.map(contexto.posYDe).toList()
-          : null;
+      final bssids = seleccionados.map((ap) => ap.bssid).toList();
+      final conjunto = contexto.conjunto;
       final mapa = conjunto == null
           ? await _generarHeatmap(
               planoId: planoId,
@@ -472,8 +435,8 @@ class HeatmapCubit extends Cubit<HeatmapState> {
               algoritmo: algoritmo,
               resolucion: resolucion,
               bssids: bssids,
-              apPosX: apPosX,
-              apPosY: apPosY,
+              apPosX: seleccionados.map(contexto.posXDe).toList(),
+              apPosY: seleccionados.map(contexto.posYDe).toList(),
             );
       emit(HeatmapReady(
         mapa: mapa,
@@ -490,27 +453,6 @@ class HeatmapCubit extends Cubit<HeatmapState> {
       emit(const HeatmapError('No se pudo generar el heatmap.'));
     }
   }
-
-  Future<void> _esperarPersistenciasUbicacion({
-    required int conjuntoId,
-    required List<String> bssids,
-  }) async {
-    final pendientes = [
-      for (final bssid in bssids)
-        _persistenciasUbicacionPendientes[_clavePersistenciaUbicacion(
-          conjuntoId: conjuntoId,
-          bssid: bssid,
-        )],
-    ].whereType<Future<void>>().toList(growable: false);
-    if (pendientes.isEmpty) return;
-    await Future.wait(pendientes);
-  }
-
-  String _clavePersistenciaUbicacion({
-    required int conjuntoId,
-    required String bssid,
-  }) =>
-      '$conjuntoId:${bssid.toLowerCase()}';
 
   String _modoGeneracion({
     required int totalConjunto,
