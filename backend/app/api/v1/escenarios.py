@@ -653,7 +653,8 @@ def _mapa_actual(
         raise HTTPException(status_code=404, detail="Conjunto AP no encontrado.")
     items_por_bssid = {item.bssid.lower(): item for item in conjunto.items}
     aps_por_bssid = {
-        ap["bssid"]: ap for ap in MedicionRepository(db).listar_aps_por_plano(plano_id=plano.id)
+        ap["bssid"]: ap
+        for ap in MedicionRepository(db).listar_aps_por_plano(plano_id=plano.id)
     }
     aps_interes = []
     for bssid in bssids_seleccionados:
