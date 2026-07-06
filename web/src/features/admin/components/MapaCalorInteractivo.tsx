@@ -262,7 +262,7 @@ export function MapaCalorInteractivo({
       </div>
 
       <div className={styles.leyenda}>
-        {mapa.escala.map((item) => <span key={`${item.desde}-${item.hasta}`}><i style={{ background: item.color }} />{item.etiqueta}</span>)}
+        {ESCALA_HEATMAP_VISUAL.map((item) => <span key={`${item.desde}-${item.hasta}`}><i style={{ background: item.color }} />{item.etiqueta}</span>)}
       </div>
 
       {detalle && <button type="button" className={styles.detalle} onClick={() => setDetalle(null)}>{detalle}<span>×</span></button>}
@@ -295,10 +295,20 @@ function _modoLegible(modo: string): string {
   return ({ INDIVIDUAL: "AP individual", SUBCONJUNTO: "Selección parcial", CONJUNTO_COMPLETO: "Mapa completo" } as Record<string, string>)[modo] ?? modo;
 }
 
+const ESCALA_HEATMAP_VISUAL = [
+  { desde: -60, hasta: 0, color: "#55C7A6", etiqueta: "Excelente" },
+  { desde: -70, hasta: -61, color: "#9CD56F", etiqueta: "Óptimo" },
+  { desde: -80, hasta: -71, color: "#F3DE78", etiqueta: "Aceptable" },
+  { desde: -85, hasta: -81, color: "#F6A654", etiqueta: "Pobre" },
+  { desde: -90, hasta: -86, color: "#E86E5A", etiqueta: "Muy pobre" },
+  { desde: -120, hasta: -91, color: "#B8463F", etiqueta: "Zona muerta" },
+];
+
 function colorRssi(rssi: number): string {
-  if (rssi >= -70) return "#A7E84A";
-  if (rssi >= -80) return "#F1E64A";
-  if (rssi >= -85) return "#C7B84B";
-  if (rssi >= -90) return "#7E8173";
-  return "#1C1C1C";
+  if (rssi >= -60) return "#55C7A6";
+  if (rssi >= -70) return "#9CD56F";
+  if (rssi >= -80) return "#F3DE78";
+  if (rssi >= -85) return "#F6A654";
+  if (rssi >= -90) return "#E86E5A";
+  return "#B8463F";
 }

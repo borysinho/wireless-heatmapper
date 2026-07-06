@@ -47,6 +47,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
 
   void _generarHeatmap() {
     context.read<HeatmapCubit>().generar(
+          proyectoId: widget.proyectoId,
           planoId: widget.planoId,
           algoritmo: 'IDW',
           resolucion: _resolucion,
@@ -55,6 +56,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
 
   void _alternarFiltroAP(APDisponible ap) {
     context.read<HeatmapCubit>().alternarFiltroAP(
+          proyectoId: widget.proyectoId,
           planoId: widget.planoId,
           ap: ap,
           algoritmo: 'IDW',
@@ -64,6 +66,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
 
   void _limpiarFiltroAP() {
     context.read<HeatmapCubit>().limpiarFiltroAP(
+          proyectoId: widget.proyectoId,
           planoId: widget.planoId,
           algoritmo: 'IDW',
           resolucion: _resolucion,
@@ -337,6 +340,57 @@ class _HeatmapPageState extends State<HeatmapPage> {
     }
   }
 }
+
+Color _colorHeatmapParaRssi(double rssi, {double alpha = 1}) {
+  final color = switch (rssi) {
+    >= -60 => const Color(0xFF55C7A6),
+    >= -70 => const Color(0xFF9CD56F),
+    >= -80 => const Color(0xFFF3DE78),
+    >= -85 => const Color(0xFFF6A654),
+    >= -90 => const Color(0xFFE86E5A),
+    _ => const Color(0xFFB8463F),
+  };
+  return color.withValues(alpha: alpha);
+}
+
+const _escalaHeatmapVisual = <EscalaHeatmap>[
+  EscalaHeatmap(
+    desde: -60,
+    hasta: 0,
+    colorHex: '#55C7A6',
+    etiqueta: 'Excelente',
+  ),
+  EscalaHeatmap(
+    desde: -70,
+    hasta: -61,
+    colorHex: '#9CD56F',
+    etiqueta: 'Óptimo',
+  ),
+  EscalaHeatmap(
+    desde: -80,
+    hasta: -71,
+    colorHex: '#F3DE78',
+    etiqueta: 'Aceptable',
+  ),
+  EscalaHeatmap(
+    desde: -85,
+    hasta: -81,
+    colorHex: '#F6A654',
+    etiqueta: 'Pobre',
+  ),
+  EscalaHeatmap(
+    desde: -90,
+    hasta: -86,
+    colorHex: '#E86E5A',
+    etiqueta: 'Muy pobre',
+  ),
+  EscalaHeatmap(
+    desde: -120,
+    hasta: -91,
+    colorHex: '#B8463F',
+    etiqueta: 'Zona muerta',
+  ),
+];
 
 class _CrearConjuntoAPSheet extends StatefulWidget {
   final List<APDisponible> aps;
@@ -1721,11 +1775,12 @@ class _LeyendaHeatmap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textStyle = Theme.of(context).textTheme.labelSmall;
+    final escalaVisual = _escalaNormalizada(escala);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Row(
-          children: escala
+          children: escalaVisual
               .map(
                 (item) => Expanded(
                   child: Container(
@@ -1741,7 +1796,7 @@ class _LeyendaHeatmap extends StatelessWidget {
           spacing: 10,
           runSpacing: 4,
           alignment: WrapAlignment.center,
-          children: escala
+          children: escalaVisual
               .map(
                 (item) => Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1763,6 +1818,15 @@ class _LeyendaHeatmap extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  List<EscalaHeatmap> _escalaNormalizada(List<EscalaHeatmap> escalaApi) {
+    final coloresApi =
+        escalaApi.map((item) => item.colorHex.toUpperCase()).toSet();
+    final usaPaletaVigente = _escalaHeatmapVisual.every(
+      (item) => coloresApi.contains(item.colorHex.toUpperCase()),
+    );
+    return usaPaletaVigente ? escalaApi : _escalaHeatmapVisual;
   }
 
   Color _colorDesdeHex(String hex) {
@@ -1871,11 +1935,7 @@ class _HeatmapMatrixPainter extends CustomPainter {
   }
 
   Color _colorParaRssi(double rssi) {
-    if (rssi >= -70) return const Color(0xFFA7E84A).withValues(alpha: 0.60);
-    if (rssi >= -80) return const Color(0xFFF1E64A).withValues(alpha: 0.60);
-    if (rssi >= -85) return const Color(0xFFC7B84B).withValues(alpha: 0.60);
-    if (rssi >= -90) return const Color(0xFF7E8173).withValues(alpha: 0.60);
-    return const Color(0xFF1C1C1C).withValues(alpha: 0.60);
+    return _colorHeatmapParaRssi(rssi, alpha: 0.60);
   }
 
   @override
@@ -1919,11 +1979,7 @@ class _PuntosLecturaPainter extends CustomPainter {
   }
 
   Color _colorParaRssi(double rssi) {
-    if (rssi >= -70) return const Color(0xFFA7E84A);
-    if (rssi >= -80) return const Color(0xFFF1E64A);
-    if (rssi >= -85) return const Color(0xFFC7B84B);
-    if (rssi >= -90) return const Color(0xFF7E8173);
-    return const Color(0xFF1C1C1C);
+    return _colorHeatmapParaRssi(rssi);
   }
 
   @override

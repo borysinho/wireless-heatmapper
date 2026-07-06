@@ -123,6 +123,10 @@ def _verificar_ownership_mapa(
     return mapa
 
 
+def _es_mapa_interno_preparacion_ia(mapa: MapaCalor) -> bool:
+    return mapa.ruta_imagen.startswith("heatmaps/ia_actual_")
+
+
 def _mapa_out(
     mapa: MapaCalor,
     request: Request,
@@ -163,7 +167,7 @@ def _mapa_out(
         bssids_generacion=mapa.bssids_generacion or [ap["bssid"] for ap in aps_interes],
         url_imagen=_firmar(mapa.ruta_imagen, request),
         matriz=mapa.matriz,
-        escala=mapa.escala,
+        escala=ESCALA_CWNA,
         cantidad_puntos=mapa.cantidad_puntos,
         rssi_min=mapa.rssi_min,
         rssi_max=mapa.rssi_max,
@@ -561,6 +565,34 @@ def _mapas_objetivo_conjunto(
 def _clave_publicacion_mapa(mapa: MapaCalor) -> tuple[str, tuple[str, ...]]:
     bssids = mapa.bssids_generacion or [mapa.bssid]
     return (mapa.algoritmo.upper(), _clave_bssids(bssids))
+
+
+def _requerir_ubicaciones_confirmadas_conjunto(
+    *,
+    conjunto,
+    bssids: list[str],
+) -> None:
+    if conjunto.origen == "ia":
+        return
+
+    items_por_bssid = {item.bssid.lower(): item for item in conjunto.items}
+    faltantes = [
+        bssid
+        for bssid in bssids
+        if (
+            (item := items_por_bssid.get(bssid.lower())) is None
+            or item.pos_x is None
+            or item.pos_y is None
+        )
+    ]
+    if faltantes:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Debe ubicar todos los APs del conjunto sobre el plano antes "
+                "de generar el heatmap."
+            ),
+        )
 
 
 def _actualizar_enlaces_cliente_por_reemplazo_mapas(
@@ -1141,7 +1173,11 @@ def listar_mapas_plano(
 ) -> list[MapaCalorOut]:
     _verificar_ownership_plano(plano_id=plano_id, current_user=current_user, db=db)
     mapas = MapaCalorRepository(db).listar_recientes_por_plano(plano_id=plano_id)
-    return [_mapa_out(mapa, request) for mapa in mapas]
+    return [
+        _mapa_out(mapa, request)
+        for mapa in mapas
+        if not _es_mapa_interno_preparacion_ia(mapa)
+    ]
 
 
 @router_planos_heatmap.get(
@@ -1392,6 +1428,10 @@ def generar_heatmap_conjunto(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Uno o más APs seleccionados no pertenecen al conjunto.",
         )
+    _requerir_ubicaciones_confirmadas_conjunto(
+        conjunto=conjunto,
+        bssids=bssids_generacion,
+    )
 
     if (body.ap_pos_x is None) != (body.ap_pos_y is None):
         raise HTTPException(
@@ -1472,6 +1512,11 @@ def generar_heatmaps_faltantes_conjunto(
     )
     if not mapas_objetivo:
         return []
+    for bssids_mapa, _ in mapas_objetivo:
+        _requerir_ubicaciones_confirmadas_conjunto(
+            conjunto=conjunto,
+            bssids=bssids_mapa,
+        )
 
     items_por_bssid = {item.bssid: item for item in conjunto.items}
     origen_lecturas = ORIGEN_IA_ESTIMADA if conjunto.origen == "ia" else ORIGEN_CAMPO

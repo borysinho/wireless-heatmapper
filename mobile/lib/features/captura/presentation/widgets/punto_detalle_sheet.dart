@@ -139,11 +139,11 @@ class PuntoDetalleSheet extends StatelessWidget {
 
   static Color _colorPorNivel(NivelSenal nivel, ThemeData theme) =>
       switch (nivel) {
-        NivelSenal.verde => const Color(0xFFA7E84A),
-        NivelSenal.amarillo => const Color(0xFFF1E64A),
-        NivelSenal.naranja => const Color(0xFFC7B84B),
-        NivelSenal.rojo => const Color(0xFF7E8173),
-        NivelSenal.negro => const Color(0xFF1C1C1C),
+        NivelSenal.verde => const Color(0xFF9CD56F),
+        NivelSenal.amarillo => const Color(0xFFF3DE78),
+        NivelSenal.naranja => const Color(0xFFF6A654),
+        NivelSenal.rojo => const Color(0xFFE86E5A),
+        NivelSenal.negro => const Color(0xFFB8463F),
       };
 }
 
@@ -259,11 +259,11 @@ class _NivelBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = switch (nivel) {
-      NivelSenal.verde => const Color(0xFFA7E84A),
-      NivelSenal.amarillo => const Color(0xFFF1E64A),
-      NivelSenal.naranja => const Color(0xFFC7B84B),
-      NivelSenal.rojo => const Color(0xFF7E8173),
-      NivelSenal.negro => const Color(0xFF1C1C1C),
+      NivelSenal.verde => const Color(0xFF9CD56F),
+      NivelSenal.amarillo => const Color(0xFFF3DE78),
+      NivelSenal.naranja => const Color(0xFFF6A654),
+      NivelSenal.rojo => const Color(0xFFE86E5A),
+      NivelSenal.negro => const Color(0xFFB8463F),
     };
     final label = switch (nivel) {
       NivelSenal.verde => 'Óptimo',

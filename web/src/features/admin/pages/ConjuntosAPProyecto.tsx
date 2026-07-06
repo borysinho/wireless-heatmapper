@@ -131,6 +131,8 @@ export default function ConjuntosAPProyecto() {
             <tbody>
               {conjuntos.map((conjunto) => {
                 const plano = planosPorId.get(conjunto.plano_id);
+                const mapasConjunto = mapasPorConjunto.get(conjunto.id) ?? [];
+                const tieneHeatmaps = mapasConjunto.length > 0;
                 return (
                   <tr key={conjunto.id}>
                     <td className={styles.nombre}>
@@ -144,10 +146,15 @@ export default function ConjuntosAPProyecto() {
                       <Button
                         variante="secondary"
                         tamano="sm"
-                        disabled={!plano || conjunto.items.length === 0}
+                        disabled={!plano || !tieneHeatmaps}
                         onClick={() => {
                           if (plano) setVistaPrevia({ conjunto, plano });
                         }}
+                        title={
+                          tieneHeatmaps
+                            ? "Previsualizar mapas generados desde móvil"
+                            : "Disponible cuando el móvil genere al menos un heatmap"
+                        }
                       >
                         <Eye size={14} aria-hidden="true" />
                         Previsualizar

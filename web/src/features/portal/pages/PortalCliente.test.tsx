@@ -105,7 +105,7 @@ const mapaPortal: MapaCalorPortalOut = {
   bssids_generacion: ["aa:bb:cc:dd:ee:01"],
   url_imagen: "/heatmaps/planta-alta.png",
   matriz: [[-62, -64], [-68, -72]],
-  escala: [{ desde: -70, hasta: -30, color: "#A7E84A", etiqueta: "Óptimo" }],
+  escala: [{ desde: -70, hasta: -61, color: "#9CD56F", etiqueta: "Óptimo" }],
   cantidad_puntos: 1,
   rssi_min: -72,
   rssi_max: -62,
@@ -154,7 +154,7 @@ describe("PortalCliente", () => {
     } as ReturnType<typeof useQuery>);
     const { container } = render(<PortalCliente />);
 
-    expect(container.querySelectorAll('circle[fill="#A7E84A"]').length).toBe(1);
+    expect(container.querySelectorAll('circle[fill="#9CD56F"]').length).toBe(1);
     fireEvent.click(screen.getByRole("button", { name: "Acercar mapa" }));
 
     await waitFor(() => {

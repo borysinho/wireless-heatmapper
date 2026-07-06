@@ -17,7 +17,9 @@ from app.api.v1.heatmaps import (
     generar_heatmaps_faltantes_conjunto,
     listar_aps_disponibles,
     listar_conjuntos_ap,
+    listar_mapas_plano,
 )
+from app.api.v1.escenarios import preparar_conjunto_ia
 from app.core.config import settings
 from app.models.heatmap import ConjuntoAP, ConjuntoAPItem, MapaCalor
 from app.models.medicion import LecturaRSSI
@@ -131,6 +133,21 @@ def _insertar_puntos_sinteticos(db_session, plano_id: int, *, cantidad: int = 5)
                 ),
             ],
         )
+
+
+def _ubicar_aps_conjunto(db_session, conjunto_id: int, bssids: list[str]) -> None:
+    for indice, bssid in enumerate(bssids):
+        item = (
+            db_session.query(ConjuntoAPItem)
+            .filter(
+                ConjuntoAPItem.conjunto_ap_id == conjunto_id,
+                ConjuntoAPItem.bssid == bssid,
+            )
+            .one()
+        )
+        item.pos_x = 100 + indice * 80
+        item.pos_y = 120 + indice * 40
+    db_session.commit()
 
 
 def test_invalidar_plano_elimina_conjuntos_ia_y_mapas_derivados(
@@ -333,6 +350,11 @@ def test_crear_conjunto_ap_y_generar_heatmaps_por_modo(
         )[0].id
         == conjunto.id
     )
+    _ubicar_aps_conjunto(
+        db_session,
+        conjunto.id,
+        ["aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"],
+    )
 
     revisado = actualizar_conjunto_ap(
         conjunto_id=conjunto.id,
@@ -401,6 +423,11 @@ def test_regenerar_heatmap_conjunto_reemplaza_mapa_previo(
         db=db_session,
         current_user=tecnico_usuario,
     )
+    _ubicar_aps_conjunto(
+        db_session,
+        conjunto.id,
+        ["aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"],
+    )
 
     mapa_inicial = generar_heatmap_conjunto(
         conjunto_id=conjunto.id,
@@ -462,6 +489,11 @@ def test_regenerar_heatmap_conjunto_reemplaza_previsualizacion_web(
         db=db_session,
         current_user=tecnico_usuario,
     )
+    _ubicar_aps_conjunto(
+        db_session,
+        conjunto.id,
+        ["aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"],
+    )
 
     mapa_web = generar_heatmap_conjunto(
         conjunto_id=conjunto.id,
@@ -507,6 +539,155 @@ def test_regenerar_heatmap_conjunto_reemplaza_previsualizacion_web(
     assert mapas[0].aps_interes[0]["pos_y"] == 115
 
 
+def test_preparacion_ia_reutiliza_heatmap_generado_por_movil(
+    db_session,
+    tecnico_usuario,
+):
+    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
+    _insertar_puntos_sinteticos(db_session, plano_id, cantidad=5)
+    plano = db_session.query(Plano).filter(Plano.id == plano_id).one()
+    conjunto = crear_conjunto_ap(
+        plano_id=plano_id,
+        body=ConjuntoAPCrearIn(
+            nombre="Cobertura preparada",
+            proposito="Validar preparación IA posterior al heatmap móvil.",
+            banda_objetivo="2.4",
+            bssids=["aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"],
+        ),
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    actualizar_ubicacion_ap_conjunto(
+        conjunto_id=conjunto.id,
+        body=ActualizarUbicacionAPConjuntoIn(
+            bssid="aa:bb:cc:dd:ee:01",
+            pos_x=190,
+            pos_y=115,
+        ),
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    actualizar_ubicacion_ap_conjunto(
+        conjunto_id=conjunto.id,
+        body=ActualizarUbicacionAPConjuntoIn(
+            bssid="aa:bb:cc:dd:ee:02",
+            pos_x=280,
+            pos_y=150,
+        ),
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    mapa_movil = generar_heatmap_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapConjuntoIn(
+            modo="CONJUNTO_COMPLETO",
+            resolucion=128,
+        ),
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    preparacion = preparar_conjunto_ia(
+        proyecto_id=plano.proyecto_id,
+        conjunto_id=conjunto.id,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    mapas = (
+        db_session.query(MapaCalor)
+        .filter(MapaCalor.conjunto_ap_id == conjunto.id)
+        .all()
+    )
+    mapas_visibles = listar_mapas_plano(
+        plano_id=plano_id,
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    assert preparacion.mapa_actual_id == mapa_movil.id
+    assert len(mapas) == 1
+    assert len([mapa for mapa in mapas_visibles if mapa.conjunto_ap_id == conjunto.id]) == 1
+    assert mapas[0].aps_interes[0]["pos_x"] == 190
+    assert mapas[0].aps_interes[0]["pos_y"] == 115
+
+
+def test_listar_mapas_plano_oculta_mapas_internos_preparacion_ia(
+    db_session,
+    tecnico_usuario,
+):
+    plano_id = _crear_plano_calibrado(db_session, tecnico_usuario)
+    _insertar_puntos_sinteticos(db_session, plano_id, cantidad=5)
+    conjunto = crear_conjunto_ap(
+        plano_id=plano_id,
+        body=ConjuntoAPCrearIn(
+            nombre="Cobertura con mapa interno",
+            proposito="Validar ocultamiento de preparación IA.",
+            banda_objetivo="2.4",
+            bssids=["aa:bb:cc:dd:ee:01"],
+        ),
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    _ubicar_aps_conjunto(db_session, conjunto.id, ["aa:bb:cc:dd:ee:01"])
+    mapa_visible = generar_heatmap_conjunto(
+        conjunto_id=conjunto.id,
+        body=GenerarHeatmapConjuntoIn(
+            modo="INDIVIDUAL",
+            bssids=["aa:bb:cc:dd:ee:01"],
+            resolucion=64,
+        ),
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+    db_session.add(
+        MapaCalor(
+            plano_id=plano_id,
+            conjunto_ap_id=conjunto.id,
+            algoritmo="IDW",
+            resolucion=64,
+            modo_generacion="CONJUNTO_COMPLETO",
+            bssid="aa:bb:cc:dd:ee:01",
+            ssid="BulldogCorp",
+            ap_pos_x=1,
+            ap_pos_y=1,
+            aps_interes=[
+                {
+                    "bssid": "aa:bb:cc:dd:ee:01",
+                    "ssid": "BulldogCorp",
+                    "canal": 6,
+                    "frecuencia_mhz": 2437,
+                    "rssi_promedio": -60,
+                    "pos_x": 1,
+                    "pos_y": 1,
+                    "cantidad_puntos": 5,
+                }
+            ],
+            bssids_generacion=["aa:bb:cc:dd:ee:01"],
+            matriz=[[-60.0]],
+            escala=ESCALA_CWNA,
+            ruta_imagen="heatmaps/ia_actual_1_interno.png",
+            cantidad_puntos=5,
+            rssi_min=-80,
+            rssi_max=-50,
+            firma_mediciones="firma-interna-preparacion",
+        )
+    )
+    db_session.commit()
+
+    mapas = listar_mapas_plano(
+        plano_id=plano_id,
+        request=None,
+        db=db_session,
+        current_user=tecnico_usuario,
+    )
+
+    assert [mapa.id for mapa in mapas] == [mapa_visible.id]
+
+
 def test_generar_heatmaps_faltantes_actualiza_idw(
     db_session,
     tecnico_usuario,
@@ -527,6 +708,15 @@ def test_generar_heatmaps_faltantes_actualiza_idw(
         ),
         db=db_session,
         current_user=tecnico_usuario,
+    )
+    _ubicar_aps_conjunto(
+        db_session,
+        conjunto.id,
+        [
+            "aa:bb:cc:dd:ee:01",
+            "aa:bb:cc:dd:ee:02",
+            "aa:bb:cc:dd:ee:03",
+        ],
     )
     mapa_previo = generar_heatmap_conjunto(
         conjunto_id=conjunto.id,
@@ -622,6 +812,15 @@ def test_generar_heatmaps_faltantes_agrega_mapas_a_enlace_con_conjunto(
         db=db_session,
         current_user=tecnico_usuario,
     )
+    _ubicar_aps_conjunto(
+        db_session,
+        conjunto.id,
+        [
+            "aa:bb:cc:dd:ee:01",
+            "aa:bb:cc:dd:ee:02",
+            "aa:bb:cc:dd:ee:03",
+        ],
+    )
     mapa_previo = generar_heatmap_conjunto(
         conjunto_id=conjunto.id,
         body=GenerarHeatmapConjuntoIn(
@@ -690,6 +889,11 @@ def test_generar_heatmaps_faltantes_reemplaza_todos_los_previos_del_conjunto(
         ),
         db=db_session,
         current_user=tecnico_usuario,
+    )
+    _ubicar_aps_conjunto(
+        db_session,
+        conjunto.id,
+        ["aa:bb:cc:dd:ee:01", "aa:bb:cc:dd:ee:02"],
     )
     mapa_64 = generar_heatmap_conjunto(
         conjunto_id=conjunto.id,
@@ -1035,19 +1239,20 @@ def test_crear_conjunto_no_persiste_posicion_estimada_de_ap(
     assert [item.pos_x for item in conjunto.items] == [None, None]
     assert [item.pos_y for item in conjunto.items] == [None, None]
 
-    mapa = generar_heatmap_conjunto(
-        conjunto_id=conjunto.id,
-        body=GenerarHeatmapConjuntoIn(
-            modo="CONJUNTO_COMPLETO",
-            resolucion=64,
-        ),
-        request=None,
-        db=db_session,
-        current_user=tecnico_usuario,
-    )
+    with pytest.raises(HTTPException) as exc:
+        generar_heatmap_conjunto(
+            conjunto_id=conjunto.id,
+            body=GenerarHeatmapConjuntoIn(
+                modo="CONJUNTO_COMPLETO",
+                resolucion=64,
+            ),
+            request=None,
+            db=db_session,
+            current_user=tecnico_usuario,
+        )
 
-    assert [ap.pos_x for ap in mapa.aps_interes] == [None, None]
-    assert [ap.pos_y for ap in mapa.aps_interes] == [None, None]
+    assert exc.value.status_code == 422
+    assert "Debe ubicar todos los APs" in exc.value.detail
 
 
 def test_conjunto_ap_persiste_potencia_tx_declarada(
@@ -1206,24 +1411,27 @@ def test_generar_heatmap_retorna_matriz_y_cache(db_session, tecnico_usuario):
 def test_escala_heatmap_prioriza_umbral_operativo():
     etiquetas = [item["etiqueta"] for item in ESCALA_CWNA]
     assert etiquetas == [
+        "Excelente",
         "Óptimo",
         "Aceptable",
         "Pobre",
         "Muy pobre",
         "Zona muerta",
     ]
-    assert ESCALA_CWNA[0]["desde"] == -70
+    assert ESCALA_CWNA[0]["desde"] == -60
+    assert ESCALA_CWNA[1]["desde"] == -70
     assert ESCALA_CWNA[-1]["desde"] == -120
 
 
 def test_render_heatmap_muestra_advertencia_en_menos_72_dbm():
     service = HeatmapImageService()
 
-    assert service._color_para_rssi(-70) == (167, 232, 74)
-    assert service._color_para_rssi(-72) == (241, 230, 74)
-    assert service._color_para_rssi(-82) == (199, 184, 75)
-    assert service._color_para_rssi(-86) == (126, 129, 115)
-    assert service._color_para_rssi(-91) == (28, 28, 28)
+    assert service._color_para_rssi(-58) == (85, 199, 166)
+    assert service._color_para_rssi(-70) == (156, 213, 111)
+    assert service._color_para_rssi(-72) == (243, 222, 120)
+    assert service._color_para_rssi(-82) == (246, 166, 84)
+    assert service._color_para_rssi(-86) == (232, 110, 90)
+    assert service._color_para_rssi(-91) == (184, 70, 63)
 
 
 def test_interpolacion_exige_soporte_local_para_islas_optimistas():

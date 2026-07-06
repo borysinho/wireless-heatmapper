@@ -598,6 +598,22 @@ def _mapa_actual(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Se requieren al menos 5 puntos de medición para IA.",
         )
+    mapa_existente = next(
+        (
+            mapa
+            for mapa in mapa_repo.listar_por_clave_conjunto(
+                conjunto_ap_id=conjunto_ap_id,
+                modo_generacion="CONJUNTO_COMPLETO",
+                algoritmo="IDW",
+                bssids=bssids_seleccionados,
+            )
+            if not mapa.ruta_imagen.startswith("heatmaps/ia_actual_")
+        ),
+        None,
+    )
+    if mapa_existente is not None:
+        return mapa_existente, puntos
+
     poligono_interes = _requerir_poligono_interes(plano)
     firma = hashlib.sha1(
         (
@@ -632,8 +648,44 @@ def _mapa_actual(
     )
     ruta = f"heatmaps/ia_actual_{plano.id}_{secrets.token_hex(8)}.png"
     _storage().save(HeatmapImageService().render_png(matriz, mascara=mascara), ruta)
-    aps = MedicionRepository(db).listar_aps_por_plano(plano_id=plano.id)
-    aps_interes = [ap for ap in aps if ap["bssid"] in set(bssids_seleccionados)]
+    conjunto = db.get(ConjuntoAP, conjunto_ap_id)
+    if conjunto is None:
+        raise HTTPException(status_code=404, detail="Conjunto AP no encontrado.")
+    items_por_bssid = {item.bssid.lower(): item for item in conjunto.items}
+    aps_por_bssid = {
+        ap["bssid"]: ap for ap in MedicionRepository(db).listar_aps_por_plano(plano_id=plano.id)
+    }
+    aps_interes = []
+    for bssid in bssids_seleccionados:
+        item = items_por_bssid.get(bssid.lower())
+        ap = aps_por_bssid.get(bssid.lower())
+        if item is None or ap is None:
+            continue
+        if item.pos_x is None or item.pos_y is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Debe ubicar todos los APs del conjunto sobre el plano antes "
+                    "de preparar IA."
+                ),
+            )
+        aps_interes.append(
+            {
+                "bssid": bssid.lower(),
+                "ssid": item.ssid_snapshot or ap["ssid"],
+                "canal": item.canal_snapshot,
+                "frecuencia_mhz": ap.get("frecuencia_mhz"),
+                "rssi_promedio": item.rssi_promedio_snapshot or ap["rssi_promedio"],
+                "pos_x": item.pos_x,
+                "pos_y": item.pos_y,
+                "cantidad_puntos": ap["cantidad_puntos"],
+            }
+        )
+    if not aps_interes:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El conjunto no tiene APs válidos para preparar IA.",
+        )
     mapa = mapa_repo.crear(
         plano_id=plano.id,
         conjunto_ap_id=conjunto_ap_id,

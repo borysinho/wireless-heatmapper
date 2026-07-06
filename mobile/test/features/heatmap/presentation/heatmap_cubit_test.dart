@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heatmapper/features/heatmap/domain/entities/ap_disponible.dart';
 import 'package:heatmapper/features/heatmap/domain/entities/conjunto_ap.dart';
+import 'package:heatmapper/features/heatmap/domain/entities/mapa_calor.dart';
 import 'package:heatmapper/features/heatmap/domain/repositories/heatmap_repository.dart';
 import 'package:heatmapper/features/heatmap/domain/usecases/heatmap_usecases.dart';
 import 'package:heatmapper/features/heatmap/presentation/cubit/heatmap_cubit.dart';
@@ -62,6 +63,34 @@ ConjuntoAP _conjunto({
       ],
       createdAt: DateTime(2026, 6, 19),
       updatedAt: DateTime(2026, 6, 19),
+    );
+
+MapaCalor _mapaConjunto() => MapaCalor(
+      id: 31,
+      planoId: 37,
+      conjuntoApId: 9,
+      modoGeneracion: 'CONJUNTO_COMPLETO',
+      algoritmo: 'IDW',
+      resolucion: 128,
+      bssid: _apPrincipal.bssid,
+      ssid: _apPrincipal.ssid,
+      apPosX: 340,
+      apPosY: 280,
+      apsInteres: const [_apPrincipal, _apSecundario],
+      bssidsGeneracion: [_apPrincipal.bssid, _apSecundario.bssid],
+      urlImagen: '/mapas/archivo/demo.png',
+      matriz: const [
+        [-60, -62],
+        [-65, -70],
+      ],
+      escala: const [],
+      cantidadPuntos: 5,
+      rssiMin: -80,
+      rssiMax: -50,
+      rssiPromedio: -65,
+      puntosLectura: const [],
+      advertencias: const [],
+      createdAt: DateTime(2026, 6, 19),
     );
 
 HeatmapCubit _crearCubit(HeatmapRepository repo) => HeatmapCubit(
@@ -166,7 +195,7 @@ void main() {
     );
   });
 
-  test('prepara IA en segundo plano luego de crear un conjunto', () async {
+  test('no prepara IA en segundo plano luego de crear un conjunto', () async {
     final conjunto = _conjunto(id: 12, nombre: 'Conjunto nuevo');
     when(
       () => repo.crearConjuntoAP(
@@ -179,8 +208,6 @@ void main() {
         configuracionesRadio: any(named: 'configuracionesRadio'),
       ),
     ).thenAnswer((_) async => conjunto);
-    when(() => repo.prepararConjuntoIA(proyectoId: 5, conjuntoId: 12))
-        .thenAnswer((_) async {});
     when(() => repo.listarConjuntosAP(37)).thenAnswer((_) async => [conjunto]);
     when(() => repo.listarAPsDisponibles(37))
         .thenAnswer((_) async => const [_apPrincipal, _apSecundario]);
@@ -194,10 +221,40 @@ void main() {
       bssids: [_apPrincipal.bssid],
     );
 
+    verifyNever(() => repo.prepararConjuntoIA(
+          proyectoId: any(named: 'proyectoId'),
+          conjuntoId: any(named: 'conjuntoId'),
+        ));
+  });
+
+  test('prepara IA en segundo plano luego de generar heatmap del conjunto',
+      () async {
+    final conjunto = _conjunto(posX: 340, posY: 280);
+    when(() => repo.listarAPsDisponibles(37))
+        .thenAnswer((_) async => const [_apPrincipal, _apSecundario]);
+    when(() => repo.listarConjuntosAP(37)).thenAnswer((_) async => [conjunto]);
+    when(
+      () => repo.generarHeatmapDesdeConjunto(
+        conjuntoId: 9,
+        modo: 'CONJUNTO_COMPLETO',
+        algoritmo: 'IDW',
+        resolucion: 128,
+        bssids: any(named: 'bssids'),
+        apPosX: any(named: 'apPosX'),
+        apPosY: any(named: 'apPosY'),
+      ),
+    ).thenAnswer((_) async => _mapaConjunto());
+    when(() => repo.prepararConjuntoIA(proyectoId: 5, conjuntoId: 9))
+        .thenAnswer((_) async {});
+
+    await cubit.iniciar(37);
+    cubit.abrirConjunto(conjunto);
+    await cubit.generar(proyectoId: 5, planoId: 37);
+
     await untilCalled(
-      () => repo.prepararConjuntoIA(proyectoId: 5, conjuntoId: 12),
+      () => repo.prepararConjuntoIA(proyectoId: 5, conjuntoId: 9),
     );
-    verify(() => repo.prepararConjuntoIA(proyectoId: 5, conjuntoId: 12))
+    verify(() => repo.prepararConjuntoIA(proyectoId: 5, conjuntoId: 9))
         .called(1);
   });
 }

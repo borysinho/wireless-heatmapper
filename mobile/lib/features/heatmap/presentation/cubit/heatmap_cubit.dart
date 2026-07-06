@@ -106,7 +106,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
     final aps = actual is HeatmapConjuntos ? actual.aps : <APDisponible>[];
     emit(const HeatmapLoading(mensaje: 'Guardando conjunto de APs…'));
     try {
-      final conjuntoCreado = await _crearConjunto(
+      await _crearConjunto(
         planoId: planoId,
         nombre: nombre,
         proposito: proposito,
@@ -115,10 +115,6 @@ class HeatmapCubit extends Cubit<HeatmapState> {
         bssids: bssids,
         configuracionesRadio: configuracionesRadio,
       );
-      unawaited(_prepararConjuntoIADespuesDeCrear(
-        proyectoId: proyectoId,
-        conjuntoId: conjuntoCreado.id,
-      ));
       final conjuntos = await _listarConjuntos(planoId);
       emit(HeatmapConjuntos(
         aps: aps.isEmpty ? await _listarAPs(planoId) : aps,
@@ -301,6 +297,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
   }
 
   Future<void> alternarFiltroAP({
+    required int proyectoId,
     required int planoId,
     required APDisponible ap,
     required String algoritmo,
@@ -311,6 +308,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
     final nuevoBssid = actual.bssidActivo == ap.bssid ? null : ap.bssid;
     emit(actual.copyWith(bssidActivo: nuevoBssid));
     await generar(
+      proyectoId: proyectoId,
       planoId: planoId,
       algoritmo: algoritmo,
       resolucion: resolucion,
@@ -318,6 +316,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
   }
 
   Future<void> limpiarFiltroAP({
+    required int proyectoId,
     required int planoId,
     required String algoritmo,
     required int resolucion,
@@ -326,6 +325,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
     if (actual is! HeatmapReady || actual.bssidActivo == null) return;
     emit(actual.copyWith(bssidActivo: null));
     await generar(
+      proyectoId: proyectoId,
       planoId: planoId,
       algoritmo: algoritmo,
       resolucion: resolucion,
@@ -387,6 +387,7 @@ class HeatmapCubit extends Cubit<HeatmapState> {
   }
 
   Future<void> generar({
+    required int proyectoId,
     required int planoId,
     String algoritmo = 'IDW',
     int resolucion = 128,
@@ -438,6 +439,12 @@ class HeatmapCubit extends Cubit<HeatmapState> {
               apPosX: seleccionados.map(contexto.posXDe).toList(),
               apPosY: seleccionados.map(contexto.posYDe).toList(),
             );
+      if (conjunto != null) {
+        unawaited(_prepararConjuntoIADespuesDeCrear(
+          proyectoId: proyectoId,
+          conjuntoId: conjunto.id,
+        ));
+      }
       emit(HeatmapReady(
         mapa: mapa,
         conjunto: contexto.conjunto,

@@ -20,11 +20,12 @@ class PuntoRSSI:
 
 
 ESCALA_CWNA = [
-    {"desde": -70, "hasta": 0, "color": "#A7E84A", "etiqueta": "Óptimo"},
-    {"desde": -80, "hasta": -71, "color": "#F1E64A", "etiqueta": "Aceptable"},
-    {"desde": -85, "hasta": -81, "color": "#C7B84B", "etiqueta": "Pobre"},
-    {"desde": -90, "hasta": -86, "color": "#7E8173", "etiqueta": "Muy pobre"},
-    {"desde": -120, "hasta": -91, "color": "#1C1C1C", "etiqueta": "Zona muerta"},
+    {"desde": -60, "hasta": 0, "color": "#55C7A6", "etiqueta": "Excelente"},
+    {"desde": -70, "hasta": -61, "color": "#9CD56F", "etiqueta": "Óptimo"},
+    {"desde": -80, "hasta": -71, "color": "#F3DE78", "etiqueta": "Aceptable"},
+    {"desde": -85, "hasta": -81, "color": "#F6A654", "etiqueta": "Pobre"},
+    {"desde": -90, "hasta": -86, "color": "#E86E5A", "etiqueta": "Muy pobre"},
+    {"desde": -120, "hasta": -91, "color": "#B8463F", "etiqueta": "Zona muerta"},
 ]
 
 
@@ -169,10 +170,10 @@ class HeatmapImageService:
                 intensidad = min(1.0, abs(delta) / 20.0)
                 if delta >= 0:
                     base = (255, 255, 255)
-                    destino = (167, 232, 74)
+                    destino = (85, 199, 166)
                 else:
                     base = (255, 255, 255)
-                    destino = (126, 129, 115)
+                    destino = (232, 110, 90)
                 color = tuple(
                     round(base[canal] + (destino[canal] - base[canal]) * intensidad)
                     for canal in range(3)
@@ -184,12 +185,14 @@ class HeatmapImageService:
         return buffer.getvalue()
 
     def _color_para_rssi(self, rssi: float) -> tuple[int, int, int]:
+        if rssi >= -60:
+            return (85, 199, 166)
         if rssi >= -70:
-            return (167, 232, 74)
+            return (156, 213, 111)
         if rssi >= -80:
-            return (241, 230, 74)
+            return (243, 222, 120)
         if rssi >= -85:
-            return (199, 184, 75)
+            return (246, 166, 84)
         if rssi >= -90:
-            return (126, 129, 115)
-        return (28, 28, 28)
+            return (232, 110, 90)
+        return (184, 70, 63)

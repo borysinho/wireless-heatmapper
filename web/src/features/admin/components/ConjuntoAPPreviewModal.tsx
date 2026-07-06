@@ -60,23 +60,24 @@ export function ConjuntoAPPreviewModal({
     }
   };
   const handleGenerarFaltantes = async () => {
+    if (!mapaActivo || cantidadFaltante === 0) return;
     try {
       const generados = await generarFaltantes({
         conjuntoId: conjunto.id,
         body: {
           algoritmo: "IDW",
-          resolucion: _resolucionSoportada(mapaActivo?.resolucion ?? 64),
-          actualizar_existentes: true,
-          reemplazar_existentes: mapasObjetivo.length > 0,
+          resolucion: _resolucionSoportada(mapaActivo.resolucion),
+          actualizar_existentes: false,
+          reemplazar_existentes: false,
         },
       });
       toast.exito(
         generados.length === 0
-          ? "No se generaron cambios en los mapas."
-          : `${generados.length} mapa(s) actualizado(s).`,
+          ? "No hay mapas faltantes por generar."
+          : `${generados.length} mapa(s) faltante(s) generado(s).`,
       );
     } catch (error) {
-      toast.error(_detalleError(error, "No se pudieron generar los mapas."));
+      toast.error(_detalleError(error, "No se pudieron generar los mapas faltantes."));
     }
   };
 
@@ -102,18 +103,6 @@ export function ConjuntoAPPreviewModal({
             <h3>Mapas de calor generados</h3>
             <div className={styles.accionesGaleria}>
               <span>{mapasObjetivo.length} mapa(s)</span>
-              {mapasObjetivo.length === 0 && apsConUbicacion.length > 0 && (
-                <button
-                  type="button"
-                  className={styles.generarFaltantes}
-                  onClick={handleGenerarFaltantes}
-                  disabled={generandoFaltantes}
-                  title="Generar mapa global e individuales con IDW"
-                >
-                  <Layers3 size={15} aria-hidden="true" />
-                  <span>{generandoFaltantes ? "Generando" : "Generar"}</span>
-                </button>
-              )}
             </div>
           </div>
 
@@ -144,10 +133,10 @@ export function ConjuntoAPPreviewModal({
               </div>
               <HeatmapCarruselItem
                 apsFallback={apsConUbicacion}
-                indice={indiceSeguro}
-                mapa={mapaActivo}
                 cantidadFaltante={cantidadFaltante}
                 generandoFaltantes={generandoFaltantes}
+                indice={indiceSeguro}
+                mapa={mapaActivo}
                 onGenerarFaltantes={handleGenerarFaltantes}
                 onEliminar={() => setMapaAEliminar(mapaActivo)}
                 plano={plano}
@@ -272,27 +261,19 @@ function HeatmapCarruselItem({
           Algoritmo {_labelAlgoritmo(mapa.algoritmo)}
         </span>
         <div className={styles.accionesMapa}>
-          <button
-            type="button"
-            className={styles.generarFaltantes}
-            onClick={onGenerarFaltantes}
-            disabled={generandoFaltantes}
-            aria-label="Generar o actualizar mapas"
-            title={
-              cantidadFaltante === 0
-                ? "Actualizar mapa global e individuales con IDW"
-                : "Generar faltantes y actualizar mapas con IDW"
-            }
-          >
-            <Layers3 size={15} aria-hidden="true" />
-            <span>
-              {generandoFaltantes
-                ? "Generando"
-                : cantidadFaltante === 0
-                  ? "Actualizar"
-                  : "Faltantes"}
-            </span>
-          </button>
+          {cantidadFaltante > 0 && (
+            <button
+              type="button"
+              className={styles.generarFaltantes}
+              onClick={onGenerarFaltantes}
+              disabled={generandoFaltantes}
+              aria-label="Generar mapas faltantes"
+              title="Generar mapa completo e individuales faltantes con IDW"
+            >
+              <Layers3 size={15} aria-hidden="true" />
+              <span>{generandoFaltantes ? "Generando" : "Faltantes"}</span>
+            </button>
+          )}
           <button
             type="button"
             className={styles.eliminarMapa}
