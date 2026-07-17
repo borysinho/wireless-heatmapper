@@ -1,0 +1,36 @@
+@startuml
+title Flujo de Trabajo de Pruebas - Proceso Unificado
+skinparam activityBackgroundColor #EBF5FB
+skinparam activityBorderColor #2980B9
+skinparam arrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+
+start
+:Planificar pruebas;
+:Disenar casos de prueba;
+:Implementar pruebas automatizadas y manuales;
+:Preparar datos y ambiente;
+:Ejecutar pruebas de unidad;
+if (Fallas de unidad?) then (si)
+  :Registrar defecto;
+  :Corregir codigo;
+  :Reejecutar pruebas;
+else (no)
+endif
+:Ejecutar pruebas QA;
+if (Fallas QA?) then (si)
+  :Clasificar severidad;
+  :Aplicar accion correctiva;
+  :Validar no regresion;
+else (no)
+endif
+:Validar con Product Owner;
+if (Aceptado?) then (si)
+  :Cerrar pruebas y autorizar release;
+else (no)
+  :Registrar observaciones;
+  :Replanificar alcance;
+endif
+stop
+@enduml
+

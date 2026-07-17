@@ -1,0 +1,29 @@
+@startuml
+title Herramientas CASE - Navegabilidad entre modelos
+left to right direction
+skinparam rectangleBackgroundColor #EBF5FB
+skinparam rectangleBorderColor #2980B9
+skinparam arrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+
+rectangle "Diagrama de paquetes" as Pkg
+rectangle "Caso de uso\nCapturar senales WiFi" as UC
+rectangle "Secuencia\nCaptura y persistencia" as Seq
+rectangle "Clases de servicio\nMedicionService" as Cls
+rectangle "Modelo de datos\nPuntoMedicion/LecturaRSSI" as Data
+rectangle "Pruebas\npytest y QA" as Test
+
+Pkg --> UC : doble clic / traza
+UC --> Seq : comportamiento
+Seq --> Cls : objetos participantes
+Cls --> Data : persistencia
+Data --> Test : datos de prueba
+Test --> UC : validacion
+
+note bottom
+  La herramienta CASE debe demostrar
+  navegacion conceptual y trazabilidad,
+  no solo dibujo aislado de diagramas.
+end note
+@enduml
+

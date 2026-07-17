@@ -1,0 +1,35 @@
+@startuml
+title Modelo de Logica - Publicacion y Portal Cliente
+skinparam participantBackgroundColor #EBF5FB
+skinparam participantBorderColor #2980B9
+skinparam sequenceArrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+
+actor "Administrador" as Admin
+participant "Web admin" as Web
+participant "Backend FastAPI" as API
+database "PostgreSQL" as DB
+actor "Cliente" as Cliente
+participant "Portal cliente" as Portal
+
+Admin -> Web : Selecciona proyecto y contenido
+Web -> API : POST /share
+API -> DB : Validar proyecto, mapas y conjuntos
+API -> DB : Crear token con expiracion
+DB --> API : Token persistido
+API --> Web : URL de portal
+Web --> Admin : Muestra enlace
+
+Admin -> Cliente : Comparte enlace
+Cliente -> Portal : Abre URL con token
+Portal -> API : GET /share/{token}
+API -> DB : Validar token, expiracion y revocacion
+DB --> API : Contenido autorizado
+API --> Portal : Heatmaps y conjuntos publicados
+Portal --> Cliente : Visualizacion interactiva
+
+note right of API
+  El token limita que mapas y conjuntos
+  puede consultar el cliente.
+end note
+@enduml

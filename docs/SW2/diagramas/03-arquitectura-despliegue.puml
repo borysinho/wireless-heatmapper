@@ -1,0 +1,54 @@
+@startuml
+title Modelo de Arquitectura - Diagrama de Despliegue
+skinparam nodeBackgroundColor #EBF5FB
+skinparam nodeBorderColor #2980B9
+skinparam artifactBackgroundColor #FDFEFE
+skinparam componentBackgroundColor #FDFEFE
+skinparam databaseBackgroundColor #EAF7EA
+skinparam arrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+
+node "Dispositivo Android" as Android {
+  artifact "APK Wireless HeatMapper" as APK {
+    component "UI Flutter"
+    component "BLoC/Cubit"
+    component "Cliente REST"
+    component "WifiScanner"
+  }
+}
+
+node "Navegador web" as Browser {
+  artifact "SPA React" as SPA
+}
+
+node "Servidor cloud con Docker Compose" as Server {
+  node "Contenedor nginx" {
+    component "Nginx + TLS" as Nginx
+  }
+  node "Contenedor backend" {
+    component "FastAPI" as FastAPI
+    component "Modulo IA" as ModIA
+  }
+  node "Contenedor web" {
+    artifact "Bundle React" as Bundle
+  }
+  node "Contenedor db" {
+    database "PostgreSQL 15" as PG
+  }
+}
+
+node "GitHub" as GH {
+  artifact "Repositorio"
+  artifact "GitHub Actions"
+  artifact "Releases moviles"
+}
+
+Android --> Nginx : HTTPS
+Browser --> Nginx : HTTPS
+Nginx --> FastAPI : API
+Nginx --> Bundle : estatico
+FastAPI --> PG : persistencia
+FastAPI --> ModIA : propuesta AP
+GH --> Server : despliegue automatizado
+@enduml
+

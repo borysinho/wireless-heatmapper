@@ -1,0 +1,44 @@
+@startuml
+title Modelo de Logica - Captura WiFi y Generacion de Heatmap
+skinparam participantBackgroundColor #EBF5FB
+skinparam participantBorderColor #2980B9
+skinparam sequenceArrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+
+actor "Tecnico" as T
+participant "App movil" as App
+participant "WifiManager API" as Wifi
+participant "Backend FastAPI" as API
+participant "MedicionService" as Med
+participant "InterpolacionService" as IDW
+database "PostgreSQL" as DB
+
+T -> App : Selecciona proyecto y plano
+T -> App : Marca punto de medicion
+App -> Wifi : Solicita escaneo WiFi
+Wifi --> App : Lista SSID/BSSID/RSSI/canal
+App -> API : POST /mediciones
+API -> Med : Validar propiedad, plano y RSSI
+Med -> DB : Persistir punto y lecturas
+DB --> Med : Confirmacion
+Med --> API : Medicion registrada
+API --> App : 201 Created
+
+T -> App : Solicita heatmap
+App -> API : POST /mapas-calor
+API -> Med : Obtener mediciones validas
+Med -> DB : Consultar puntos y lecturas
+DB --> Med : Dataset
+Med --> API : Datos normalizados
+API -> IDW : Generar matriz interpolada
+IDW --> API : Matriz y escala
+API -> DB : Persistir mapa de calor
+API --> App : Heatmap listo
+App --> T : Renderiza mapa
+
+note right of App
+  El cliente movil no conserva estado de dominio
+  entre sesiones. Toda persistencia ocurre en backend.
+end note
+@enduml
+

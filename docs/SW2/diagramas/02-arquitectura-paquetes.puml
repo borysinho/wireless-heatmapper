@@ -1,0 +1,78 @@
+@startuml
+title Modelo de Arquitectura - Diagrama de Paquetes
+skinparam packageStyle rectangle
+skinparam packageBackgroundColor #EBF5FB
+skinparam packageBorderColor #2980B9
+skinparam componentBackgroundColor #FDFEFE
+skinparam componentBorderColor #5D6D7E
+skinparam arrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+
+package "App movil Flutter" as Mobile {
+  package "presentacion" {
+    [LoginPage]
+    [ProyectosPage]
+    [CapturaPage]
+    [HeatmapPage]
+  }
+  package "dominio" {
+    [Casos de uso movil]
+    [Cubits / BLoC]
+  }
+  package "datos" {
+    [ApiClient]
+    [AuthInterceptor]
+    [WifiScanner]
+  }
+}
+
+package "Web React" as Web {
+  package "admin" {
+    [GestionUsuarios]
+    [GestionClientes]
+    [ListadoProyectos]
+  }
+  package "portal cliente" {
+    [VistaHeatmap]
+    [VistaConjuntosAP]
+  }
+  package "shared" {
+    [ApiClient web]
+    [Router]
+  }
+}
+
+package "Backend FastAPI" as Backend {
+  package "api" {
+    [auth_router]
+    [proyectos_router]
+    [planos_router]
+    [mediciones_router]
+    [heatmaps_router]
+    [share_router]
+  }
+  package "servicios" {
+    [AuthService]
+    [ProyectoService]
+    [InterpolacionService]
+    [OptimizadorAPService]
+  }
+  package "repositorios" {
+    [Repositorios SQLAlchemy]
+  }
+  package "modelos" {
+    [Modelos ORM]
+    [Schemas Pydantic]
+    [Migraciones Alembic]
+  }
+}
+
+database "PostgreSQL" as DB
+node "Nginx TLS" as Nginx
+
+Mobile --> Nginx : HTTPS REST
+Web --> Nginx : HTTPS REST
+Nginx --> Backend : /api/*
+Backend --> DB : SQL
+@enduml
+

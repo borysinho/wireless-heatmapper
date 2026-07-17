@@ -1,0 +1,124 @@
+@startuml
+title Modelo de Datos Conceptual - Wireless HeatMapper
+skinparam classBackgroundColor #EBF5FB
+skinparam classBorderColor #2980B9
+skinparam classHeaderBackgroundColor #2980B9
+skinparam classHeaderFontColor white
+skinparam arrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+hide circle
+
+enum RolUsuario {
+  admin
+  tecnico
+}
+
+enum EstadoProyecto {
+  nuevo
+  en_progreso
+  completado
+  archivado
+}
+
+class Usuario {
+  +id : Integer
+  +nombre : String
+  +email : String
+  +passwordHash : String
+  +rol : RolUsuario
+  +activo : Boolean
+}
+
+class Cliente {
+  +id : Integer
+  +nombre : String
+  +emailReferencia : String
+  +activo : Boolean
+}
+
+class Proyecto {
+  +id : Integer
+  +nombre : String
+  +descripcion : String
+  +estado : EstadoProyecto
+  +ultimaActividad : DateTime
+}
+
+class Plano {
+  +id : Integer
+  +nombre : String
+  +rutaStorage : String
+  +anchoPx : Integer
+  +altoPx : Integer
+  +escalaMPorPx : Float
+}
+
+class PuntoMedicion {
+  +id : Integer
+  +posX : Float
+  +posY : Float
+  +nivel : String
+}
+
+class LecturaRSSI {
+  +id : Integer
+  +ssid : String
+  +bssid : String
+  +rssi : Integer
+  +canal : Integer
+  +frecuenciaMhz : Integer
+  +origen : String
+}
+
+class ConjuntoAP {
+  +id : Integer
+  +nombre : String
+  +proposito : String
+  +origen : String
+  +metricasIA : JSON
+}
+
+class ConjuntoAPItem {
+  +id : Integer
+  +bssid : String
+  +ssidSnapshot : String
+  +posX : Float
+  +posY : Float
+  +accionRecomendada : String
+}
+
+class MapaCalor {
+  +id : Integer
+  +algoritmo : String
+  +resolucion : Integer
+  +matriz : JSON
+  +rssiMin : Float
+  +rssiMax : Float
+}
+
+class TokenEnlaceCliente {
+  +id : Integer
+  +token : String
+  +contenido : JSON
+  +expiraEn : DateTime
+  +revocado : Boolean
+}
+
+Usuario "1" -- "0..*" Proyecto : tecnico
+Cliente "1" -- "0..*" Proyecto : encarga
+Proyecto "1" *-- "0..*" Plano : contiene
+Proyecto "1" *-- "0..*" TokenEnlaceCliente : publica
+Plano "1" *-- "0..*" PuntoMedicion : registra
+PuntoMedicion "1" *-- "0..*" LecturaRSSI : contiene
+Plano "1" *-- "0..*" ConjuntoAP : organiza
+ConjuntoAP "1" *-- "1..*" ConjuntoAPItem : incluye
+ConjuntoAP "0..1" -- "0..*" ConjuntoAP : deriva
+Plano "1" *-- "0..*" MapaCalor : genera
+ConjuntoAP "0..1" -- "0..*" MapaCalor : contexto
+
+note bottom of LecturaRSSI
+  origen = CAMPO o IA_ESTIMADA.
+  Las mediciones de campo no son reemplazadas por IA.
+end note
+@enduml
+

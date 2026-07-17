@@ -1,0 +1,26 @@
+@startuml
+title Modelo de Logica - Estados del Proyecto
+skinparam stateBackgroundColor #EBF5FB
+skinparam stateBorderColor #2980B9
+skinparam arrowColor #2980B9
+skinparam noteBackgroundColor #FFFDE7
+
+[*] --> Nuevo
+Nuevo --> EnProgreso : crear plano o iniciar captura
+EnProgreso --> EnProgreso : registrar mediciones
+EnProgreso --> EnProgreso : generar heatmap
+EnProgreso --> Completado : publicar resultados
+Completado --> Archivado : cerrar administrativamente
+Archivado --> EnProgreso : reactivar proyecto
+
+state Nuevo as "nuevo"
+state EnProgreso as "en_progreso"
+state Completado as "completado"
+state Archivado as "archivado"
+
+note right of Completado
+  La publicacion puede incluir
+  uno o varios mapas y conjuntos AP.
+end note
+@enduml
+
