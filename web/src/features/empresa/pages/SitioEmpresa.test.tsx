@@ -22,7 +22,11 @@ describe("SitioEmpresa", () => {
     expect(screen.getByRole("heading", { name: "Wireless HeatMapper" })).toBeInTheDocument();
     expect(screen.getByText("borysquiroga@gmail.com")).toBeInTheDocument();
     expect(screen.getByText("+891-77685777")).toBeInTheDocument();
-    expect(screen.getByText(/LinkedIn · pendiente/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /facebook oficial/i })).toHaveAttribute(
+      "href",
+      "https://www.facebook.com/profile.php?id=61591962512748",
+    );
+    expect(screen.queryByText(/LinkedIn|Instagram|YouTube/i)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /abrir manual/i })).toHaveAttribute("href", "/manual/");
     expect(screen.getByRole("heading", { name: "APK Android" })).toBeInTheDocument();
   });

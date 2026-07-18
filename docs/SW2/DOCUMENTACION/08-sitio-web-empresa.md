@@ -14,6 +14,12 @@ La publicacion en linea del producto y sitio institucional se encuentra en:
 
 Para presentaciones academicas, entregas documentales y demostraciones, esta URL puede acompanarse con codigo QR en anexos o material promocional. La URL no debe depender de `localhost`, tuneles temporales ni servidores personales apagables durante la evaluacion.
 
+La pagina oficial de la empresa en Facebook se encuentra en:
+
+<https://www.facebook.com/profile.php?id=61591962512748>
+
+Este enlace se incorpora como canal publico de difusion y debe acompanarse con codigo QR en anexos o material promocional. No se publican enlaces a otras redes sociales porque no forman parte de los canales oficiales vigentes.
+
 ## 3. Objetivos del sitio
 
 | Objetivo | Descripcion |
@@ -146,7 +152,7 @@ La seccion de contacto debe ofrecer canales claros y evitar informacion ambigua.
 | Formulario web | Solicitudes comerciales, demostraciones, soporte general y mensajes academicos. |
 | Correo institucional | Comunicacion formal, seguimiento de incidentes y entrega de evidencias. |
 | WhatsApp autorizado | Coordinacion rapida de demostraciones o soporte de baja complejidad. |
-| Redes sociales | Difusion institucional, marketing y anuncios publicos. |
+| Facebook oficial | Difusion institucional, marketing y anuncios publicos mediante la pagina <https://www.facebook.com/profile.php?id=61591962512748>. |
 | Ubicacion referencial | Identificar la ciudad base de operacion sin publicar domicilios privados. |
 
 El formulario debe pedir solo datos necesarios: nombre, correo, organizacion, motivo, mensaje y consentimiento para tratamiento de datos. No debe solicitar contrasenas, tokens, credenciales ni informacion sensible de redes internas.

@@ -51,6 +51,7 @@ const urlPublica = "https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/"
 const correoContacto = "borysquiroga@gmail.com";
 const telefonoContacto = "+891-77685777";
 const whatsappContacto = "https://wa.me/89177685777";
+const facebookEmpresa = "https://www.facebook.com/profile.php?id=61591962512748";
 
 const navegacion = [
   ["Empresa", "#empresa"],
@@ -585,10 +586,11 @@ function SitioEmpresa() {
               Santa Cruz de la Sierra, Bolivia
             </li>
           </ul>
-          <div className={styles.redesSociales} aria-label="Redes sociales pendientes de actualización">
-            {["LinkedIn", "Facebook", "Instagram", "YouTube"].map((red) => (
-              <span key={red}>{red} · pendiente</span>
-            ))}
+          <div className={styles.redesSociales} aria-label="Red social oficial">
+            <a href={facebookEmpresa} target="_blank" rel="noreferrer">
+              Facebook oficial
+              <ExternalLink size={16} aria-hidden="true" />
+            </a>
           </div>
         </div>
         <form className={styles.formularioContacto}>
@@ -647,6 +649,7 @@ function SitioEmpresa() {
         </div>
         <div className={styles.enlacesPie}>
           <a href={urlPublica}>URL pública</a>
+          <a href={facebookEmpresa} target="_blank" rel="noreferrer">Facebook</a>
           <a href="/admin/login">Login</a>
           <a href="/manual/">Manual</a>
           <a href="#chatbot">Chatbot</a>

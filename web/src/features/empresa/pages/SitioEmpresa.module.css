@@ -620,13 +620,17 @@
   margin-top: 1.25rem;
 }
 
-.redesSociales span {
+.redesSociales a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
   padding: 0.45rem 0.65rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  color: var(--text-muted);
+  color: var(--color-primary);
   font-size: 0.82rem;
   font-weight: 700;
+  text-decoration: none;
   background: var(--bg-surface);
 }
 

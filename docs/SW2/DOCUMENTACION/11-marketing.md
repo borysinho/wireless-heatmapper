@@ -23,8 +23,7 @@ Wireless HeatMapper se posiciona como una solucion SaaS local, ligera y especial
 | Canal | Uso |
 | ----- | --- |
 | Sitio web | Presentacion institucional, demo, contacto y soporte. |
-| LinkedIn | Publicaciones tecnicas y casos de uso empresariales. |
-| Facebook | Alcance local y demostraciones visuales. |
+| Facebook oficial | Alcance local, demostraciones visuales y anuncios publicos en <https://www.facebook.com/profile.php?id=61591962512748>. |
 | WhatsApp Business | Contacto comercial y soporte inicial. |
 | Ferias tecnologicas | Demostracion presencial con mapas de calor. |
 | Convenios academicos | Validacion y difusion en entornos educativos. |
@@ -37,7 +36,7 @@ Wireless HeatMapper se posiciona como una solucion SaaS local, ligera y especial
 - Caso de uso con plano, mediciones y heatmap.
 - Presentacion comercial corta.
 - Publicaciones comparativas: app gratuita vs. Wireless HeatMapper.
-- QR hacia demo web, repositorio y releases moviles.
+- QR hacia demo web, Facebook oficial, repositorio y releases moviles.
 
 ## Calendario inicial
 
@@ -69,4 +68,3 @@ Wireless HeatMapper se posiciona como una solucion SaaS local, ligera y especial
 - Conversion a plan pago.
 - Costo por lead.
 - Retencion posterior al primer mes.
-

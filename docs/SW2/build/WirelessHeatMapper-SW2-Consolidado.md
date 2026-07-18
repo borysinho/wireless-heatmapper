@@ -905,6 +905,12 @@ La publicacion en linea del producto y sitio institucional se encuentra en:
 
 Para presentaciones academicas, entregas documentales y demostraciones, esta URL puede acompanarse con codigo QR en anexos o material promocional. La URL no debe depender de `localhost`, tuneles temporales ni servidores personales apagables durante la evaluacion.
 
+La pagina oficial de la empresa en Facebook se encuentra en:
+
+<https://www.facebook.com/profile.php?id=61591962512748>
+
+Este enlace se incorpora como canal publico de difusion y debe acompanarse con codigo QR en anexos o material promocional. No se publican enlaces a otras redes sociales porque no forman parte de los canales oficiales vigentes.
+
 ## 3. Objetivos del sitio
 
 | Objetivo | Descripcion |
@@ -1037,7 +1043,7 @@ La seccion de contacto debe ofrecer canales claros y evitar informacion ambigua.
 | Formulario web | Solicitudes comerciales, demostraciones, soporte general y mensajes academicos. |
 | Correo institucional | Comunicacion formal, seguimiento de incidentes y entrega de evidencias. |
 | WhatsApp autorizado | Coordinacion rapida de demostraciones o soporte de baja complejidad. |
-| Redes sociales | Difusion institucional, marketing y anuncios publicos. |
+| Facebook oficial | Difusion institucional, marketing y anuncios publicos mediante la pagina <https://www.facebook.com/profile.php?id=61591962512748>. |
 | Ubicacion referencial | Identificar la ciudad base de operacion sin publicar domicilios privados. |
 
 El formulario debe pedir solo datos necesarios: nombre, correo, organizacion, motivo, mensaje y consentimiento para tratamiento de datos. No debe solicitar contrasenas, tokens, credenciales ni informacion sensible de redes internas.
@@ -1470,8 +1476,7 @@ Wireless HeatMapper se posiciona como una solucion SaaS local, ligera y especial
 | Canal | Uso |
 | ----- | --- |
 | Sitio web | Presentacion institucional, demo, contacto y soporte. |
-| LinkedIn | Publicaciones tecnicas y casos de uso empresariales. |
-| Facebook | Alcance local y demostraciones visuales. |
+| Facebook oficial | Alcance local, demostraciones visuales y anuncios publicos en <https://www.facebook.com/profile.php?id=61591962512748>. |
 | WhatsApp Business | Contacto comercial y soporte inicial. |
 | Ferias tecnologicas | Demostracion presencial con mapas de calor. |
 | Convenios academicos | Validacion y difusion en entornos educativos. |
@@ -1484,7 +1489,7 @@ Wireless HeatMapper se posiciona como una solucion SaaS local, ligera y especial
 - Caso de uso con plano, mediciones y heatmap.
 - Presentacion comercial corta.
 - Publicaciones comparativas: app gratuita vs. Wireless HeatMapper.
-- QR hacia demo web, repositorio y releases moviles.
+- QR hacia demo web, Facebook oficial, repositorio y releases moviles.
 
 ## Calendario inicial
 
@@ -1516,7 +1521,6 @@ Wireless HeatMapper se posiciona como una solucion SaaS local, ligera y especial
 - Conversion a plan pago.
 - Costo por lead.
 - Retencion posterior al primer mes.
-
 
 
 # Aspectos para la puesta en marcha
@@ -1634,7 +1638,7 @@ Wireless HeatMapper se entrega como un producto integrado para relevamiento, ana
 | Recurso | URL | Uso |
 | ------- | --- | --- |
 | Repositorio GitHub | <https://github.com/borysinho/wireless-heatmapper> | Codigo fuente, documentacion, historial, workflows y trazabilidad tecnica. |
-| Frontend publicado | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/> | Entrada publica al panel web y portal de cliente. |
+| Sitio empresarial Team 24 Software | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/> | Entrada publica institucional, acceso a producto, descargas, soporte y contacto. |
 | Panel administrador | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/admin/login> | Acceso para administradores y usuarios autorizados. |
 | Portal cliente | `https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/portal/{token}` | Acceso por enlace unico generado desde el panel web. |
 | API REST | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/api/> | Base publica de endpoints consumidos por web y movil. |
@@ -1643,7 +1647,7 @@ Wireless HeatMapper se entrega como un producto integrado para relevamiento, ana
 | Manual de usuario | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/manual/> | Guia publica de operacion funcional. |
 | Releases moviles | <https://github.com/borysinho/wireless-heatmapper/releases> | APK Android generado por GitHub Actions. |
 
-Estas URLs son las referencias publicas para entrega academica, demostracion y continuidad. En anexos se incorporan codigos QR hacia repositorio, frontend publicado, manual de usuario y releases moviles.
+Estas URLs son las referencias publicas para entrega academica, demostracion y continuidad. En anexos se incorporan codigos QR hacia repositorio, sitio empresarial, documentacion OpenAPI, manual de usuario y releases moviles.
 
 ## Componentes entregables
 
@@ -1884,7 +1888,10 @@ The Institute of Electrical and Electronics Engineers. (2014). *IEEE Standard fo
 | Recurso | URL |
 | ------- | --- |
 | Repositorio GitHub | https://github.com/borysinho/wireless-heatmapper |
-| Frontend publicado | https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/ |
+| Sitio empresarial Team 24 Software | https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/ |
+| Facebook oficial Team 24 Software | https://www.facebook.com/profile.php?id=61591962512748 |
+| Panel administrador | https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/admin/login |
+| Documentacion Swagger / OpenAPI | https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/api/docs |
 | Manual de usuario | https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/manual/ |
 | Releases moviles | https://github.com/borysinho/wireless-heatmapper/releases |
 
@@ -1990,11 +1997,23 @@ El documento Word se genera mediante el script de consolidacion incluido con est
 
 ![QR repositorio](/home/bquiroga/Documentos/dev/taller/proyecto-final/docs/SW2/assets/qr-repositorio.png)
 
-## Frontend publicado
+## Sitio empresarial Team 24 Software
 
 <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/>
 
-![QR frontend](/home/bquiroga/Documentos/dev/taller/proyecto-final/docs/SW2/assets/qr-frontend.png)
+![QR sitio empresarial](/home/bquiroga/Documentos/dev/taller/proyecto-final/docs/SW2/assets/qr-sitio-empresa.png)
+
+## Facebook oficial Team 24 Software
+
+<https://www.facebook.com/profile.php?id=61591962512748>
+
+![QR Facebook oficial](/home/bquiroga/Documentos/dev/taller/proyecto-final/docs/SW2/assets/qr-facebook.png)
+
+## Documentacion Swagger / OpenAPI
+
+<https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/api/docs>
+
+![QR documentacion API](/home/bquiroga/Documentos/dev/taller/proyecto-final/docs/SW2/assets/qr-api-docs.png)
 
 ## Manual de usuario
 

@@ -71,6 +71,7 @@ append_document() {
 generate_qr "https://github.com/borysinho/wireless-heatmapper" "$ASSET_DIR/qr-repositorio.png"
 generate_qr "https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/" "$ASSET_DIR/qr-frontend.png"
 generate_qr "https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/" "$ASSET_DIR/qr-sitio-empresa.png"
+generate_qr "https://www.facebook.com/profile.php?id=61591962512748" "$ASSET_DIR/qr-facebook.png"
 generate_qr "https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/api/docs" "$ASSET_DIR/qr-api-docs.png"
 generate_qr "https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/manual/" "$ASSET_DIR/qr-manual.png"
 generate_qr "https://github.com/borysinho/wireless-heatmapper/releases" "$ASSET_DIR/qr-releases.png"
@@ -122,6 +123,12 @@ $(if [[ -f "$ASSET_DIR/qr-repositorio.png" ]]; then echo "![QR repositorio]($ASS
 <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/>
 
 $(if [[ -f "$ASSET_DIR/qr-sitio-empresa.png" ]]; then echo "![QR sitio empresarial]($ASSET_DIR/qr-sitio-empresa.png)"; fi)
+
+## Facebook oficial Team 24 Software
+
+<https://www.facebook.com/profile.php?id=61591962512748>
+
+$(if [[ -f "$ASSET_DIR/qr-facebook.png" ]]; then echo "![QR Facebook oficial]($ASSET_DIR/qr-facebook.png)"; fi)
 
 ## Documentacion Swagger / OpenAPI
 
