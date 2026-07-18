@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOC_DIR="$ROOT_DIR/DOCUMENTACION"
 PROJECT_DOCS_DIR="$(cd "$ROOT_DIR/.." && pwd)"
-PAPS_SOURCE="$PROJECT_DOCS_DIR/ONLINE/Wireless Heatmapper - PAPS - Modalidad Online.md"
+PAPS_SOURCE="$PROJECT_DOCS_DIR/ONLINE/PLAN-IMPLEMENTACION/02-paps.md"
 SQAP_SOURCE="$PROJECT_DOCS_DIR/SQAP/Manual de Calidad - SQAP.md"
 DIAGRAM_DIR="$ROOT_DIR/diagramas"
 ASSET_DIR="$ROOT_DIR/assets"
@@ -75,75 +75,160 @@ normalize_paps_tables() {
   local input="$1"
   local output="$2"
 
-  awk '
-    function trim(s) {
-      gsub(/^[[:space:]]+/, "", s)
-      gsub(/[[:space:]]+$/, "", s)
-      return s
-    }
+  python3 - "$input" "$output" <<'PY'
+import re
+import sys
 
-    function emit_attr_table(block, count, j, line, label, value) {
-      print "| Atributo | Valor |"
-      print "| --- | --- |"
-      pending_label = ""
-      pending_value = ""
-      for (j = 1; j <= count; j++) {
-        line = trim(block[j])
-        if (line == "") {
-          continue
-        }
-        if (line ~ /\*\*Atributo\*\*/ && line ~ /\*\*Valor\*\*/) {
-          continue
-        }
-        if (match(line, /[[:space:]][[:space:]]+/)) {
-          if (pending_label != "") {
-            print "| " pending_label " | " pending_value " |"
-          }
-          label = trim(substr(line, 1, RSTART - 1))
-          value = trim(substr(line, RSTART + RLENGTH))
-          pending_label = label
-          pending_value = value
-        } else if (pending_label != "") {
-          pending_value = pending_value " " line
-        }
-      }
-      if (pending_label != "") {
-        print "| " pending_label " | " pending_value " |"
-      }
-    }
+entrada = sys.argv[1]
+salida = sys.argv[2]
 
-    { lines[++n] = $0 }
 
-    END {
-      for (i = 1; i <= n; i++) {
-        if (lines[i] ~ /^---[[:space:]]*$/) {
-          header = i + 1
-          while (header <= n && trim(lines[header]) == "") {
-            header++
-          }
-          separator = header + 1
-          while (separator <= n && trim(lines[separator]) == "") {
-            separator++
-          }
-          if (lines[header] ~ /\*\*Atributo\*\*/ && lines[header] ~ /\*\*Valor\*\*/ && lines[separator] ~ /^---[[:space:]]*$/) {
-            delete block
-            count = 0
-            end = separator + 1
-            while (end <= n && !(lines[end] ~ /^---[[:space:]]*$/)) {
-              block[++count] = lines[end]
-              end++
-            }
-            if (end <= n) {
-              emit_attr_table(block, count)
-              i = end
-              continue
-            }
-          }
-        }
-        print lines[i]
-      }
-    }
-  ' "$input" > "$output"
+def es_separador(linea: str) -> bool:
+    return linea.strip() == "---"
+
+
+def limpiar(texto: str) -> str:
+    texto = texto.replace("**", "")
+    texto = re.sub(r"\s+", " ", texto.strip())
+    return texto
+
+
+def sin_negrita(texto: str) -> str:
+    return texto.replace("**", "").strip()
+
+
+def extraer_encabezados(lineas: list[str]) -> list[str]:
+    unido = " ".join(limpiar(linea) for linea in lineas if linea.strip())
+    encabezados = re.findall(r"\*\*(.*?)\*\*", " ".join(linea.strip() for linea in lineas), flags=re.S)
+    encabezados = [limpiar(encabezado) for encabezado in encabezados]
+    if len(encabezados) >= 2:
+        return encabezados
+
+    partes = [limpiar(parte) for parte in re.split(r"\s{2,}", unido) if limpiar(parte)]
+    return partes if len(partes) >= 2 else []
+
+
+def token_valor(token: str) -> bool:
+    token = token.strip(",.;:()")
+    return bool(re.fullmatch(r"[0-9]+([.,][0-9]+)?%?|\d{1,2}\s*[A-Za-z]+|[A-Z][0-9]?|---|[0-9]+[+]?|[0-9]+-[0-9]+", token))
+
+
+def partir_linea(linea: str, columnas: int) -> list[str] | None:
+    texto = sin_negrita(linea)
+    if not texto:
+        return None
+
+    partes = [parte for parte in re.split(r"\s{2,}", texto) if parte]
+    if len(partes) >= columnas:
+        return partes[: columnas - 1] + [" ".join(partes[columnas - 1 :])]
+
+    tokens = texto.split()
+    if columnas >= 3 and len(tokens) >= columnas and all(token_valor(token) for token in tokens[-(columnas - 1) :]):
+        return [" ".join(tokens[: -(columnas - 1)])] + tokens[-(columnas - 1) :]
+
+    if columnas == 4 and len(tokens) >= 4 and all(token_valor(token) for token in tokens[-3:]):
+        return [" ".join(tokens[:-3])] + tokens[-3:]
+
+    if columnas == 3 and len(tokens) >= 4 and token_valor(tokens[-2]) and token_valor(tokens[-1]):
+        return [" ".join(tokens[:-2]), tokens[-2], tokens[-1]]
+
+    return None
+
+
+def agregar_continuacion(filas: list[list[str]], linea: str, columnas: int) -> None:
+    if not filas:
+        return
+
+    texto = sin_negrita(linea)
+    if not texto:
+        return
+
+    partes = [parte for parte in re.split(r"\s{2,}", texto) if parte]
+    sangria = len(linea) - len(linea.lstrip(" "))
+
+    if 1 < len(partes) < columnas:
+        filas[-1][0] = limpiar(f"{filas[-1][0]} {partes[0]}")
+        filas[-1][-1] = limpiar(f"{filas[-1][-1]} {' '.join(partes[1:])}")
+        return
+
+    destino = columnas - 1 if sangria > 15 else 0
+    filas[-1][destino] = limpiar(f"{filas[-1][destino]} {texto}")
+
+
+def normalizar_filas(lineas: list[str], columnas: int) -> list[list[str]]:
+    filas: list[list[str]] = []
+    for linea in lineas:
+        if not linea.strip():
+            continue
+
+        fila = partir_linea(linea, columnas)
+        if fila:
+            fila = [limpiar(celda) for celda in fila]
+            if any(celda for celda in fila):
+                filas.append(fila)
+            continue
+
+        agregar_continuacion(filas, linea, columnas)
+
+    return filas
+
+
+def escapar(texto: str) -> str:
+    return texto.replace("|", "\\|")
+
+
+def emitir_tabla(encabezados: list[str], filas: list[list[str]]) -> list[str]:
+    if not encabezados or not filas:
+        return []
+    columnas = len(encabezados)
+    filas = [(fila + [""] * columnas)[:columnas] for fila in filas]
+    salida_tabla = [
+        "| " + " | ".join(escapar(celda) for celda in encabezados) + " |",
+        "| " + " | ".join("---" for _ in encabezados) + " |",
+    ]
+    salida_tabla.extend("| " + " | ".join(escapar(celda) for celda in fila) + " |" for fila in filas)
+    return salida_tabla
+
+
+with open(entrada, "r", encoding="utf-8-sig") as archivo:
+    lineas = archivo.read().splitlines()
+
+resultado: list[str] = []
+i = 0
+while i < len(lineas):
+    if not es_separador(lineas[i]):
+        resultado.append(lineas[i])
+        i += 1
+        continue
+
+    inicio = i + 1
+    while inicio < len(lineas) and not lineas[inicio].strip():
+        inicio += 1
+
+    medio = inicio
+    while medio < len(lineas) and not es_separador(lineas[medio]):
+        medio += 1
+
+    fin = medio + 1
+    while fin < len(lineas) and not es_separador(lineas[fin]):
+        fin += 1
+
+    if medio < len(lineas) and fin < len(lineas):
+        encabezados = extraer_encabezados(lineas[inicio:medio])
+        if len(encabezados) >= 2:
+            filas = normalizar_filas(lineas[medio + 1 : fin], len(encabezados))
+            tabla = emitir_tabla(encabezados, filas)
+            if tabla:
+                resultado.extend(tabla)
+                i = fin + 1
+                continue
+
+    resultado.append(lineas[i])
+    i += 1
+
+with open(salida, "w", encoding="utf-8") as archivo:
+    archivo.write("\n".join(resultado) + "\n")
+PY
 }
 
 append_shifted_markdown() {
