@@ -82,6 +82,13 @@ tests/
 | `SMTP_FROM_EMAIL`             | vacío                                                      | Remitente visible |
 | `SMTP_FROM_NAME`              | `Wireless HeatMapper`                                      | Nombre del remitente |
 | `PUBLIC_WEB_URL`              | vacío                                                      | URL pública del frontend para enlaces enviados por correo |
+| `AZURE_OPENAI_API_KEY`        | vacío                                                      | Clave del recurso Azure OpenAI |
+| `AZURE_OPENAI_ENDPOINT`       | vacío                                                      | Endpoint del recurso Azure OpenAI |
+| `AZURE_OPENAI_POLIGONO_DEPLOYMENT` | `whm-poligono-gpt5-nano`                             | Deployment usado para generación asistida de polígonos |
+| `AZURE_OPENAI_POLIGONO_MAX_PX` | `768`                                                     | Tamaño máximo de imagen enviado al módulo IA de polígonos |
+| `AZURE_OPENAI_POLIGONO_TIMEOUT_SECONDS` | `30`                                             | Timeout de Azure OpenAI para polígonos |
+| `AZURE_OPENAI_CHATBOT_DEPLOYMENT` | vacío                                                  | Deployment usado por el chatbot público del sitio empresarial |
+| `AZURE_OPENAI_CHATBOT_TIMEOUT_SECONDS` | `20`                                             | Timeout de Azure OpenAI para el chatbot público |
 
 La configuración generada por FlutterFire habilita el cliente Android, pero el
 backend necesita además credenciales de Firebase Admin. En desarrollo puede
