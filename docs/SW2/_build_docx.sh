@@ -3,6 +3,9 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DOC_DIR="$ROOT_DIR/DOCUMENTACION"
+PROJECT_DOCS_DIR="$(cd "$ROOT_DIR/.." && pwd)"
+PAPS_SOURCE="$PROJECT_DOCS_DIR/ONLINE/Wireless Heatmapper - PAPS - Modalidad Online.md"
+SQAP_SOURCE="$PROJECT_DOCS_DIR/SQAP/Manual de Calidad - SQAP.md"
 DIAGRAM_DIR="$ROOT_DIR/diagramas"
 ASSET_DIR="$ROOT_DIR/assets"
 BUILD_DIR="$ROOT_DIR/build"
@@ -62,20 +65,55 @@ render_diagrams() {
   fi
 }
 
+append_shifted_markdown() {
+  local file="$1"
+  local skip_first_h1="${2:-true}"
+  local source_dir
+  source_dir="$(cd "$(dirname "$file")" && pwd)"
+
+  awk -v skip_first_h1="$skip_first_h1" -v source_dir="$source_dir" '
+    BEGIN { skipped = (skip_first_h1 == "true") ? 0 : 1 }
+    skipped == 0 && /^# / { skipped = 1; next }
+    skipped == 0 { next }
+    function print_shifted_heading(line, hashes, text) {
+      match(line, /^#+/)
+      hashes = substr(line, RSTART, RLENGTH)
+      text = substr(line, RLENGTH + 2)
+      sub(/^[0-9]+([.][0-9]+)*[.)]?[[:space:]]+/, "", text)
+      print "#" hashes " " text
+    }
+    {
+      gsub(/\]\(assets\/team-24-software-logo\.svg\)/, "](" source_dir "/assets/team-24-software-logo.png)")
+      gsub(/\]\(assets\//, "](" source_dir "/assets/")
+      if (/^###### /) {
+        print_shifted_heading($0)
+      } else if (/^##### /) {
+        print_shifted_heading($0)
+      } else if (/^#### /) {
+        print_shifted_heading($0)
+      } else if (/^### /) {
+        print_shifted_heading($0)
+      } else if (/^## /) {
+        print_shifted_heading($0)
+      } else if (/^# /) {
+        print_shifted_heading($0)
+      } else {
+        print
+      }
+    }
+  ' "$file" >> "$MERGED"
+}
+
 append_point() {
   local title="$1"
   local file="$2"
 
   {
     printf '\n\n'
-    printf '### %s\n\n' "$title"
+    printf '# %s\n\n' "$title"
   } >> "$MERGED"
 
-  awk '
-    NR == 1 && /^# / { next }
-    /^#/ { print "##" $0; next }
-    { print }
-  ' "$file" >> "$MERGED"
+  append_shifted_markdown "$file" true
 }
 
 append_diagram_section() {
@@ -84,7 +122,7 @@ append_diagram_section() {
 
   {
     printf '\n\n'
-    printf '#### %s\n\n' "$title"
+    printf '## %s\n\n' "$title"
   } >> "$MERGED"
 
   for puml in "$@"; do
@@ -96,7 +134,7 @@ append_diagram_section() {
     diagram_title="$(echo "$base" | sed 's/[0-9][0-9]-//; s/-/ /g')"
     {
       printf '\n'
-      printf '##### %s\n\n' "$diagram_title"
+      printf '### %s\n\n' "$diagram_title"
       if [[ -f "$png" ]]; then
         printf '![%s](%s)\n\n' "$diagram_title" "$png"
       else
@@ -113,7 +151,7 @@ append_qr() {
 
   {
     printf '\n'
-    printf '##### %s\n\n' "$title"
+    printf '### %s\n\n' "$title"
     printf '<%s>\n\n' "$url"
     if [[ -f "$image" ]]; then
       printf '![QR %s](%s)\n\n' "$title" "$image"
@@ -134,38 +172,51 @@ render_diagrams
 : > "$MERGED"
 cat >> "$MERGED" <<'EOF'
 ---
-title: "Clase 21/04/2026 — Aspectos Generales del Proyecto"
-subtitle: "Documentación SW2 - Wireless HeatMapper"
+title: "Documentación formal del proyecto y empresa"
+subtitle: "Team 24 Software - Wireless HeatMapper"
 author:
   - "Grupo 24 - Team 24 Software"
 date: "Gestión 2026"
 lang: es-BO
 ---
 
-# Clase 21/04/2026 — Aspectos Generales del Proyecto
+| Campo | Detalle |
+| ----- | ------- |
+| Universidad | Universidad Autonoma Gabriel Rene Moreno |
+| Facultad | Facultad de Ingenieria en Ciencias de la Computacion y Telecomunicaciones |
+| Materia | Ingenieria de Software II |
+| Empresa de software | Team 24 Software |
+| Proyecto | Sistema Inteligente de Analisis y Optimizacion de Cobertura WiFi mediante Mapas de Calor |
+| Producto | Wireless HeatMapper |
+| Cliente del caso | Bulldog Tech. |
+| Grupo | 24 |
+| Integrantes | Jhasmany Jhunnior Fernandez Ortega; Herland Borys Quiroga Flores |
+| Ciudad | Santa Cruz de la Sierra, Bolivia |
+| Gestion | 2026 |
+| Modalidad del producto | 100 % en linea |
 
-> **Contexto:** El documento consolidado sigue la estructura solicitada por la clase del 21/04/2026 para presentar los aspectos generales del proyecto de Ingeniería de Software II. Cada grupo se presenta como una empresa de software real.
+El presente documento es una presentacion formal, de investigacion y de desarrollo elaborada por Team 24 Software como startup academica de desarrollo de software. La documentacion no se limita al desarrollo puntual de Wireless HeatMapper: presenta a la empresa, su sistema de calidad, su presencia web, sus politicas, su infraestructura, su estrategia de mercado, sus mecanismos de puesta en marcha y la entrega del software como producto real.
 
----
+La estructura principal sigue exactamente los doce puntos solicitados en la clase del 21/04/2026:
 
-## Organización inicial de grupos
-
-- **Grupo:** 24.
-- **Empresa de software:** Team 24 Software.
-- **Integrantes:** Jhasmany Jhunnior Fernandez Ortega; Herland Borys Quiroga Flores.
-- **Cliente del caso:** Bulldog Tech.
-- **Proyecto:** Sistema Inteligente de Análisis y Optimización de Cobertura WiFi mediante Mapas de Calor.
-- **Modalidad del producto:** 100 % en línea.
-
----
-
-## Puntos del Proyecto de la Materia
-
-El docente recapitula que el proyecto tiene múltiples puntos que deben entregarse. A continuación se desarrolla cada uno aplicado a Wireless HeatMapper y Team 24 Software.
+| # | Punto |
+| - | ----- |
+| 1 | PAPS |
+| 2 | Modelos de Desarrollo |
+| 3 | Manual de Garantia de Calidad del Software SQAP |
+| 4 | Herramientas CASE |
+| 5 | Aspectos Legales para Apertura de Empresa de Software |
+| 6 | Infraestructura para la Produccion de Software |
+| 7 | Sitio Web de la Empresa |
+| 8 | Estudio de Mercado |
+| 9 | Pruebas del Software |
+| 10 | Marketing |
+| 11 | Aspectos para la Puesta en Marcha |
+| 12 | Software como Producto |
 EOF
 
-append_point "Punto 1 — PAPS" "$DOC_DIR/02-paps.md"
-append_point "Punto 2 — Modelos de Desarrollo" "$DOC_DIR/03-modelos-desarrollo.md"
+append_point "1. PAPS" "$PAPS_SOURCE"
+append_point "2. Modelos de Desarrollo" "$DOC_DIR/03-modelos-desarrollo.md"
 append_diagram_section "Evidencias de los cuatro modelos obligatorios" \
   "$DIAGRAM_DIR/01-modelo-contexto.puml" \
   "$DIAGRAM_DIR/02-arquitectura-paquetes.puml" \
@@ -174,74 +225,34 @@ append_diagram_section "Evidencias de los cuatro modelos obligatorios" \
   "$DIAGRAM_DIR/05-logica-captura-heatmap.puml" \
   "$DIAGRAM_DIR/06-logica-portal-cliente.puml" \
   "$DIAGRAM_DIR/07-estados-proyecto.puml"
-append_point "Punto 3 — Plan/Manual de Garantía de Calidad del Software (SQA / QAP)" "$DOC_DIR/04-manual-calidad.md"
-append_point "Punto 4 — Herramientas CASE" "$DOC_DIR/05-herramientas-case.md"
+append_point "3. Manual de Garantía de Calidad del Software SQAP" "$SQAP_SOURCE"
+append_point "4. Herramientas CASE" "$DOC_DIR/05-herramientas-case.md"
 append_diagram_section "Evidencia de navegabilidad CASE" \
   "$DIAGRAM_DIR/08-case-navegabilidad.puml"
-append_point "Punto 5 — Aspectos Legales para Apertura de Empresa de Software" "$DOC_DIR/06-aspectos-legales.md"
-append_point "Punto 6 — Infraestructura para la Producción de Software" "$DOC_DIR/07-infraestructura-produccion.md"
-append_point "Punto 7 — Sitio Web de la Empresa" "$DOC_DIR/08-sitio-web-empresa.md"
+append_point "5. Aspectos Legales para Apertura de Empresa de Software" "$DOC_DIR/06-aspectos-legales.md"
+append_point "6. Infraestructura para la Producción de Software" "$DOC_DIR/07-infraestructura-produccion.md"
+append_point "7. Sitio Web de la Empresa" "$DOC_DIR/08-sitio-web-empresa.md"
 {
   printf '\n\n'
-  printf '#### Evidencias públicas del sitio web\n\n'
+  printf '## Evidencias públicas del sitio web\n\n'
 } >> "$MERGED"
 append_qr "Sitio empresarial Team 24 Software" "https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/" "$ASSET_DIR/qr-sitio-empresa.png"
 append_qr "Facebook oficial Team 24 Software" "https://www.facebook.com/profile.php?id=61591962512748" "$ASSET_DIR/qr-facebook.png"
-append_point "Punto 8 — Estudio de Mercado" "$DOC_DIR/09-estudio-mercado.md"
-append_point "Punto 9 — Pruebas del Software" "$DOC_DIR/10-plan-pruebas.md"
+append_point "8. Estudio de Mercado" "$DOC_DIR/09-estudio-mercado.md"
+append_point "9. Pruebas del Software" "$DOC_DIR/10-plan-pruebas.md"
 append_diagram_section "Evidencia del flujo de trabajo de pruebas" \
   "$DIAGRAM_DIR/09-flujo-pruebas-rup.puml"
-append_point "Punto 10 — Marketing" "$DOC_DIR/11-marketing.md"
-append_point "Punto 11 — Aspectos para la Puesta en Marcha" "$DOC_DIR/12-puesta-marcha.md"
-append_point "Punto 12 — Software como Producto (Entregable Final)" "$DOC_DIR/13-software-producto.md"
+append_point "10. Marketing" "$DOC_DIR/11-marketing.md"
+append_point "11. Aspectos para la Puesta en Marcha" "$DOC_DIR/12-puesta-marcha.md"
+append_point "12. Software como Producto (Entregable Final)" "$DOC_DIR/13-software-producto.md"
 {
   printf '\n\n'
-  printf '#### Evidencias públicas del producto\n\n'
+  printf '## Evidencias públicas del producto\n\n'
 } >> "$MERGED"
 append_qr "Repositorio GitHub" "https://github.com/borysinho/wireless-heatmapper" "$ASSET_DIR/qr-repositorio.png"
 append_qr "Documentación Swagger / OpenAPI" "https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/api/docs" "$ASSET_DIR/qr-api-docs.png"
 append_qr "Manual de usuario" "https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/manual/" "$ASSET_DIR/qr-manual.png"
 append_qr "Releases móviles" "https://github.com/borysinho/wireless-heatmapper/releases" "$ASSET_DIR/qr-releases.png"
-
-cat >> "$MERGED" <<'EOF'
-
----
-
-## Fechas y Dinámica de Entrega
-
-- **Fecha máxima:** dos semanas antes del último día de clases, según la indicación docente.
-- **Entrega incremental:** los puntos pueden revisarse a lo largo del semestre conforme se avance en Scrum.
-- **Gestión Scrum:** el tablero, los sprints, el backlog y las evidencias deben mantenerse actualizados sin esperar aviso de revisión.
-- **Estado del proyecto:** Wireless HeatMapper se documenta como producto integrado en línea con backend, web, app móvil, despliegue y evidencias públicas.
-
----
-
-## Actividad del día (21/04/2026)
-
-- La clase se orientó a revisiones con Scrum y seguimiento del estado del sprint/tablero de cada grupo.
-- El equipo mantiene la documentación del proyecto como evidencia del avance de Team 24 Software.
-- El uso de IA se considera apoyo responsable dentro del enfoque de Desarrollo Dirigido por Especificación, conservando trazabilidad entre requerimientos, diseño, implementación, pruebas y entrega.
-
----
-
-## Resumen de los 12 Puntos del Proyecto
-
-| # | Punto | Descripción breve | Evidencia en este documento |
-| - | ----- | ----------------- | --------------------------- |
-| 1 | **PAPS** | Plan Aplicado a Proyecto de Software. | Punto 1. |
-| 2 | **Modelos de Desarrollo** | Contexto, Arquitectura, Datos y Lógica con Scrum. | Punto 2 y diagramas UML. |
-| 3 | **Manual de Garantía de Calidad** | ISO/IEEE/CMMI aplicado a la empresa, no solo al producto. | Punto 3. |
-| 4 | **Herramientas CASE** | Demostración de navegabilidad y uso real de herramientas CASE. | Punto 4 y diagrama de navegabilidad. |
-| 5 | **Aspectos Legales** | Trámites para apertura de empresa de software en Bolivia. | Punto 5. |
-| 6 | **Infraestructura para producción** | Gestión, versionado, CI/CD, Docker, despliegue e IA integrada. | Punto 6. |
-| 7 | **Sitio Web** | Sitio publicado, empresa de software, soporte, contacto y chatbot. | Punto 7 y QR públicos. |
-| 8 | **Estudio de Mercado** | Cuantificación, segmentación y monetización basadas en números. | Punto 8. |
-| 9 | **Pruebas** | Unidad, QA, PO, caja blanca, checklists y herramientas. | Punto 9 y flujo de pruebas. |
-| 10 | **Marketing** | Estrategias y materiales para promocionar el producto. | Punto 10. |
-| 11 | **Puesta en Marcha** | AWS/GCP/Azure, licencias, tiendas, términos y privacidad. | Punto 11. |
-| 12 | **Software como Producto** | Entrega final completa y funcional. | Punto 12. |
-
-EOF
 
 require_cmd pandoc
 
@@ -250,7 +261,7 @@ PANDOC_ARGS=(
   -o "$OUTPUT"
   --from markdown
   --toc
-  --toc-depth=3
+  --toc-depth=1
   --metadata lang=es-BO
 )
 
