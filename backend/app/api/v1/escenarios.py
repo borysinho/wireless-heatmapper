@@ -709,7 +709,7 @@ def _mapa_actual(
     )
     return mapa, puntos
 
-
+"""Extrae las mediciones reales del plano y arma las muestras de calibración."""
 def _modelo_calibrado_para_plano(
     *,
     plano: Plano,

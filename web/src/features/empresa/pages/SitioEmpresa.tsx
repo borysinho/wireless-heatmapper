@@ -49,8 +49,8 @@ type EstadoChatbot = "listo" | "consultando" | "respaldo";
 
 const urlPublica = "https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/";
 const correoContacto = "borysquiroga@gmail.com";
-const telefonoContacto = "+891-77685777";
-const whatsappContacto = "https://wa.me/89177685777";
+const telefonoContacto = "+591-77685777";
+const whatsappContacto = "https://wa.me/59177685777";
 const facebookEmpresa = "https://www.facebook.com/profile.php?id=61591962512748";
 
 const navegacion = [

@@ -21,7 +21,7 @@ describe("SitioEmpresa", () => {
     expect(screen.getByRole("heading", { name: /soluciones de software técnico/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Wireless HeatMapper" })).toBeInTheDocument();
     expect(screen.getByText("borysquiroga@gmail.com")).toBeInTheDocument();
-    expect(screen.getByText("+891-77685777")).toBeInTheDocument();
+    expect(screen.getByText("+591-77685777")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /facebook oficial/i })).toHaveAttribute(
       "href",
       "https://www.facebook.com/profile.php?id=61591962512748",

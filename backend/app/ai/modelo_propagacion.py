@@ -65,6 +65,7 @@ class ModeloPropagacion:
         perdida = 6.0 * math.log2(distancia)
         return round(max(-120.0, min(0.0, rssi_referencia - perdida)), 2)
 
+    """Calibra desde muestras tomadas en campo"""
     @classmethod
     def calibrar_desde_muestras(
         cls,
