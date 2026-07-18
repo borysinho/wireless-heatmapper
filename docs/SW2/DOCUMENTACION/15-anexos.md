@@ -5,7 +5,9 @@
 | Recurso | URL |
 | ------- | --- |
 | Repositorio GitHub | https://github.com/borysinho/wireless-heatmapper |
-| Frontend publicado | https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/ |
+| Sitio empresarial Team 24 Software | https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/ |
+| Panel administrador | https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/admin/login |
+| Documentacion Swagger / OpenAPI | https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/api/docs |
 | Manual de usuario | https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/manual/ |
 | Releases moviles | https://github.com/borysinho/wireless-heatmapper/releases |
 

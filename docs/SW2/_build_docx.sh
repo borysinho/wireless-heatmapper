@@ -70,6 +70,8 @@ append_document() {
 
 generate_qr "https://github.com/borysinho/wireless-heatmapper" "$ASSET_DIR/qr-repositorio.png"
 generate_qr "https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/" "$ASSET_DIR/qr-frontend.png"
+generate_qr "https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/" "$ASSET_DIR/qr-sitio-empresa.png"
+generate_qr "https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/api/docs" "$ASSET_DIR/qr-api-docs.png"
 generate_qr "https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/manual/" "$ASSET_DIR/qr-manual.png"
 generate_qr "https://github.com/borysinho/wireless-heatmapper/releases" "$ASSET_DIR/qr-releases.png"
 
@@ -115,11 +117,17 @@ cat >> "$MERGED" <<EOF
 
 $(if [[ -f "$ASSET_DIR/qr-repositorio.png" ]]; then echo "![QR repositorio]($ASSET_DIR/qr-repositorio.png)"; fi)
 
-## Frontend publicado
+## Sitio empresarial Team 24 Software
 
 <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/>
 
-$(if [[ -f "$ASSET_DIR/qr-frontend.png" ]]; then echo "![QR frontend]($ASSET_DIR/qr-frontend.png)"; fi)
+$(if [[ -f "$ASSET_DIR/qr-sitio-empresa.png" ]]; then echo "![QR sitio empresarial]($ASSET_DIR/qr-sitio-empresa.png)"; fi)
+
+## Documentacion Swagger / OpenAPI
+
+<https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/api/docs>
+
+$(if [[ -f "$ASSET_DIR/qr-api-docs.png" ]]; then echo "![QR documentacion API]($ASSET_DIR/qr-api-docs.png)"; fi)
 
 ## Manual de usuario
 

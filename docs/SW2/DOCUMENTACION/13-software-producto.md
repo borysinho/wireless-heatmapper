@@ -16,7 +16,7 @@ Wireless HeatMapper se entrega como un producto integrado para relevamiento, ana
 | Recurso | URL | Uso |
 | ------- | --- | --- |
 | Repositorio GitHub | <https://github.com/borysinho/wireless-heatmapper> | Codigo fuente, documentacion, historial, workflows y trazabilidad tecnica. |
-| Frontend publicado | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/> | Entrada publica al panel web y portal de cliente. |
+| Sitio empresarial Team 24 Software | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/> | Entrada publica institucional, acceso a producto, descargas, soporte y contacto. |
 | Panel administrador | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/admin/login> | Acceso para administradores y usuarios autorizados. |
 | Portal cliente | `https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/portal/{token}` | Acceso por enlace unico generado desde el panel web. |
 | API REST | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/api/> | Base publica de endpoints consumidos por web y movil. |
@@ -25,7 +25,7 @@ Wireless HeatMapper se entrega como un producto integrado para relevamiento, ana
 | Manual de usuario | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/manual/> | Guia publica de operacion funcional. |
 | Releases moviles | <https://github.com/borysinho/wireless-heatmapper/releases> | APK Android generado por GitHub Actions. |
 
-Estas URLs son las referencias publicas para entrega academica, demostracion y continuidad. En anexos se incorporan codigos QR hacia repositorio, frontend publicado, manual de usuario y releases moviles.
+Estas URLs son las referencias publicas para entrega academica, demostracion y continuidad. En anexos se incorporan codigos QR hacia repositorio, sitio empresarial, documentacion OpenAPI, manual de usuario y releases moviles.
 
 ## Componentes entregables
 
