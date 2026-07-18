@@ -231,6 +231,105 @@ with open(salida, "w", encoding="utf-8") as archivo:
 PY
 }
 
+apply_word_alignment() {
+  local docx="$1"
+
+  python3 - "$docx" <<'PY'
+import shutil
+import sys
+import tempfile
+import xml.etree.ElementTree as ET
+from pathlib import Path
+from zipfile import ZipFile, ZIP_DEFLATED
+
+docx = Path(sys.argv[1])
+ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+ET.register_namespace("w", ns["w"])
+
+W = f"{{{ns['w']}}}"
+EXCLUDED_STYLES = {
+    "Title",
+    "Subtitle",
+    "Author",
+    "Date",
+    "TOCHeading",
+    "TOC1",
+    "TOC2",
+    "TOC3",
+    "Heading1",
+    "Heading2",
+    "Heading3",
+    "Heading4",
+    "Heading5",
+    "Heading6",
+    "ImageCaption",
+    "Caption",
+}
+
+
+def has_text(paragraph: ET.Element) -> bool:
+    return any((node.text or "").strip() for node in paragraph.findall(".//w:t", ns))
+
+
+def has_field(paragraph: ET.Element) -> bool:
+    return paragraph.find(".//w:fldChar", ns) is not None or paragraph.find(".//w:instrText", ns) is not None
+
+
+def paragraph_style(paragraph: ET.Element) -> str | None:
+    style = paragraph.find("w:pPr/w:pStyle", ns)
+    if style is None:
+        return None
+    return style.get(f"{W}val")
+
+
+def set_alignment(paragraph: ET.Element, value: str) -> None:
+    ppr = paragraph.find("w:pPr", ns)
+    if ppr is None:
+        ppr = ET.Element(f"{W}pPr")
+        paragraph.insert(0, ppr)
+
+    for existing in list(ppr.findall("w:jc", ns)):
+        ppr.remove(existing)
+
+    jc = ET.Element(f"{W}jc")
+    jc.set(f"{W}val", value)
+    ppr.append(jc)
+
+
+def visit(element: ET.Element, inside_table: bool = False) -> None:
+    current_inside_table = inside_table or element.tag == f"{W}tbl"
+    if element.tag == f"{W}p":
+        if current_inside_table:
+            set_alignment(element, "left")
+        elif has_text(element) and not has_field(element) and paragraph_style(element) not in EXCLUDED_STYLES:
+            set_alignment(element, "both")
+        return
+
+    for child in list(element):
+        visit(child, current_inside_table)
+
+
+with tempfile.TemporaryDirectory() as tmpdir:
+    tmp_path = Path(tmpdir)
+    xml_path = tmp_path / "document.xml"
+
+    with ZipFile(docx, "r") as archive:
+        xml_path.write_bytes(archive.read("word/document.xml"))
+
+    tree = ET.parse(xml_path)
+    visit(tree.getroot())
+    tree.write(xml_path, encoding="UTF-8", xml_declaration=True)
+
+    temp_docx = docx.with_suffix(".alineado.tmp.docx")
+    with ZipFile(docx, "r") as source, ZipFile(temp_docx, "w", ZIP_DEFLATED) as target:
+        for item in source.infolist():
+            data = xml_path.read_bytes() if item.filename == "word/document.xml" else source.read(item.filename)
+            target.writestr(item, data)
+
+    shutil.move(temp_docx, docx)
+PY
+}
+
 append_shifted_markdown() {
   local file="$1"
   local skip_first_h1="${2:-true}"
@@ -438,6 +537,7 @@ if [[ -f "$REFERENCE_DOCX" ]]; then
 fi
 
 pandoc "${PANDOC_ARGS[@]}"
+apply_word_alignment "$OUTPUT"
 
 echo "Documento generado: $OUTPUT"
 echo "Markdown consolidado: $MERGED"
