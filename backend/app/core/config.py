@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     azure_openai_poligono_deployment: str = "whm-poligono-gpt5-nano"
     azure_openai_poligono_max_px: int = 768
     azure_openai_poligono_timeout_seconds: int = 30
+    azure_openai_chatbot_deployment: str = ""
+    azure_openai_chatbot_timeout_seconds: int = 20
 
 
 settings = Settings()

@@ -1,9 +1,20 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import SitioEmpresa from "./SitioEmpresa";
+import { consultarChatbotEmpresa } from "../api/chatbotEmpresaApi";
+
+vi.mock("../api/chatbotEmpresaApi", () => ({
+  consultarChatbotEmpresa: vi.fn(),
+}));
+
+const consultarChatbotEmpresaMock = vi.mocked(consultarChatbotEmpresa);
 
 describe("SitioEmpresa", () => {
+  beforeEach(() => {
+    consultarChatbotEmpresaMock.mockReset();
+  });
+
   it("muestra identidad empresarial, producto, contacto y recursos oficiales", () => {
     render(<SitioEmpresa />);
 
@@ -16,12 +27,30 @@ describe("SitioEmpresa", () => {
     expect(screen.getByRole("heading", { name: "APK Android" })).toBeInTheDocument();
   });
 
-  it("responde preguntas frecuentes desde la base local del chatbot", async () => {
+  it("consulta el chatbot empresarial mediante el endpoint Azure", async () => {
     const usuario = userEvent.setup();
+    consultarChatbotEmpresaMock.mockResolvedValue({
+      respuesta: "Respuesta generada por Azure OpenAI para Wireless HeatMapper.",
+      origen: "azure_openai",
+    });
 
     render(<SitioEmpresa />);
     await usuario.click(screen.getByRole("button", { name: /¿Qué significa RSSI < -90 dBm/i }));
 
-    expect(screen.getByText(/RSSI menor a -90 dBm se interpreta como zona muerta/i)).toBeInTheDocument();
+    expect(consultarChatbotEmpresaMock).toHaveBeenCalledWith("¿Qué significa RSSI < -90 dBm?");
+    expect(await screen.findByText(/Respuesta generada por Azure OpenAI/i)).toBeInTheDocument();
+    expect(screen.getByText("Respuesta generada con Azure OpenAI")).toBeInTheDocument();
+  });
+
+  it("usa la respuesta local aprobada cuando Azure no responde", async () => {
+    const usuario = userEvent.setup();
+    consultarChatbotEmpresaMock.mockRejectedValue(new Error("sin conexión"));
+
+    render(<SitioEmpresa />);
+    await usuario.type(screen.getByLabelText("Consulta breve"), "¿Qué significa RSSI < -90 dBm?");
+    await usuario.click(screen.getByRole("button", { name: /consultar/i }));
+
+    expect(await screen.findByText(/RSSI menor a -90 dBm se interpreta como zona muerta/i)).toBeInTheDocument();
+    expect(screen.getByText(/No se pudo consultar la IA/i)).toBeInTheDocument();
   });
 });

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import {
   ArrowRight,
@@ -10,11 +10,13 @@ import {
   Download,
   ExternalLink,
   FileText,
+  Loader2,
   LockKeyhole,
   Mail,
   MapPin,
   MessageSquare,
   Phone,
+  Send,
   ShieldCheck,
   Smartphone,
   Sparkles,
@@ -26,6 +28,7 @@ import logoTeam24 from "@/assets/empresa/team-24-software-logo.svg";
 import heroEmpresa from "@/assets/empresa/hero-empresa.png";
 import productoHeatmapper from "@/assets/empresa/producto-heatmapper.png";
 import soporteDevops from "@/assets/empresa/soporte-devops.png";
+import { consultarChatbotEmpresa } from "../api/chatbotEmpresaApi";
 
 type Icono = typeof Building2;
 
@@ -41,6 +44,8 @@ interface PreguntaChatbot {
   pregunta: string;
   respuesta: string;
 }
+
+type EstadoChatbot = "listo" | "consultando" | "respaldo";
 
 const urlPublica = "https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/";
 const correoContacto = "borysquiroga@gmail.com";
@@ -199,6 +204,13 @@ const politicas = [
 
 function buscarRespuesta(consulta: string): string {
   const normalizada = consulta.toLowerCase();
+  const preguntaExacta = preguntas.find(
+    ({ pregunta }) => pregunta.toLowerCase() === normalizada,
+  );
+  if (preguntaExacta) {
+    return preguntaExacta.respuesta;
+  }
+
   const encontrada = preguntas.find(({ pregunta, respuesta }) => {
     const base = `${pregunta} ${respuesta}`.toLowerCase();
     return normalizada
@@ -216,11 +228,35 @@ function buscarRespuesta(consulta: string): string {
 function SitioEmpresa() {
   const [consulta, setConsulta] = useState("");
   const [respuesta, setRespuesta] = useState(preguntas[1].respuesta);
+  const [estadoChatbot, setEstadoChatbot] = useState<EstadoChatbot>("listo");
+  const [origenRespuesta, setOrigenRespuesta] = useState<"azure_openai" | "local">("local");
   const anio = useMemo(() => new Date().getFullYear(), []);
+
+  const responderConsulta = useCallback(async (texto: string) => {
+    const pregunta = texto.trim();
+    if (!pregunta) {
+      setRespuesta("Escribe una consulta breve sobre Team 24 Software o Wireless HeatMapper.");
+      setOrigenRespuesta("local");
+      setEstadoChatbot("respaldo");
+      return;
+    }
+
+    setEstadoChatbot("consultando");
+    try {
+      const data = await consultarChatbotEmpresa(pregunta);
+      setRespuesta(data.respuesta);
+      setOrigenRespuesta(data.origen);
+      setEstadoChatbot("listo");
+    } catch {
+      setRespuesta(buscarRespuesta(pregunta));
+      setOrigenRespuesta("local");
+      setEstadoChatbot("respaldo");
+    }
+  }, []);
 
   function enviarConsulta(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
-    setRespuesta(buscarRespuesta(consulta));
+    void responderConsulta(consulta);
   }
 
   return (
@@ -471,13 +507,32 @@ function SitioEmpresa() {
         <div className={styles.chatbot}>
           <div className={styles.panelPreguntas}>
             {preguntas.slice(0, 7).map((item) => (
-              <button key={item.pregunta} type="button" onClick={() => setRespuesta(item.respuesta)}>
+              <button
+                key={item.pregunta}
+                type="button"
+                disabled={estadoChatbot === "consultando"}
+                onClick={() => {
+                  setConsulta(item.pregunta);
+                  void responderConsulta(item.pregunta);
+                }}
+              >
                 {item.pregunta}
               </button>
             ))}
           </div>
           <div className={styles.panelRespuesta} aria-live="polite">
-            <Bot size={32} aria-hidden="true" />
+            {estadoChatbot === "consultando" ? (
+              <Loader2 className={styles.iconoCargando} size={32} aria-hidden="true" />
+            ) : (
+              <Bot size={32} aria-hidden="true" />
+            )}
+            <span className={styles.estadoChatbot}>
+              {estadoChatbot === "consultando"
+                ? "Consultando Azure OpenAI"
+                : origenRespuesta === "azure_openai"
+                  ? "Respuesta generada con Azure OpenAI"
+                  : "Respuesta local de respaldo"}
+            </span>
             <p>{respuesta}</p>
             <form onSubmit={enviarConsulta} className={styles.formChatbot}>
               <label htmlFor="consulta-chatbot">Consulta breve</label>
@@ -487,9 +542,18 @@ function SitioEmpresa() {
                   value={consulta}
                   onChange={(evento) => setConsulta(evento.target.value)}
                   placeholder="Ej.: ¿cómo reporto un problema?"
+                  maxLength={700}
                 />
-                <button type="submit">Consultar</button>
+                <button type="submit" disabled={estadoChatbot === "consultando"}>
+                  <Send size={16} aria-hidden="true" />
+                  Consultar
+                </button>
               </div>
+              {estadoChatbot === "respaldo" && (
+                <small className={styles.avisoChatbot}>
+                  No se pudo consultar la IA en este momento; se muestra una respuesta aprobada localmente.
+                </small>
+              )}
             </form>
           </div>
         </div>

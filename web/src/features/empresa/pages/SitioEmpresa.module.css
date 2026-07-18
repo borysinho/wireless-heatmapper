@@ -506,6 +506,12 @@
   background: var(--color-primary-bg);
 }
 
+.panelPreguntas button:disabled,
+.formChatbot button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 .panelRespuesta {
   display: grid;
   align-content: start;
@@ -514,6 +520,17 @@
 
 .panelRespuesta svg {
   color: var(--color-primary);
+}
+
+.iconoCargando {
+  animation: girar 0.9s linear infinite;
+}
+
+.estadoChatbot,
+.avisoChatbot {
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-weight: 750;
 }
 
 .panelRespuesta p {
@@ -562,10 +579,20 @@
 }
 
 .formChatbot button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   padding: 0.75rem 1rem;
   color: #ffffff;
   border-color: var(--color-primary);
   background: var(--color-primary);
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .seccionContacto {

@@ -15,6 +15,7 @@ from app.api.v1 import (
     admin_usuarios,
     auth,
     clientes,
+    empresa,
     escenarios,
     heatmaps,
     mediciones,
@@ -29,6 +30,7 @@ api_router.include_router(auth.router)
 api_router.include_router(admin_usuarios.router)
 api_router.include_router(admin_proyectos.router)
 api_router.include_router(clientes.router)
+api_router.include_router(empresa.router)
 api_router.include_router(proyectos.router)
 api_router.include_router(notificaciones.router)
 api_router.include_router(planos.router_proyectos)
