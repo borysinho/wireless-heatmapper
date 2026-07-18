@@ -8,12 +8,13 @@ Wireless HeatMapper se considera el primer caso formal de aplicacion del manual,
 
 ## Marco normativo de referencia
 
-El manual toma como referencia dos normas de calidad aplicables al desarrollo de software:
+La clase indica que el manual debe elegir una referencia principal entre ISO, IEEE 730 o CMMI. Team 24 Software selecciona **IEEE 730** como estandar principal porque su estructura corresponde directamente a un plan de aseguramiento de calidad del software.
 
-| Norma | Uso institucional en Team 24 Software |
-| ----- | ------------------------------------- |
-| ISO/IEC 90003 | Guia para aplicar principios de gestion de calidad ISO 9001 en organizaciones que adquieren, desarrollan, operan o mantienen software. Se adopta para organizar procesos, responsabilidades, control documental, gestion de requisitos, diseno, desarrollo, validacion, entrega y mejora. |
-| IEEE 730 | Estructura de referencia para el plan de aseguramiento de calidad del software. Se adopta para definir actividades SQA, revisiones, auditorias, registros, metricas, control de no conformidades, gestion de riesgos y evidencia objetiva. |
+| Alternativa | Decision institucional |
+| ----------- | ---------------------- |
+| ISO 9001 / ISO/IEC 90003 | Se usa como referencia complementaria para gestion de procesos, control documental, responsabilidades y mejora continua. |
+| IEEE 730 | Se adopta como estandar principal del manual SQA/QAP para definir actividades, revisiones, auditorias, registros, metricas, control de no conformidades, riesgos y evidencia objetiva. |
+| CMMI | No se adopta como marco principal en esta entrega; se reconoce como modelo de madurez y capacidad que podria evaluarse cuando la empresa tenga procesos repetidos durante mas ciclos. |
 
 La adopcion es proporcional al tamano de la empresa y al contexto academico-comercial de Team 24 Software. No implica certificacion formal, sino aplicacion disciplinada de practicas verificables y auditables.
 

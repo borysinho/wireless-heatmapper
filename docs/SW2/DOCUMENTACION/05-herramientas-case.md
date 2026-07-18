@@ -25,6 +25,8 @@ La demostracion CASE debe permitir recorrer la arquitectura desde niveles genera
 6. Entidades de datos persistidas.
 7. Pruebas vinculadas al comportamiento esperado.
 
+El recorrido replica la navegabilidad solicitada en clase: desde un diagrama de paquetes se ingresa al caso de uso, luego al diagrama de comunicacion o secuencia, despues a las clases participantes, y los mensajes observados en la interaccion se verifican como metodos u operaciones de esas clases.
+
 La figura UML de navegabilidad CASE representa este recorrido y demuestra la relacion entre modelos, clases, datos y pruebas.
 
 ## Evidencia de uso real

@@ -8,6 +8,8 @@ La infraestructura de Team 24 Software integra herramientas de gestion, desarrol
 
 El proyecto se gestiona con Scrum. El Product Backlog organiza historias de usuario; el Sprint Backlog descompone tareas; la Sprint Review valida incrementos; y la Retrospective captura mejoras. El tablero debe reflejar el estado real del sprint sin depender de avisos del docente.
 
+Las herramientas aceptables para demostrar la gestion incluyen Jira, Trello, GitHub Projects o Chotrack. Para esta entrega se documenta el flujo Scrum y se conserva evidencia versionada del backlog, sprint, tareas y trazabilidad.
+
 ## Desarrollo colaborativo
 
 | Area | Herramienta o practica |
@@ -53,6 +55,8 @@ El despliegue productivo se organiza con Docker Compose:
 
 Nginx publica la API bajo `/api`, el panel web, el portal de cliente y los recursos estaticos. El backend no expone directamente la base de datos al exterior.
 
+Kubernetes se considera una alternativa de orquestacion para una etapa posterior con multiples microservicios, escalamiento horizontal o alta disponibilidad. No se adopta como tecnologia principal de esta entrega porque el alcance operativo inicial se cubre con Docker Compose, Nginx y una unica base PostgreSQL centralizada.
+
 ## Seguridad operativa
 
 | Control | Aplicacion |
@@ -69,6 +73,8 @@ Nginx publica la API bajo `/api`, el panel web, el portal de cliente y los recur
 
 El equipo puede utilizar asistentes de IA en IDE para acelerar tareas de analisis, generacion de pruebas, refactorizacion, documentacion y revision. Su uso debe ser responsable: todo resultado generado por IA se revisa, prueba y adapta al criterio del equipo. La IA no reemplaza la validacion tecnica ni la responsabilidad profesional.
 
+Ejemplos de herramientas aplicables son GitHub Copilot, Gemini, Codex u otros asistentes integrados al IDE. Su evidencia debe mostrarse como apoyo al desarrollo y a la especificacion, no como sustituto de pruebas, revisiones o aceptacion del Product Owner.
+
 ## Ambientes
 
 | Ambiente | Uso | Reglas |
@@ -76,4 +82,3 @@ El equipo puede utilizar asistentes de IA en IDE para acelerar tareas de analisi
 | Local | Desarrollo individual | Datos de prueba y secretos locales. |
 | Integracion | Validacion de ramas | Tests automatizados y base efimera. |
 | Produccion | Acceso real del producto | TLS, backups, monitoreo y cambios aprobados. |
-
