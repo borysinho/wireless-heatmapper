@@ -25,7 +25,7 @@ Wireless HeatMapper se entrega como un producto integrado para relevamiento, ana
 | Manual de usuario | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/manual/> | Guia publica de operacion funcional. |
 | Releases moviles | <https://github.com/borysinho/wireless-heatmapper/releases> | APK Android generado por GitHub Actions. |
 
-Estas URLs son las referencias publicas para entrega academica, demostracion y continuidad. En anexos se incorporan codigos QR hacia repositorio, frontend publicado y releases moviles.
+Estas URLs son las referencias publicas para entrega academica, demostracion y continuidad. En anexos se incorporan codigos QR hacia repositorio, frontend publicado, manual de usuario y releases moviles.
 
 ## Componentes entregables
 

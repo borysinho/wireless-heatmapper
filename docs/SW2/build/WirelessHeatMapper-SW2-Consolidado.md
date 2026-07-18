@@ -37,40 +37,72 @@ El presente documento consolida los doce puntos exigidos para la materia Ingenie
 
 # Resumen ejecutivo
 
-Wireless HeatMapper es un sistema integrado para relevar, analizar y compartir cobertura WiFi en interiores mediante mapas de calor. El problema que atiende es la operacion fragmentada de los tecnicos de Bulldog Tech., quienes tradicionalmente combinan aplicaciones moviles de analisis WiFi, planos impresos, hojas de calculo y procesamiento manual posterior. Esa forma de trabajo eleva el riesgo de error, dificulta la trazabilidad de mediciones y retrasa la entrega de resultados tecnicos al cliente.
+Wireless HeatMapper es un sistema integrado para relevar, procesar, analizar y publicar resultados de cobertura WiFi en ambientes interiores mediante mapas de calor. El proyecto se presenta para la materia Ingenieria de Software II como producto de Team 24 Software y toma como cliente del caso a Bulldog Tech., empresa que requiere mejorar la forma en que documenta y justifica sus decisiones tecnicas sobre redes inalambricas.
 
-La solucion se construyo bajo una modalidad 100 % en linea. La aplicacion movil Android funciona como cliente delgado para el tecnico de campo; el backend REST concentra la logica de negocio, persistencia, interpolacion e inteligencia artificial; y la plataforma web permite administracion organizacional y acceso seguro del cliente final mediante enlace unico. Toda persistencia de dominio reside en PostgreSQL, sin base de datos local ni sincronizacion diferida en el dispositivo movil.
+## Sintesis del problema
 
-El producto entrega las siguientes capacidades principales:
+El proceso tradicional de site survey usado por Bulldog Tech. depende en gran medida de la experiencia del tecnico, de herramientas aisladas y de consolidacion posterior manual. Las mediciones de intensidad de senal, la ubicacion de cada lectura sobre el plano, la interpretacion de zonas criticas y la entrega de resultados al cliente no quedan integradas en una unica fuente de verdad. Esta situacion genera riesgo de perdida de datos, dificulta la trazabilidad tecnica, aumenta el retrabajo y limita la capacidad de demostrar con evidencia objetiva por que una zona requiere ajuste, reemplazo o reubicacion de puntos de acceso.
 
-- Gestion de usuarios, clientes y proyectos.
-- Importacion y calibracion de planos.
-- Captura de mediciones WiFi con RSSI, SSID, BSSID, canal y frecuencia.
-- Generacion de mapas de calor mediante procesamiento backend.
-- Gestion de conjuntos de puntos de acceso y propuestas asistidas por IA.
-- Comparacion entre configuracion actual y propuesta.
-- Portal de cliente con visualizacion interactiva del resultado publicado.
-- Repositorio, releases moviles y frontend accesibles en linea.
+El problema no se reduce a capturar valores RSSI. La necesidad real es convertir mediciones de campo en informacion tecnica verificable, visual y compartible. Sin un flujo integrado, Bulldog Tech. no puede mantener historiales consistentes por proyecto, comparar escenarios de cobertura ni entregar al cliente final una visualizacion clara del estado de su red.
 
-La documentacion SW2 complementa el producto con el enfoque institucional exigido por la materia. No solo describe el software, sino tambien la empresa simulada que lo produce, su manual de calidad, su infraestructura, su estrategia comercial, sus procedimientos legales, su plan de pruebas y su puesta en marcha como producto real.
+## Sintesis de la solucion
+
+La solucion propuesta es un sistema 100 % en linea compuesto por aplicacion movil Android, backend REST, base de datos central, modulo de inteligencia artificial y plataforma web. La aplicacion movil opera como cliente delgado para tecnicos de campo; el backend concentra la logica de negocio, seguridad, persistencia, interpolacion y procesamiento de propuestas; PostgreSQL actua como unica fuente de verdad; y la web cubre la administracion interna y la publicacion segura de resultados al cliente.
+
+El sistema permite registrar proyectos, asociarlos a clientes, importar y calibrar planos, marcar puntos de medicion, capturar redes WiFi cercanas, generar mapas de calor, administrar conjuntos de puntos de acceso, comparar propuestas actuales y derivadas por IA, y publicar resultados mediante un enlace unico. Los criterios tecnicos conservan los umbrales definidos para el producto: RSSI < -90 dBm como zona muerta, objetivo de diseno >= -70 dBm y consideracion del throttling de Android >= 8.0 de 4 escaneos cada 2 minutos.
+
+## Alcance del producto
+
+El alcance funcional vigente cubre ocho dominios principales: autenticacion y administracion de usuarios, gestion de clientes, gestion de proyectos, carga y calibracion de planos, captura de mediciones WiFi en campo, generacion de mapas de calor, optimizacion asistida por IA y portal web para clientes. La operacion se organiza alrededor de proyectos de cobertura, cada uno con sus planos, mediciones, conjuntos de puntos de acceso, heatmaps y publicaciones.
+
+Quedan fuera del alcance vigente la sincronizacion diferida, la persistencia local de dominio en el dispositivo movil, la medicion activa de ancho de banda con herramientas externas, el posicionamiento automatico del tecnico por SLAM o triangulacion inercial, el diagnostico persistido como modulo independiente y la generacion de reportes PDF como flujo principal. La entrega prioriza visualizacion interactiva, trazabilidad en backend y publicacion web controlada.
+
+## Valor para Bulldog Tech.
+
+Para Bulldog Tech., Wireless HeatMapper aporta valor operativo y comercial. En lo operativo, estandariza el trabajo de campo, reduce la dependencia de registros manuales, centraliza evidencias y facilita revisar mediciones historicas de cada proyecto. En lo tecnico, permite interpretar cobertura sobre planos calibrados, identificar zonas de senal degradada y comparar escenarios de puntos de acceso con criterios objetivos. En lo comercial, mejora la presentacion de resultados ante clientes finales mediante un portal visual, accesible por enlace, sin depender de archivos estaticos o explicaciones informales.
+
+El producto tambien fortalece la capacidad de la empresa para escalar servicios de consultoria WiFi. Al convertir cada proyecto en un conjunto de datos trazables, Bulldog Tech. puede justificar recomendaciones de infraestructura, documentar decisiones y ofrecer un servicio mas profesional en sectores como oficinas, instituciones educativas, hoteles, comercios y ambientes industriales.
+
+## Componentes entregados
+
+| Componente | Sintesis de entrega |
+| ---------- | ------------------- |
+| Aplicacion movil Android | Cliente Flutter para tecnicos de campo, con autenticacion, gestion de proyectos, planos, captura de mediciones y visualizacion de resultados. |
+| Backend REST | API FastAPI con reglas de negocio, autenticacion, autorizacion, endpoints de dominio, procesamiento de heatmaps y servicios de IA. |
+| Base de datos central | Persistencia PostgreSQL para usuarios, clientes, proyectos, planos, lecturas, mapas de calor, conjuntos de AP y publicaciones. |
+| Plataforma web administrativa | Interfaz React para administradores, gestion de usuarios, clientes, proyectos, propuestas, publicaciones y supervision general. |
+| Portal de cliente | Vista web por enlace unico para consultar resultados publicados sin instalar la aplicacion movil ni acceder al panel administrativo. |
+| Infraestructura de despliegue | Contenedores, reverse proxy, configuracion de ambientes, automatizacion y criterios de operacion en linea. |
+| Documentacion academica | PAPS, modelos, manual de calidad, herramientas CASE, aspectos legales, infraestructura, mercado, pruebas, marketing, puesta en marcha y producto final. |
+
+## Modalidad operativa
+
+La modalidad operativa oficial es 100 % en linea. Esto significa que la aplicacion movil no conserva estado de dominio entre sesiones ni implementa base de datos local para proyectos, planos o mediciones. Cada accion relevante se ejecuta contra el backend mediante servicios REST autenticados, y toda informacion persistente queda registrada en PostgreSQL.
+
+Este enfoque simplifica la trazabilidad, evita conflictos de sincronizacion y garantiza que administradores, tecnicos y clientes consulten informacion consistente. Cuando no existe conectividad, la operacion de dominio no se simula como trabajo offline; el sistema debe informar la condicion y reanudar el flujo cuando el backend vuelva a estar disponible.
 
 ## Cobertura de los doce puntos
 
-| Punto | Entregable documental |
-| ----- | --------------------- |
-| 1 | PAPS adaptado a SW2. |
-| 2 | Modelos de contexto, arquitectura, datos y logica. |
-| 3 | Manual de garantia de calidad institucional. |
-| 4 | Uso de herramientas CASE y navegabilidad entre modelos. |
-| 5 | Aspectos legales para apertura de empresa de software en Bolivia. |
-| 6 | Infraestructura tecnologica para produccion de software. |
-| 7 | Sitio web de la empresa publicado en linea. |
-| 8 | Estudio de mercado cuantificado. |
-| 9 | Plan integral de pruebas del software. |
-| 10 | Plan de marketing. |
-| 11 | Puesta en marcha, cloud, licencias, tiendas, terminos y privacidad. |
-| 12 | Software como producto final entregable. |
+La documentacion integral se estructura alrededor de los doce puntos solicitados por la materia. Cada punto cumple una funcion distinta dentro de la evaluacion: algunos describen el producto, otros formalizan el proceso de desarrollo, la empresa de software, la calidad, la validacion, la comercializacion y la puesta en marcha.
 
+| Punto | Eje documental | Contenido esperado |
+| ----- | -------------- | ------------------ |
+| 1 | PAPS adaptado a SW2 | Problema, situacion deseada, objetivos, alcance, restricciones, requerimientos, stack, cronograma y criterios de aceptacion. |
+| 2 | Modelos de desarrollo | Modelos de contexto, arquitectura, datos y logica, con trazabilidad entre casos de uso, componentes, entidades y flujos. |
+| 3 | Manual de garantia de calidad | Politica institucional de calidad, roles, procesos, registros, metricas, auditorias, no conformidades y mejora continua. |
+| 4 | Herramientas CASE | Uso de modelado UML, navegabilidad entre diagramas, trazabilidad y evidencias de soporte al diseno. |
+| 5 | Aspectos legales | Apertura de empresa de software en Bolivia, obligaciones tributarias, contratos, propiedad intelectual y proteccion de datos. |
+| 6 | Infraestructura tecnologica | Gestion de repositorio, ramas, CI/CD, contenedores, Nginx, base de datos, ambientes, seguridad, monitoreo y backups. |
+| 7 | Sitio web de la empresa | Presencia publica de Team 24 Software, servicios, producto, descargas, soporte, contacto y mantenimiento de contenido. |
+| 8 | Estudio de mercado | Segmentos objetivo, competidores, propuesta de valor, precios, monetizacion, costos, proyeccion y riesgos comerciales. |
+| 9 | Plan de pruebas | Estrategia de pruebas por niveles, caja blanca, rendimiento, seguridad, checklists y criterios de aceptacion. |
+| 10 | Marketing | Objetivos, publicos, posicionamiento, canales, calendario, piezas promocionales, metricas y presupuesto inicial. |
+| 11 | Puesta en marcha | Comparacion cloud, costos, decision de plataforma, licencias, tiendas, terminos, privacidad y adopcion asistida. |
+| 12 | Software como producto | Componentes finales, funcionalidades, accesos publicos, releases, versionado, soporte, criterios de entrega y evidencias. |
+
+## Cierre ejecutivo
+
+Wireless HeatMapper integra ingenieria de software, redes inalambricas, visualizacion espacial e inteligencia artificial aplicada en un producto operable en linea. Su valor principal consiste en transformar un proceso tecnico manual en un flujo digital trazable, verificable y presentable para el cliente final. La documentacion de SW2 amplia esa entrega tecnica con una vision institucional completa: empresa productora, calidad, legalidad, mercado, pruebas, marketing, despliegue y sostenibilidad del producto.
 
 
 # Plan Aplicado a Proyecto de Software
@@ -163,133 +195,487 @@ RP4 y RP6 se conservan como requerimientos historicos de analisis y reportes, pe
 
 # Modelos de desarrollo
 
-El proyecto adopta Scrum como marco de gestion y complementa cada incremento con modelos de ingenieria elaborados en UML 2.5+. Los modelos obligatorios son contexto, arquitectura, datos y logica. Su funcion es mantener una vision verificable del alcance, estructura, persistencia y comportamiento dinamico del sistema.
+El proyecto Wireless HeatMapper utiliza modelos UML 2.5+ como soporte tecnico del proceso Scrum. Estos modelos permiten representar el sistema desde cuatro perspectivas obligatorias: contexto, arquitectura, datos y logica. Cada perspectiva tiene un proposito distinto y se vincula con diagramas PlantUML versionados en `docs/SW2/diagramas/`, de forma que el documento academico, la herramienta CASE y el repositorio mantengan la misma fuente de verdad.
+
+Los modelos se aplican sobre la modalidad 100 % en linea del producto: la aplicacion movil actua como cliente delgado, el backend FastAPI concentra la logica de negocio, PostgreSQL es la unica fuente persistente de datos de dominio y la plataforma web cubre la administracion y el portal de cliente.
 
 ## Modelo de contexto
 
-El modelo de contexto delimita actores, casos de uso y frontera del sistema. Los actores principales son tecnico de campo, administrador, cliente, Android WifiManager API y servicio interno de IA. Su representacion se incorpora como figura UML en el documento consolidado.
+El modelo de contexto delimita la frontera funcional de Wireless HeatMapper y muestra como interactuan los actores humanos y sistemas externos con el producto. Su objetivo es aclarar que responsabilidades pertenecen al sistema y que responsabilidades quedan fuera de el.
+
+En este proyecto, el contexto distingue al tecnico de campo, administrador, cliente, Android WifiManager API y servicio interno de IA. Tambien resume los casos de uso principales relacionados con autenticacion, proyectos, planos, captura WiFi, heatmaps, administracion, propuestas IA y consulta por enlace.
+
+| Diagrama | Tipo UML | Bloque PlantUML |
+| -------- | -------- | --------------- |
+| Modelo de Contexto - Wireless HeatMapper | Casos de uso | [01-modelo-contexto.puml](../diagramas/01-modelo-contexto.puml) |
 
 ## Modelo de arquitectura
 
-El modelo de arquitectura representa los componentes principales: app movil Flutter, plataforma web React, backend FastAPI, modulo IA, PostgreSQL, Nginx y pipeline de despliegue. Se documenta mediante diagrama de paquetes y diagrama de despliegue:
+El modelo de arquitectura describe la organizacion tecnica del sistema y las responsabilidades de cada componente. Sirve para verificar que la solucion respeta el stack acordado: Flutter/Dart para la app movil, React/TypeScript para la web, FastAPI para el backend, PostgreSQL como base central, Docker Compose y Nginx para despliegue.
 
-- Diagrama de paquetes.
-- Diagrama de despliegue.
+La arquitectura se representa con dos vistas complementarias. La vista de paquetes muestra la separacion por capas y modulos de software. La vista de despliegue muestra los nodos de ejecucion, contenedores, artefactos y enlaces de comunicacion entre dispositivo Android, navegador, servidor cloud, backend, web, base de datos y GitHub Actions.
+
+| Diagrama | Tipo UML | Bloque PlantUML |
+| -------- | -------- | --------------- |
+| Modelo de Arquitectura - Diagrama de Paquetes | Paquetes | [02-arquitectura-paquetes.puml](../diagramas/02-arquitectura-paquetes.puml) |
+| Modelo de Arquitectura - Diagrama de Despliegue | Despliegue | [03-arquitectura-despliegue.puml](../diagramas/03-arquitectura-despliegue.puml) |
 
 ## Modelo de datos
 
-El modelo de datos define las entidades de negocio persistidas en PostgreSQL: usuario, cliente, proyecto, plano, punto de medicion, lectura RSSI, conjunto AP, mapa de calor y token de enlace cliente. Su representacion conceptual se incorpora como figura UML en el documento consolidado.
+El modelo de datos representa las entidades de negocio, sus atributos principales y relaciones. Su funcion es asegurar que la persistencia centralizada cubre los datos necesarios para ejecutar los flujos del producto sin almacenamiento local de dominio en la app movil.
+
+El modelo conceptual incluye usuarios, clientes, proyectos, planos, puntos de medicion, lecturas RSSI, conjuntos AP, items de conjuntos, mapas de calor y tokens de enlace cliente. Tambien explicita relaciones de composicion y multiplicidad para reflejar que un proyecto contiene planos, mediciones, heatmaps y enlaces publicados.
+
+| Diagrama | Tipo UML | Bloque PlantUML |
+| -------- | -------- | --------------- |
+| Modelo de Datos Conceptual - Wireless HeatMapper | Clases | [04-modelo-datos-conceptual.puml](../diagramas/04-modelo-datos-conceptual.puml) |
 
 ## Modelo de logica
 
-El modelo de logica describe flujos dinamicos relevantes mediante diagramas de secuencia, estados y actividad. Para SW2 se priorizan los flujos que demuestran mayor valor de negocio:
+El modelo de logica describe el comportamiento dinamico del sistema. A diferencia del modelo de datos, que muestra estructura, este modelo muestra secuencias de mensajes, cambios de estado y reglas de ejecucion observables durante los casos de uso principales.
 
-- Captura de mediciones y generacion de heatmap.
-- Publicacion y consulta del portal cliente.
-- Ciclo de vida de un proyecto.
+Para SW2 se priorizan tres diagramas. El primero cubre la captura WiFi en linea y generacion de heatmap. El segundo cubre la publicacion de resultados y acceso del cliente mediante token. El tercero resume el ciclo de vida de un proyecto desde su creacion hasta archivo o reactivacion.
+
+| Diagrama | Tipo UML | Bloque PlantUML |
+| -------- | -------- | --------------- |
+| Modelo de Logica - Captura WiFi y Generacion de Heatmap | Secuencia | [05-logica-captura-heatmap.puml](../diagramas/05-logica-captura-heatmap.puml) |
+| Modelo de Logica - Publicacion y Portal Cliente | Secuencia | [06-logica-portal-cliente.puml](../diagramas/06-logica-portal-cliente.puml) |
+| Modelo de Logica - Estados del Proyecto | Estados | [07-estados-proyecto.puml](../diagramas/07-estados-proyecto.puml) |
+
+## Diagramas complementarios
+
+Ademas de los cuatro modelos obligatorios, el paquete documental incluye diagramas de apoyo para demostrar trazabilidad con herramientas CASE y planificacion de pruebas. No reemplazan los modelos principales; sirven como evidencia academica de navegabilidad, validacion y control de calidad.
+
+| Diagrama | Proposito | Bloque PlantUML |
+| -------- | --------- | --------------- |
+| Herramientas CASE - Navegabilidad entre modelos | Evidenciar trazas entre casos de uso, secuencias, clases, datos y pruebas. | [08-case-navegabilidad.puml](../diagramas/08-case-navegabilidad.puml) |
+| Flujo de Trabajo de Pruebas - Proceso Unificado | Representar el flujo general de planificacion, ejecucion, correccion y validacion de pruebas. | [09-flujo-pruebas-rup.puml](../diagramas/09-flujo-pruebas-rup.puml) |
 
 ## Trazabilidad entre modelos
 
-| Elemento | Modelo de contexto | Modelo de arquitectura | Modelo de datos | Modelo de logica |
-| -------- | ------------------ | ---------------------- | --------------- | ---------------- |
-| Captura WiFi | UC05 | App movil, backend, PostgreSQL | PuntoMedicion, LecturaRSSI | Secuencia captura-heatmap |
-| Heatmap | UC06 | Backend, InterpolacionService | MapaCalor, ConjuntoAP | Secuencia captura-heatmap |
-| IA | UC08, UC09 | Modulo IA backend | ConjuntoAP, ConjuntoAPItem | Flujo de propuesta |
-| Portal cliente | UC15, UC16, UC17 | Web, backend, Nginx | TokenEnlaceCliente | Secuencia portal |
-| Administracion | UC13, UC18, UC19 | Web admin, backend | Usuario, Cliente, Proyecto | CRUD administrativo |
+| Elemento funcional | Modelo de contexto | Modelo de arquitectura | Modelo de datos | Modelo de logica |
+| ------------------ | ------------------ | ---------------------- | --------------- | ---------------- |
+| Captura WiFi | UC05 Capturar senales WiFi | App movil, WifiScanner, backend, PostgreSQL | PuntoMedicion, LecturaRSSI | Secuencia captura WiFi y heatmap |
+| Gestion de proyectos | UC01 Gestionar proyecto | App movil, web admin, backend | Proyecto, Usuario, Cliente | Estados del proyecto |
+| Planos | UC02 Importar plano, UC03 Calibrar plano | App movil, backend, repositorios | Plano, PuntoMedicion | Secuencia captura WiFi y heatmap |
+| Heatmaps | UC06 Generar mapa de calor | InterpolacionService, backend, PostgreSQL | MapaCalor, ConjuntoAP | Secuencia captura WiFi y heatmap |
+| IA | UC08 Generar propuesta IA, UC09 Comparar propuesta | Modulo IA backend, OptimizadorAPService | ConjuntoAP, ConjuntoAPItem, MapaCalor | Comparacion derivada desde conjuntos AP |
+| Portal cliente | UC15 Generar enlace cliente, UC16 Consultar heatmap, UC17 Ver conjuntos AP | Web portal, Nginx, backend share | TokenEnlaceCliente, MapaCalor, ConjuntoAP | Secuencia publicacion y portal cliente |
+| Administracion | UC13 Gestionar usuarios, UC18 Ver proyectos organizacion, UC19 Gestionar clientes | Web admin, backend, PostgreSQL | Usuario, Cliente, Proyecto | Flujos CRUD administrativos |
 
 ## Criterios formales UML
 
-- Los casos de uso separan actores humanos y sistemas externos.
-- Los paquetes muestran dependencias dirigidas y responsabilidades por capa.
-- El despliegue distingue nodos fisicos/logicos, contenedores y artefactos.
-- Las clases expresan atributos, multiplicidades, composicion y asociaciones.
-- Las secuencias muestran mensajes sincronos, validaciones y persistencia.
+- Los casos de uso separan actores humanos, sistemas externos y frontera del sistema.
+- Los paquetes muestran responsabilidades por capa y dependencias dirigidas.
+- El despliegue distingue nodos, contenedores, artefactos y canales de comunicacion.
+- Las clases expresan atributos, multiplicidades, composicion y asociaciones relevantes.
+- Las secuencias muestran participantes, mensajes sincronos, validaciones y persistencia.
+- El diagrama de estados mantiene transiciones compatibles con los estados del proyecto.
+- Todos los diagramas se mantienen como PlantUML para facilitar regeneracion, revision y uso en herramientas CASE.
 
 
-# Manual de garantia de calidad del software
+# Manual institucional de calidad del software
+
+## Proposito
+
+El presente manual define el sistema institucional de gestion y aseguramiento de la calidad de Team 24 Software. Su alcance no se limita a un producto especifico: establece politicas, roles, procesos, registros, metricas, auditorias, tratamiento de no conformidades y mejora continua aplicables a todos los proyectos de software desarrollados por la empresa.
+
+Wireless HeatMapper se considera el primer caso formal de aplicacion del manual, pero las reglas aqui descritas son corporativas y deben mantenerse para futuros productos, servicios de desarrollo, mantenimiento, soporte, consultoria e implementaciones para clientes.
+
+## Marco normativo de referencia
+
+El manual toma como referencia dos normas de calidad aplicables al desarrollo de software:
+
+| Norma | Uso institucional en Team 24 Software |
+| ----- | ------------------------------------- |
+| ISO/IEC 90003 | Guia para aplicar principios de gestion de calidad ISO 9001 en organizaciones que adquieren, desarrollan, operan o mantienen software. Se adopta para organizar procesos, responsabilidades, control documental, gestion de requisitos, diseno, desarrollo, validacion, entrega y mejora. |
+| IEEE 730 | Estructura de referencia para el plan de aseguramiento de calidad del software. Se adopta para definir actividades SQA, revisiones, auditorias, registros, metricas, control de no conformidades, gestion de riesgos y evidencia objetiva. |
+
+La adopcion es proporcional al tamano de la empresa y al contexto academico-comercial de Team 24 Software. No implica certificacion formal, sino aplicacion disciplinada de practicas verificables y auditables.
 
 ## Identidad institucional
 
-**Empresa:** Team 24 Software  
-**Eslogan:** Software medible, verificable y alineado al cliente.  
-**Normas guia:** ISO/IEC 90003 e IEEE 730.  
-
-Este manual se orienta a la empresa de software, no solamente a Wireless HeatMapper. Define politicas y procedimientos aplicables a los proyectos de Team 24 Software, usando Wireless HeatMapper como primera aplicacion institucional.
+| Elemento | Definicion |
+| -------- | ---------- |
+| Empresa | Team 24 Software |
+| Rubro | Desarrollo, integracion, despliegue y soporte de soluciones de software. |
+| Enfoque | Productos web, moviles y backend orientados a procesos tecnicos verificables. |
+| Cliente de referencia | Bulldog Tech., para el caso Wireless HeatMapper. |
+| Eslogan | Software medible, verificable y alineado al cliente. |
 
 ## Mision
 
-Desarrollar soluciones de software confiables, mantenibles y verificables, aplicando practicas de ingenieria, gestion de calidad y mejora continua para resolver necesidades reales de clientes mediante productos funcionales y documentados.
+Desarrollar soluciones de software confiables, mantenibles, seguras y verificables, aplicando practicas de ingenieria, gestion de calidad y mejora continua para resolver necesidades reales de clientes mediante productos funcionales, documentados y sostenibles.
 
 ## Vision
 
-Consolidarse como una empresa capaz de entregar productos de software con trazabilidad completa, evidencia de calidad, seguridad operativa y valor de negocio medible.
+Consolidarse como una empresa de software reconocida por entregar productos con trazabilidad completa, evidencia objetiva de calidad, seguridad operativa, cumplimiento documental y valor de negocio medible para sus clientes.
+
+## Principios de calidad
+
+Team 24 Software adopta los siguientes principios como base de su sistema de calidad:
+
+- Orientacion al cliente y a los usuarios reales del software.
+- Liderazgo tecnico con responsabilidades claras.
+- Participacion activa del equipo en la prevencion de defectos.
+- Enfoque basado en procesos, no en esfuerzos aislados.
+- Decisiones sustentadas en datos, metricas y evidencia.
+- Gestion preventiva de riesgos tecnicos, operativos y de seguridad.
+- Mejora continua del producto, del proceso y de la organizacion.
+- Trazabilidad entre requisitos, diseno, implementacion, pruebas y entrega.
 
 ## Politica de calidad
 
-Team 24 Software se compromete a construir software que satisfaga requisitos acordados con el cliente, cumpla criterios tecnicos verificables y conserve evidencia documental suficiente para demostrar conformidad. La calidad se gestiona desde el inicio del proyecto mediante requisitos claros, diseno trazable, revision tecnica, pruebas por niveles, control de cambios y mejora continua.
+Team 24 Software se compromete a desarrollar, mantener y entregar software que satisfaga los requisitos acordados con el cliente, cumpla criterios tecnicos verificables y conserve evidencia documental suficiente para demostrar conformidad.
 
-## Objetivos de calidad
+La calidad se gestiona desde el inicio de cada proyecto mediante requisitos claros, diseno trazable, control de cambios, revisiones tecnicas, pruebas por niveles, auditorias internas, gestion de no conformidades y mejora continua. Cada incremento entregable debe contar con evidencia proporcional a su riesgo, impacto y alcance.
 
-| Objetivo | Metrica | Meta |
-| -------- | ------- | ---- |
-| Requisitos verificables | Historias con criterios de aceptacion | 100 % antes de ejecucion |
-| Trazabilidad | Requisitos vinculados con diseno y prueba | 100 % de funcionalidades implementadas |
-| Defectos criticos | Defectos criticos abiertos al liberar | 0 |
-| Calidad de codigo | Cambios revisados o validados | 100 % de incrementos entregables |
-| Pruebas | Pruebas definidas ejecutadas | 100 % de pruebas obligatorias por sprint |
-| Documentacion | Artefactos afectados actualizados | 100 % antes del cierre |
+La direccion de Team 24 Software es responsable de comunicar esta politica, revisarla periodicamente y asegurar que el equipo cuente con procedimientos, herramientas y criterios de aceptacion suficientes para cumplirla.
 
-## Roles de calidad
+## Objetivos institucionales de calidad
 
-| Rol | Responsabilidad |
-| --- | --------------- |
-| Direccion tecnica | Aprobar arquitectura, releases y decisiones de alto impacto. |
-| Product Owner | Validar valor de negocio y aceptacion funcional. |
-| Scrum Master | Controlar proceso, riesgos, impedimentos y mejora continua. |
-| Desarrollador | Implementar y probar su propio codigo antes de entregar. |
-| QA rotativo | Intentar quebrar el incremento, revisar seguridad, rendimiento y bordes. |
-| Responsable de configuracion | Controlar versiones, ramas, dependencias y artefactos liberados. |
+| Objetivo | Metrica | Meta institucional |
+| -------- | ------- | ------------------ |
+| Asegurar requisitos verificables | Historias o requisitos con criterios de aceptacion definidos | 100 % antes de iniciar desarrollo |
+| Mantener trazabilidad | Requisitos vinculados con diseno, codigo, pruebas y evidencias | 100 % de funcionalidades liberadas |
+| Prevenir defectos criticos | Defectos criticos abiertos al liberar | 0 |
+| Mejorar calidad tecnica | Cambios revisados, probados o validados por CI | 100 % de incrementos entregables |
+| Asegurar pruebas suficientes | Pruebas obligatorias ejecutadas segun nivel de riesgo | 100 % antes de aprobacion |
+| Controlar documentacion | Artefactos afectados actualizados | 100 % antes de cierre de sprint o release |
+| Gestionar riesgos | Riesgos relevantes identificados con respuesta definida | 100 % de riesgos altos |
+| Mejorar continuamente | Acciones de mejora registradas y verificadas | Al menos 1 por retrospectiva |
 
-## Procesos de calidad
+## Alcance del sistema de calidad
 
-| Proceso | Entradas | Salidas | Evidencia |
-| ------- | -------- | ------- | --------- |
-| Gestion de requisitos | Necesidad del cliente | Backlog priorizado | Historias, criterios, trazabilidad |
-| Diseno | Historias aceptadas | Modelos UML y decisiones | Diagramas, actas tecnicas |
-| Implementacion | Diseno y criterios | Codigo integrado | Commits, revisiones, CI |
-| Verificacion | Codigo ejecutable | Resultados de prueba | Reportes pytest, Flutter, web |
-| Validacion | Incremento desplegable | Aceptacion o rechazo | Acta de Sprint Review |
-| Liberacion | Incremento validado | Version entregable | Release, changelog, evidencia |
-| Mejora | Metricas y defectos | Acciones correctivas | Retrospectiva |
+El sistema de calidad aplica a:
 
-## Control documental y configuracion
+- Descubrimiento y gestion de necesidades del cliente.
+- Definicion de alcance, requerimientos y criterios de aceptacion.
+- Diseno funcional, tecnico, de datos, seguridad e infraestructura.
+- Desarrollo de software backend, web, movil, integraciones y scripts.
+- Pruebas unitarias, integracion, sistema, seguridad, rendimiento y aceptacion.
+- Gestion de configuracion, ramas, versiones, dependencias y releases.
+- Despliegue, puesta en marcha, soporte y mantenimiento.
+- Documentacion tecnica, academica, comercial y operativa.
+- Auditoria interna, no conformidades, acciones correctivas y mejora continua.
 
-- Todo documento formal mantiene version, fecha, responsable y estado.
-- Todo cambio de alcance se registra con impacto sobre requisitos, historias, modelos y pruebas.
-- El codigo fuente se administra con Git y ramas controladas.
-- Los secretos no se versionan; se gestionan por variables de entorno o mecanismos seguros.
-- Los artefactos liberados se vinculan a una version de repositorio y a evidencias de prueba.
+Quedan fuera del alcance del sistema de calidad las decisiones comerciales, legales o contractuales que no esten relacionadas con el cumplimiento del producto o servicio. Sin embargo, cuando dichas decisiones afecten requisitos, seguridad, datos, costos de operacion o soporte, deben registrarse como riesgos o restricciones del proyecto.
 
-## Auditoria interna
+## Estructura organizacional y roles
 
-La auditoria de calidad se ejecuta por sprint o antes de una liberacion relevante. Debe revisar:
+| Rol | Responsabilidades de calidad |
+| --- | ---------------------------- |
+| Direccion tecnica | Aprobar arquitectura, releases, tecnologia base, decisiones de alto impacto y politica de calidad. |
+| Product Owner | Representar valor de negocio, priorizar backlog, aceptar o rechazar incrementos y validar criterios de aceptacion. |
+| Scrum Master | Facilitar el proceso, remover impedimentos, proteger la Definition of Done, registrar retrospectivas y dar seguimiento a mejoras. |
+| Responsable de calidad | Mantener este manual, coordinar auditorias internas, revisar registros, controlar no conformidades y reportar metricas. |
+| Responsable de configuracion | Administrar repositorio, ramas, versionado, dependencias, ambientes, artefactos liberados y evidencias de build. |
+| Desarrollador | Implementar con criterios de calidad, ejecutar pruebas propias, documentar decisiones relevantes y corregir defectos asignados. |
+| QA rotativo | Disenar y ejecutar pruebas, intentar quebrar el incremento, revisar bordes, seguridad, rendimiento y evidencia de aceptacion. |
+| Responsable de seguridad | Revisar autenticacion, autorizacion, secretos, exposicion de datos, dependencias vulnerables y configuracion de despliegue. |
+| Cliente o representante | Revisar entregables, confirmar aceptacion funcional, informar desviaciones y validar que el producto resuelva la necesidad acordada. |
 
-- Trazabilidad entre requisito, historia, implementacion y prueba.
+En equipos pequenos, una persona puede asumir mas de un rol, pero las responsabilidades no desaparecen. Cuando exista conflicto entre quien desarrolla y quien valida, se debe registrar la validacion cruzada posible o la limitacion existente.
+
+## Mapa de procesos institucionales
+
+El sistema de calidad se organiza en tres grupos de procesos: direccion, realizacion del software y soporte.
+
+| Grupo | Proceso | Proposito |
+| ----- | ------- | --------- |
+| Direccion | Planificacion de calidad | Definir objetivos, politicas, alcance, roles, riesgos y criterios de aceptacion. |
+| Direccion | Revision de direccion | Evaluar metricas, auditorias, no conformidades, satisfaccion del cliente y acciones de mejora. |
+| Realizacion | Gestion de requisitos | Capturar, analizar, priorizar, validar y controlar cambios sobre requisitos. |
+| Realizacion | Diseno y arquitectura | Definir estructura del sistema, modelo de datos, integraciones, seguridad y restricciones tecnicas. |
+| Realizacion | Desarrollo | Implementar funcionalidades segun estandares, revisiones, pruebas y control de configuracion. |
+| Realizacion | Verificacion | Comprobar que el software cumple especificaciones mediante pruebas, revisiones y analisis estatico. |
+| Realizacion | Validacion | Confirmar con el cliente o PO que el producto satisface la necesidad de negocio. |
+| Realizacion | Liberacion y despliegue | Preparar versiones, migraciones, configuracion, evidencias, changelog y puesta en marcha. |
+| Soporte | Gestion de configuracion | Controlar repositorio, ramas, versiones, ambientes, dependencias y artefactos. |
+| Soporte | Gestion de riesgos | Identificar, analizar, responder y monitorear riesgos tecnicos, operativos y de negocio. |
+| Soporte | Gestion de no conformidades | Registrar desviaciones, analizar causa, corregir, prevenir recurrencia y verificar cierre. |
+| Soporte | Mejora continua | Convertir metricas, defectos, auditorias y retrospectivas en acciones de mejora verificables. |
+
+## Procedimientos de calidad por ciclo de vida
+
+### Inicio de proyecto
+
+- Identificar cliente, problema, objetivos, alcance, restricciones y criterios de exito.
+- Registrar interesados, roles y responsabilidades.
+- Definir riesgos iniciales y supuestos.
+- Seleccionar herramientas de gestion, repositorio, comunicacion y documentacion.
+- Establecer Definition of Done inicial y estrategia de pruebas.
+
+### Gestion de requisitos
+
+- Cada requisito debe tener origen, descripcion, prioridad, criterio de aceptacion y responsable de validacion.
+- Los requisitos funcionales deben conectarse con casos de uso, historias o tareas implementables.
+- Los requisitos no funcionales deben expresarse como condiciones verificables.
+- Todo cambio de alcance debe evaluar impacto en tiempo, costo, pruebas, documentacion y riesgos.
+- Los requisitos eliminados o diferidos deben conservar justificacion para evitar reintroducciones accidentales.
+
+### Diseno y arquitectura
+
+- El diseno debe representar la solucion antes de codificar componentes de alto impacto.
+- Los modelos deben conservar consistencia con el alcance aprobado.
+- Las decisiones arquitectonicas relevantes deben registrar contexto, alternativas, decision y consecuencia.
+- El diseno debe considerar seguridad, mantenibilidad, despliegue, pruebas y operacion.
+- Los cambios sobre arquitectura, modelo de datos o integraciones deben pasar por revision tecnica.
+
+### Desarrollo
+
+- El codigo debe implementarse en ramas o cambios controlados.
+- Cada incremento debe compilar, ejecutarse o construirse segun corresponda.
+- El desarrollador debe ejecutar pruebas locales razonables antes de solicitar validacion.
+- Las reglas de negocio deben permanecer en componentes apropiados, evitando duplicacion innecesaria.
+- Los secretos, claves y credenciales no deben versionarse.
+- Los errores deben manejarse con mensajes controlados y sin exponer informacion sensible.
+
+### Revision tecnica
+
+- Las revisiones verifican legibilidad, mantenibilidad, seguridad, cobertura de pruebas, consistencia con requisitos y efecto sobre documentacion.
+- Para cambios pequenos, la revision puede ser ejecutada por el propio responsable con evidencia de pruebas.
+- Para cambios de alto impacto, se requiere revision cruzada o aprobacion de direccion tecnica.
+- Todo hallazgo critico debe resolverse antes de integrar o liberar.
+
+### Verificacion y pruebas
+
+- La verificacion confirma que el software fue construido correctamente respecto a sus especificaciones.
+- Deben aplicarse pruebas proporcionales al riesgo: unidad, integracion, sistema, seguridad, rendimiento, regresion y pruebas manuales.
+- Cada defecto encontrado debe registrarse con severidad, pasos de reproduccion, resultado esperado, resultado obtenido y evidencia.
+- La correccion de un defecto debe incluir reejecucion de la prueba afectada y evaluacion de no regresion.
+
+### Validacion con cliente
+
+- La validacion confirma que el software construido resuelve la necesidad del usuario o cliente.
+- Debe ejecutarse sobre incrementos demostrables, no solamente sobre documentos.
+- La aceptacion puede ser total, parcial o rechazada, pero siempre debe quedar registrada.
+- Las observaciones del cliente pueden convertirse en defectos, cambios de alcance, mejoras o riesgos.
+
+### Liberacion y despliegue
+
+- Toda liberacion debe estar asociada a una version identificable del repositorio.
+- Deben registrarse cambios incluidos, pruebas ejecutadas, defectos abiertos aceptados y riesgos residuales.
+- Las migraciones, variables de entorno, dependencias y pasos de despliegue deben estar documentados.
+- La liberacion no debe exponer datos sensibles, credenciales ni configuraciones inseguras.
+- El responsable de configuracion conserva evidencia de build, despliegue y rollback posible.
+
+### Operacion y mantenimiento
+
+- Los incidentes reportados por usuarios se registran y clasifican por severidad.
+- Las correcciones se priorizan segun impacto operativo, seguridad y compromiso contractual.
+- Los cambios correctivos siguen el mismo control de calidad proporcional al riesgo.
+- Las metricas de soporte alimentan retrospectivas y revisiones de direccion.
+
+## Registros obligatorios de calidad
+
+| Registro | Responsable | Momento de generacion | Retencion minima |
+| -------- | ----------- | --------------------- | ---------------- |
+| Backlog o lista de requisitos | Product Owner | Inicio y refinamiento continuo | Vida del proyecto |
+| Criterios de aceptacion | Product Owner | Antes de desarrollo | Vida del proyecto |
+| Matriz de trazabilidad | Responsable de calidad | Al cerrar incremento o release | Vida del proyecto |
+| Decisiones tecnicas | Direccion tecnica | Cuando exista decision relevante | Vida del proyecto |
+| Evidencia de pruebas | QA rotativo / desarrollador | Antes de validar o liberar | Vida del proyecto |
+| Reporte de defectos | QA rotativo | Al detectar desviacion | Vida del proyecto |
+| Registro de no conformidad | Responsable de calidad | Al confirmar incumplimiento | Vida del proyecto |
+| Accion correctiva o preventiva | Responsable asignado | Despues de analizar causa | Hasta cierre y revision |
+| Acta de Sprint Review o aceptacion | Product Owner | Al validar incremento | Vida del proyecto |
+| Retrospectiva | Scrum Master | Al cerrar ciclo | Vida del proyecto |
+| Auditoria interna | Responsable de calidad | Por sprint o antes de release | Vida del proyecto |
+| Registro de version o release | Responsable de configuracion | Al liberar | Vida util del producto |
+| Inventario de riesgos | Scrum Master | Inicio y seguimiento continuo | Vida del proyecto |
+
+Los registros pueden mantenerse como documentos Markdown, issues, tableros, actas, reportes de CI, commits, capturas, releases o evidencias exportadas, siempre que sean localizables, fechados y vinculables al incremento correspondiente.
+
+## Metricas de calidad
+
+Team 24 Software usa metricas para tomar decisiones y no como mecanismo punitivo. La interpretacion debe considerar contexto, complejidad y riesgo.
+
+| Categoria | Metrica | Formula o criterio | Frecuencia |
+| --------- | ------- | ------------------ | ---------- |
+| Requisitos | Cobertura de aceptacion | Requisitos con criterios / requisitos totales | Por sprint |
+| Trazabilidad | Cobertura trazada | Elementos liberados con vinculo a requisito y prueba / elementos liberados | Por release |
+| Defectos | Densidad de defectos | Defectos confirmados / incremento o modulo | Por sprint |
+| Severidad | Defectos criticos abiertos | Conteo de defectos criticos no cerrados | Antes de release |
+| Pruebas | Ejecucion de pruebas obligatorias | Pruebas ejecutadas / pruebas planificadas | Por sprint |
+| Automatizacion | Cobertura de pruebas automatizadas | Pruebas automatizadas relevantes / pruebas repetibles | Por release |
+| Estabilidad | Tasa de regresion | Defectos reabiertos o inducidos / defectos cerrados | Por sprint |
+| Entrega | Cumplimiento de Definition of Done | Items DoD cumplidos / items DoD aplicables | Por incremento |
+| Seguridad | Hallazgos de seguridad abiertos | Conteo por severidad | Por release |
+| Mantenimiento | Tiempo medio de correccion | Tiempo desde registro hasta cierre de defecto | Mensual o por sprint |
+| Satisfaccion | Aceptacion del PO o cliente | Incrementos aceptados / incrementos presentados | Por review |
+| Mejora | Acciones cerradas | Acciones de mejora cerradas / acciones comprometidas | Por retrospectiva |
+
+## Auditoria interna de calidad
+
+La auditoria interna verifica de forma independiente que los procesos definidos se cumplen y que existe evidencia objetiva de conformidad. Debe ejecutarse al menos al cierre de cada sprint relevante o antes de una liberacion externa.
+
+### Alcance minimo de auditoria
+
+- Trazabilidad entre requisitos, historias, diseno, implementacion y pruebas.
 - Cumplimiento de Definition of Done.
-- Resultados de pruebas automatizadas y manuales.
-- Riesgos abiertos.
-- Defectos bloqueantes.
-- Estado de documentacion y evidencias.
+- Estado de pruebas automatizadas y manuales.
+- Defectos abiertos y justificacion de riesgos residuales.
+- Cumplimiento de controles de seguridad y configuracion.
+- Estado de documentacion afectada.
+- Evidencia de revision tecnica y aceptacion del PO o cliente.
+- Seguimiento de no conformidades y acciones correctivas previas.
 
-## No conformidades
+### Resultado de auditoria
 
-Una no conformidad se registra cuando un entregable no cumple un requisito, criterio de aceptacion, politica de calidad o control obligatorio. El registro minimo incluye descripcion, severidad, responsable, causa probable, accion correctiva, accion preventiva y evidencia de cierre.
+| Resultado | Criterio |
+| --------- | -------- |
+| Conforme | El proceso o entregable cumple requisitos y conserva evidencia suficiente. |
+| Observacion | Existe una debilidad que no incumple aun, pero puede generar defecto o riesgo. |
+| No conformidad menor | Incumplimiento localizado sin impacto critico sobre entrega, seguridad o cliente. |
+| No conformidad mayor | Incumplimiento que afecta requisitos, seguridad, trazabilidad, liberacion o confianza del cliente. |
+
+El reporte de auditoria debe incluir fecha, auditor, alcance, hallazgos, evidencias revisadas, severidad, responsables, acciones requeridas y fecha objetivo de cierre.
+
+## Gestion de no conformidades
+
+Una no conformidad ocurre cuando un producto, proceso, registro o entregable incumple un requisito, criterio de aceptacion, politica de calidad, control obligatorio o compromiso aprobado.
+
+### Clasificacion
+
+| Severidad | Descripcion | Ejemplos |
+| --------- | ----------- | -------- |
+| Critica | Impide liberar, compromete seguridad, datos o cumplimiento contractual. | Exposicion de credenciales, perdida de datos, acceso no autorizado, funcionalidad principal inutilizable. |
+| Alta | Afecta funcionalidad importante o genera riesgo operativo serio. | Requisito clave incompleto, prueba obligatoria fallida, migracion inconsistente. |
+| Media | Afecta uso normal, mantenibilidad o evidencia, pero tiene alternativa temporal. | Documentacion incompleta, validacion parcial, defecto funcional acotado. |
+| Baja | Desviacion menor sin impacto operativo inmediato. | Error de formato, inconsistencia menor, mejora de claridad. |
+
+### Registro minimo
+
+Cada no conformidad debe registrar:
+
+- Identificador unico.
+- Fecha de deteccion.
+- Proyecto o proceso afectado.
+- Descripcion objetiva.
+- Requisito, politica o control incumplido.
+- Severidad.
+- Evidencia.
+- Responsable asignado.
+- Analisis de causa raiz.
+- Accion correctiva.
+- Accion preventiva, cuando aplique.
+- Fecha objetivo.
+- Estado.
+- Evidencia de verificacion de cierre.
+
+### Flujo de tratamiento
+
+| Paso | Actividad | Responsable |
+| ---- | --------- | ----------- |
+| 1 | Detectar desviacion y conservar evidencia | Cualquier integrante |
+| 2 | Clasificar severidad e impacto | Responsable de calidad |
+| 3 | Asignar responsable y fecha objetivo | Scrum Master / direccion tecnica |
+| 4 | Analizar causa raiz | Responsable asignado |
+| 5 | Ejecutar accion correctiva | Responsable asignado |
+| 6 | Definir accion preventiva si existe riesgo de recurrencia | Responsable de calidad |
+| 7 | Verificar cierre con evidencia | QA rotativo o responsable de calidad |
+| 8 | Registrar aprendizaje en retrospectiva si corresponde | Scrum Master |
+
+Una no conformidad critica o alta bloquea la liberacion salvo aceptacion explicita de direccion tecnica y Product Owner, con registro del riesgo residual.
+
+## Control de cambios
+
+Todo cambio relevante debe evaluarse antes de incorporarse. El control de cambios aplica a requisitos, diseno, arquitectura, datos, seguridad, infraestructura, alcance, releases y documentacion formal.
+
+| Tipo de cambio | Evaluacion requerida |
+| -------------- | -------------------- |
+| Requisito funcional | Impacto en backlog, casos de uso, pruebas, estimacion y aceptacion. |
+| Requisito no funcional | Impacto en rendimiento, seguridad, disponibilidad, mantenibilidad y operacion. |
+| Modelo de datos | Impacto en migraciones, integridad, compatibilidad y respaldo. |
+| Arquitectura | Impacto en componentes, despliegue, dependencias, riesgos y costos. |
+| Seguridad | Impacto en autenticacion, autorizacion, secretos, datos personales y auditoria. |
+| Infraestructura | Impacto en ambientes, despliegue, monitoreo, backups y rollback. |
+| Documentacion | Impacto en trazabilidad, manuales, planes, anexos y evidencias. |
+
+Los cambios aprobados deben quedar vinculados al commit, tarea, historia, issue, acta o documento que los justifique.
+
+## Gestion de configuracion
+
+La gestion de configuracion asegura que los elementos del software sean identificables, reproducibles y controlados.
+
+| Elemento | Control esperado |
+| -------- | ---------------- |
+| Codigo fuente | Versionado en Git, commits claros, ramas controladas y cambios revisables. |
+| Dependencias | Versiones declaradas, actualizacion controlada y revision de vulnerabilidades. |
+| Configuracion | Variables de entorno documentadas y secretos excluidos del repositorio. |
+| Base de datos | Migraciones trazables, respaldos y procedimientos de restauracion. |
+| Artefactos | Builds, releases, imagenes o paquetes asociados a version del repositorio. |
+| Documentos | Version, fecha, responsable y coherencia con alcance vigente. |
+| Diagramas | Fuente editable conservada y salida visual regenerable cuando aplique. |
+
+## Criterios de liberacion
+
+Un incremento o version puede liberarse cuando cumple las siguientes condiciones:
+
+- Requisitos incluidos tienen criterios de aceptacion cumplidos o excepciones aprobadas.
+- No existen defectos criticos abiertos.
+- Las pruebas obligatorias pasaron o los riesgos residuales fueron aceptados formalmente.
+- La documentacion afectada fue actualizada.
+- La version del repositorio esta identificada.
+- La configuracion de despliegue no expone secretos ni datos sensibles.
+- El PO o cliente valido el incremento segun el alcance acordado.
+- Las no conformidades mayores relacionadas con la entrega estan cerradas o aceptadas con plan de mitigacion.
 
 ## Mejora continua
 
-Cada sprint concluye con retrospectiva. La empresa debe registrar al menos una accion de mejora, asignar responsable y verificar su cierre en el siguiente ciclo. La mejora no se limita al codigo; puede afectar pruebas, comunicacion, infraestructura, documentacion, seguridad o estimacion.
+La mejora continua convierte la experiencia del equipo en acciones verificables. No se limita al codigo: tambien abarca requisitos, comunicacion, estimacion, pruebas, documentacion, seguridad, infraestructura, soporte y relacion con el cliente.
 
+### Fuentes de mejora
+
+- Retrospectivas de sprint.
+- Auditorias internas.
+- No conformidades y defectos recurrentes.
+- Incidentes de operacion.
+- Comentarios del cliente o usuarios.
+- Metricas de calidad.
+- Revisiones tecnicas.
+- Riesgos materializados.
+
+### Ciclo de mejora
+
+| Etapa | Actividad |
+| ----- | --------- |
+| Identificar | Detectar oportunidad a partir de evidencia o experiencia del equipo. |
+| Analizar | Determinar causa, impacto, urgencia y alternativa de solucion. |
+| Planificar | Definir accion, responsable, fecha objetivo y metrica de verificacion. |
+| Ejecutar | Implementar la accion aprobada. |
+| Verificar | Comprobar si la accion redujo el problema o mejoro el resultado. |
+| Estandarizar | Incorporar el aprendizaje en procesos, plantillas, checklists o Definition of Done. |
+
+Cada retrospectiva debe producir al menos una accion de mejora. Si una accion no se cierra, debe mantenerse visible hasta ser completada, replanteada o descartada con justificacion.
+
+## Aplicacion inicial en Wireless HeatMapper
+
+Para Wireless HeatMapper, este manual se aplica de la siguiente forma:
+
+| Area | Aplicacion concreta |
+| ---- | ------------------- |
+| Requisitos | Historias, casos de uso y requerimientos principales deben conservar trazabilidad. |
+| Diseno | Modelos de contexto, arquitectura, datos y logica deben mantenerse coherentes con la modalidad 100 % en linea. |
+| Desarrollo | Backend FastAPI, web React y app Flutter deben seguir control de configuracion, pruebas y revision tecnica. |
+| Pruebas | El plan de pruebas define niveles, tecnicas, rendimiento, seguridad y criterios de cierre. |
+| Seguridad | Autenticacion, autorizacion por roles, proteccion de datos y secretos excluidos del repositorio son controles obligatorios. |
+| Entrega | Cada release debe vincularse a version, evidencias, cambios incluidos y validacion del PO. |
+| Cliente | Bulldog Tech. valida que el producto resuelva el flujo de relevamiento, analisis y publicacion de cobertura WiFi. |
+
+## Revision del manual
+
+Este manual debe revisarse cuando ocurra cualquiera de las siguientes situaciones:
+
+- Inicio de un nuevo proyecto institucional.
+- Cambio relevante de metodologia, tecnologia o estructura del equipo.
+- Auditoria con no conformidad mayor.
+- Incidente de seguridad o perdida de datos.
+- Cierre de release principal.
+- Solicitud de direccion tecnica, Product Owner o cliente.
+
+La revision debe registrar version, fecha, responsable, motivo del cambio y resumen de modificaciones. El objetivo no es aumentar burocracia, sino mantener un sistema de calidad util, proporcional y verificable.
 
 
 # Herramientas CASE
@@ -505,65 +891,315 @@ El equipo puede utilizar asistentes de IA en IDE para acelerar tareas de analisi
 
 # Sitio web de la empresa
 
-## Proposito
+## 1. Proposito
 
-El sitio web representa a Team 24 Software como empresa de desarrollo, no solamente al producto Wireless HeatMapper. Debe estar publicado en linea y servir como punto institucional para presentacion corporativa, servicios, soporte, contacto y acceso a soluciones.
+El sitio web publico representa a **Team 24 Software** como empresa de desarrollo de software y servicios tecnologicos. Su funcion no se limita a promocionar Wireless HeatMapper: tambien comunica la identidad institucional, el catalogo de servicios, los canales de soporte, las descargas disponibles, las politicas publicas y el acceso a informacion confiable para clientes, docentes, usuarios tecnicos y visitantes externos.
 
-## URL publica
+El sitio se considera parte de la presencia digital de la empresa y debe mantenerse publicado en linea, disponible por HTTPS y alineado con la documentacion oficial del proyecto.
 
-La plataforma publicada se accede mediante:
+## 2. URL publica
+
+La publicacion en linea del producto y sitio institucional se encuentra en:
 
 <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/>
 
-Para la presentacion academica, esta URL se acompana con codigo QR en anexos.
+Para presentaciones academicas, entregas documentales y demostraciones, esta URL puede acompanarse con codigo QR en anexos o material promocional. La URL no debe depender de `localhost`, tuneles temporales ni servidores personales apagables durante la evaluacion.
 
-## Contenido minimo del sitio
+## 3. Objetivos del sitio
 
-| Seccion | Contenido esperado |
-| ------- | ------------------ |
-| Quienes somos | Identidad de Team 24 Software, mision, vision y equipo. |
-| Productos y servicios | Desarrollo de software, sistemas web, aplicaciones moviles, consultoria WiFi y analitica. |
-| Producto destacado | Wireless HeatMapper, problema que resuelve, beneficios y componentes. |
-| Descargas | Releases de la aplicacion movil, manuales y enlaces a repositorio si corresponde. |
-| Soporte | Canal de ayuda, preguntas frecuentes y flujo de atencion. |
-| Contacto | Email, WhatsApp, redes sociales y formulario. |
-| Politicas | Terminos y condiciones, privacidad y licenciamiento. |
-| Chatbot | Asistente propio entrenado con informacion de empresa y producto. |
+| Objetivo | Descripcion |
+| -------- | ----------- |
+| Presencia institucional | Presentar a Team 24 Software como proveedor responsable de soluciones de software. |
+| Difusion comercial | Mostrar servicios ofrecidos, producto principal y beneficios para clientes potenciales. |
+| Acceso al producto | Dirigir al usuario hacia Wireless HeatMapper, portal web, manuales y descargas moviles. |
+| Soporte operativo | Centralizar preguntas frecuentes, canales de ayuda y reporte de incidentes. |
+| Confianza y transparencia | Publicar politicas basicas de privacidad, terminos de uso, mantenimiento y contacto. |
+| Atencion asistida | Incorporar un chatbot entrenado con informacion de empresa, producto y soporte. |
 
-## Chatbot propio
+## 4. Publico objetivo
 
-El chatbot no debe reducirse a un enlace de WhatsApp. Debe responder preguntas frecuentes sobre:
+| Publico | Necesidad principal dentro del sitio |
+| ------- | ------------------------------------ |
+| Clientes empresariales | Entender que problema resuelve Wireless HeatMapper y como solicitar una demostracion. |
+| Tecnicos de redes | Conocer el flujo de trabajo, descargas moviles, manuales y soporte tecnico. |
+| Administradores de organizaciones | Revisar beneficios, seguridad, gestion de usuarios y portal de cliente. |
+| Docentes y evaluadores | Ver evidencia de publicacion, alcance del producto y documentacion asociada. |
+| Visitantes generales | Identificar a la empresa, servicios ofrecidos y formas de contacto. |
 
-- Servicios de Team 24 Software.
-- Uso general de Wireless HeatMapper.
-- Diferencia entre tecnico, administrador y cliente.
-- Requisitos para levantar un proyecto de site survey.
-- Interpretacion basica de RSSI, mapas de calor y zonas muertas.
-- Canales de soporte y escalamiento.
+## 5. Mapa de secciones publicas
 
-### Base de conocimiento propuesta
+| Seccion | Contenido esperado | Resultado para el visitante |
+| ------- | ------------------ | --------------------------- |
+| Inicio | Mensaje principal de Team 24 Software, acceso a Wireless HeatMapper, llamada a demo y accesos rapidos. | Comprende en segundos que ofrece la empresa y donde ingresar. |
+| Empresa | Quienes somos, mision, vision, valores, equipo Grupo 24 y enfoque de trabajo. | Reconoce la identidad institucional y responsabilidad del proveedor. |
+| Servicios | Desarrollo web, aplicaciones moviles, backend/API, consultoria WiFi, analitica, IA aplicada y mantenimiento. | Identifica servicios contratables mas alla del producto principal. |
+| Producto | Presentacion de Wireless HeatMapper, problema, usuarios, arquitectura general, beneficios y flujo de uso. | Entiende el valor del producto y su modalidad 100 % en linea. |
+| Descargas | APK Android, manual de usuario, documentacion publica, notas de version y enlaces autorizados. | Obtiene recursos oficiales sin recurrir a archivos sueltos o enlaces informales. |
+| Soporte | Preguntas frecuentes, guia para reportar incidentes, horarios de atencion, severidades y tiempos de respuesta. | Sabe como pedir ayuda y que informacion debe enviar. |
+| Contacto | Formulario web, correo institucional del proyecto, telefono/WhatsApp autorizado y ubicacion referencial en Santa Cruz de la Sierra. | Puede solicitar informacion, soporte o una demostracion. |
+| Chatbot | Asistente conversacional entrenado con informacion aprobada de empresa, producto, soporte y WiFi basico. | Recibe respuestas inmediatas y consistentes antes de escalar a soporte humano. |
+| Politicas | Privacidad, terminos de uso, licenciamiento, cookies si aplican y mantenimiento de contenido. | Conoce reglas de uso, tratamiento de datos y alcance del servicio. |
 
-| Tema | Respuestas esperadas |
-| ---- | -------------------- |
-| Empresa | Que hace Team 24 Software, a que clientes atiende y como contactarla. |
-| Producto | Funcionalidades principales, modalidad en linea y beneficios. |
-| Soporte | Como reportar incidentes, que informacion enviar y tiempos estimados. |
-| WiFi | Explicacion de RSSI, objetivo >= -70 dBm y zona muerta < -90 dBm. |
-| Privacidad | Datos tratados, finalidad y controles de acceso. |
+## 6. Seccion Empresa
 
-## Criterios de publicacion
+La seccion de empresa debe diferenciar claramente a **Team 24 Software** del cliente del caso **Bulldog Tech.**. Team 24 Software es la empresa desarrolladora del producto; Bulldog Tech. es el cliente real utilizado para contextualizar el problema de cobertura WiFi.
 
-- El sitio se accede por HTTPS.
-- No depende de localhost ni prototipos.
-- Los enlaces publicos funcionan.
-- El contenido distingue empresa, producto y cliente.
-- El chatbot responde con informacion especifica y no generica.
-- Las politicas legales estan enlazadas.
+Contenido minimo:
 
-## Mantenimiento
+- Nombre institucional: Team 24 Software.
+- Equipo: Grupo 24 de Ingenieria de Software II.
+- Ubicacion referencial: Santa Cruz de la Sierra, Bolivia.
+- Mision: desarrollar soluciones digitales verificables, mantenibles y orientadas a necesidades reales de clientes.
+- Vision: consolidarse como equipo proveedor de software tecnico para redes, analitica y procesos empresariales.
+- Valores: calidad, trazabilidad, responsabilidad, seguridad, aprendizaje continuo y comunicacion clara.
+- Perfil del equipo: desarrollo web, movil, backend, documentacion, pruebas y despliegue.
 
-El contenido debe revisarse en cada release mayor. Los enlaces a descargas moviles, repositorio y documentacion publica deben validarse antes de cada entrega academica o demostracion.
+## 7. Seccion Servicios
 
+La seccion de servicios presenta capacidades de Team 24 Software de forma comercial y verificable. No debe prometer servicios que no puedan explicarse o demostrarse.
+
+| Servicio | Alcance |
+| -------- | ------- |
+| Desarrollo de software web | Sistemas administrativos, portales de cliente, dashboards y aplicaciones SPA. |
+| Desarrollo movil | Aplicaciones Android con cliente delgado, consumo REST y experiencia orientada a campo. |
+| Backend y APIs | APIs REST, autenticacion JWT, persistencia centralizada y documentacion OpenAPI. |
+| Consultoria WiFi | Herramientas para relevamiento, interpretacion de RSSI, mapas de calor y evidencia tecnica. |
+| Analitica e IA aplicada | Procesamiento de datos, recomendaciones asistidas y automatizacion de decisiones tecnicas. |
+| DevOps basico | Contenedores, despliegue con Docker Compose, Nginx, HTTPS y CI/CD. |
+| Mantenimiento y soporte | Correcciones, actualizaciones, respaldos, monitoreo y atencion de incidentes. |
+
+Cada servicio debe incluir una descripcion breve, beneficios, ejemplos de entregables y un llamado a contacto.
+
+## 8. Seccion Producto: Wireless HeatMapper
+
+Wireless HeatMapper es el producto destacado del sitio. Debe presentarse como una solucion integrada para relevar, procesar y publicar resultados de cobertura WiFi en interiores mediante mapas de calor.
+
+Contenido minimo:
+
+- Problema que resuelve: mediciones WiFi fragmentadas, uso de planos impresos, transcripcion manual y baja trazabilidad.
+- Usuarios principales: administrador, tecnico de campo y cliente final.
+- Componentes: app movil Android, backend FastAPI, PostgreSQL, panel web, portal de cliente e IA backend.
+- Modalidad: 100 % en linea, sin persistencia local de dominio ni sincronizacion diferida.
+- Beneficios: evidencia centralizada, mapas de calor, comparacion de escenarios, portal por enlace y supervision organizacional.
+- Criterios tecnicos visibles: objetivo de diseno RSSI >= -70 dBm y zona muerta RSSI < -90 dBm.
+
+La seccion debe incluir enlaces hacia login, portal, manual de usuario, API/documentacion tecnica cuando corresponda y canal de soporte.
+
+## 9. Seccion Descargas
+
+La seccion de descargas debe publicar solamente recursos oficiales, versionados y revisados.
+
+| Recurso | Contenido | Regla de publicacion |
+| ------- | --------- | -------------------- |
+| APK Android | Instalador de la app movil para tecnicos. | Publicar solo builds generados desde release o entrega aprobada. |
+| Manual de usuario | Guia de uso para administrador, tecnico y cliente. | Mantener sincronizado con el incremento desplegado. |
+| Notas de version | Cambios principales, correcciones y advertencias. | Una entrada por version liberada. |
+| Documentacion publica | Enlaces a documentos aprobados para consulta externa. | No exponer secretos, credenciales ni datos privados. |
+| Politicas | Terminos, privacidad, soporte y mantenimiento. | Revisar ante cada cambio de operacion o tratamiento de datos. |
+
+Los enlaces rotos, archivos duplicados o versiones obsoletas deben retirarse o marcarse claramente como historicas.
+
+## 10. Seccion Soporte
+
+La seccion de soporte debe orientar al usuario antes de escalar a contacto humano. Debe contener:
+
+- Preguntas frecuentes sobre acceso, roles, carga de planos, mediciones, heatmaps y portal cliente.
+- Guia para reportar incidentes.
+- Horario de atencion definido para el contexto academico o productivo.
+- Clasificacion de severidad.
+- Datos minimos que debe enviar el usuario.
+- Flujo de escalamiento desde chatbot hacia soporte humano.
+
+### 10.1. Clasificacion de incidentes
+
+| Severidad | Ejemplo | Tiempo objetivo de primera respuesta |
+| --------- | ------- | ------------------------------------ |
+| Alta | Sistema publicado inaccesible, login general caido, perdida de acceso al portal. | 4 horas habiles. |
+| Media | Error en carga de planos, falla en generacion de heatmap o descarga no disponible. | 1 dia habil. |
+| Baja | Consulta funcional, ajuste de texto, duda de uso o solicitud de mejora. | 2 dias habiles. |
+
+### 10.2. Datos requeridos para soporte
+
+- Nombre y rol del usuario.
+- Organizacion o cliente relacionado.
+- URL o pantalla donde ocurre el problema.
+- Pasos para reproducir el incidente.
+- Fecha y hora aproximada.
+- Captura de pantalla si corresponde.
+- Version de APK o navegador utilizado.
+
+## 11. Seccion Contacto
+
+La seccion de contacto debe ofrecer canales claros y evitar informacion ambigua.
+
+| Canal | Uso recomendado |
+| ----- | --------------- |
+| Formulario web | Solicitudes comerciales, demostraciones, soporte general y mensajes academicos. |
+| Correo institucional | Comunicacion formal, seguimiento de incidentes y entrega de evidencias. |
+| WhatsApp autorizado | Coordinacion rapida de demostraciones o soporte de baja complejidad. |
+| Redes sociales | Difusion institucional, marketing y anuncios publicos. |
+| Ubicacion referencial | Identificar la ciudad base de operacion sin publicar domicilios privados. |
+
+El formulario debe pedir solo datos necesarios: nombre, correo, organizacion, motivo, mensaje y consentimiento para tratamiento de datos. No debe solicitar contrasenas, tokens, credenciales ni informacion sensible de redes internas.
+
+## 12. Chatbot entrenado
+
+El sitio debe incluir un chatbot propio o integrado que responda con informacion especifica de Team 24 Software y Wireless HeatMapper. No debe limitarse a redirigir a WhatsApp ni responder con texto generico sin contexto.
+
+### 12.1. Objetivo del chatbot
+
+Atender consultas frecuentes, reducir carga de soporte inicial y guiar al visitante hacia la seccion correcta del sitio. Cuando la consulta supere su alcance, debe escalar al formulario de contacto o al canal de soporte humano.
+
+### 12.2. Base de conocimiento
+
+| Tema | Contenido entrenado o documentado |
+| ---- | --------------------------------- |
+| Empresa | Identidad de Team 24 Software, equipo, servicios, ubicacion referencial y contacto. |
+| Producto | Componentes de Wireless HeatMapper, roles, modalidad online, beneficios y limites. |
+| Uso | Inicio de sesion, creacion de proyectos, carga de planos, mediciones, heatmaps y portal cliente. |
+| Soporte | Como reportar incidentes, severidades, datos requeridos y tiempos de respuesta. |
+| WiFi basico | RSSI, mapas de calor, objetivo >= -70 dBm, zona muerta < -90 dBm e interpretacion general. |
+| Privacidad | Datos tratados, finalidad, roles de acceso y recomendaciones de seguridad. |
+| Descargas | Donde obtener APK, manuales, notas de version y documentacion autorizada. |
+
+### 12.3. Preguntas que debe responder
+
+- Que es Team 24 Software?
+- Que problema resuelve Wireless HeatMapper?
+- Como ingreso al sistema publicado?
+- Cual es la diferencia entre administrador, tecnico y cliente?
+- Como se reporta un problema?
+- Donde descargo la app movil?
+- Que significa RSSI >= -70 dBm?
+- Que significa RSSI < -90 dBm?
+- Como se comparte un proyecto con un cliente?
+- Que datos trata el sistema?
+
+### 12.4. Limites y seguridad del chatbot
+
+El chatbot debe aplicar las siguientes reglas:
+
+- No inventar precios, contratos, credenciales ni compromisos comerciales no aprobados.
+- No solicitar contrasenas, tokens, claves WiFi reales ni secretos de infraestructura.
+- No entregar datos privados de clientes, usuarios, planos o proyectos.
+- No reemplazar soporte humano en incidentes criticos.
+- Indicar cuando una respuesta requiere validacion del equipo.
+- Usar lenguaje claro, breve y profesional.
+- Basar respuestas en documentacion aprobada, no en suposiciones.
+
+### 12.5. Mantenimiento del entrenamiento
+
+La base del chatbot se actualiza cuando cambian:
+
+- servicios publicados;
+- politicas de privacidad o terminos de uso;
+- URL productiva;
+- flujo de autenticacion;
+- version de APK;
+- manual de usuario;
+- roles o permisos;
+- procedimientos de soporte;
+- criterios tecnicos visibles para usuarios.
+
+Cada actualizacion debe registrar fecha, responsable, fuente documental usada y alcance del cambio.
+
+## 13. Politicas publicas del sitio
+
+El sitio debe enlazar politicas basicas en lenguaje comprensible:
+
+| Politica | Contenido minimo |
+| -------- | ---------------- |
+| Privacidad | Datos recolectados, finalidad, responsables, conservacion, seguridad y contacto. |
+| Terminos de uso | Reglas de acceso, uso permitido, restricciones, disponibilidad y responsabilidades. |
+| Licenciamiento | Titularidad del software, uso de terceros y condiciones de distribucion del APK. |
+| Cookies o analitica | Herramientas usadas, finalidad y opciones del usuario, si corresponde. |
+| Soporte | Canales, horarios, severidades, tiempos de respuesta y alcance del servicio. |
+| Mantenimiento de contenido | Responsables, frecuencia, versionado y criterios para retirar informacion obsoleta. |
+
+Estas politicas deben estar visibles desde el pie de pagina y desde la seccion de soporte o contacto.
+
+## 14. Politicas de mantenimiento del contenido
+
+El contenido del sitio debe tratarse como informacion oficial de la empresa. Cualquier cambio debe ser revisado antes de publicarse, especialmente si afecta producto, soporte, politicas o descargas.
+
+### 14.1. Responsabilidades
+
+| Rol | Responsabilidad |
+| --- | --------------- |
+| Product Owner | Aprueba contenido de producto, beneficios, alcance y mensajes orientados al cliente. |
+| Scrum Master | Coordina revision, evidencia de publicacion y cumplimiento de fechas. |
+| Responsable tecnico | Valida URLs, descargas, version de APK, estado del despliegue y enlaces a documentacion. |
+| Responsable de calidad | Revisa claridad, consistencia, ortografia, trazabilidad y ausencia de datos sensibles. |
+
+### 14.2. Frecuencia de revision
+
+| Frecuencia | Actividad |
+| ---------- | --------- |
+| En cada release | Validar enlaces, descargas, notas de version, manuales y capturas visibles. |
+| Mensual | Revisar textos institucionales, servicios, contacto, preguntas frecuentes y chatbot. |
+| Antes de una demo | Confirmar disponibilidad HTTPS, login, portal, QR, descargas y formulario de contacto. |
+| Ante incidente critico | Publicar aviso, actualizar soporte y retirar informacion temporal incorrecta si aplica. |
+| Ante cambio legal o de datos | Revisar privacidad, terminos de uso y consentimiento del formulario. |
+
+### 14.3. Flujo de cambio de contenido
+
+1. Identificar necesidad de cambio.
+2. Registrar fuente del cambio: release, incidente, feedback de usuario, decision del PO o ajuste legal.
+3. Editar contenido en rama o cambio controlado.
+4. Revisar ortografia, enlaces, consistencia y datos sensibles.
+5. Validar despliegue en ambiente publicado.
+6. Registrar fecha, responsable y descripcion breve del cambio.
+
+### 14.4. Criterios de retiro de contenido
+
+Se debe retirar, corregir o marcar como historico cualquier contenido que:
+
+- apunte a descargas no vigentes;
+- mencione funcionalidades no disponibles;
+- contradiga la modalidad 100 % en linea;
+- exponga datos internos, credenciales o informacion de clientes;
+- tenga enlaces rotos;
+- use capturas desactualizadas;
+- prometa tiempos, precios o garantias no aprobadas;
+- confunda a Team 24 Software con Bulldog Tech.
+
+## 15. Criterios de aceptacion del sitio publicado
+
+| Criterio | Verificacion |
+| -------- | ------------ |
+| Acceso publico | La URL abre por HTTPS desde navegador externo. |
+| Identidad clara | Se distingue Team 24 Software, Wireless HeatMapper y Bulldog Tech. |
+| Secciones completas | Empresa, servicios, producto, descargas, soporte, contacto, chatbot y politicas estan visibles. |
+| Enlaces funcionales | Login, manuales, descargas, politicas y contacto no devuelven error. |
+| Chatbot entrenado | Responde preguntas especificas de empresa, producto, soporte y WiFi basico. |
+| Seguridad de informacion | No se publican secretos, credenciales, datos privados ni enlaces internos sensibles. |
+| Contenido vigente | Textos, descargas y manuales coinciden con la version desplegada. |
+| Mantenimiento definido | Existe responsable, frecuencia y flujo de actualizacion documentado. |
+
+## 16. Evidencias recomendadas
+
+Para demostrar que el sitio esta publicado y mantenido, se recomienda conservar:
+
+- captura de la pagina principal con URL visible;
+- captura de cada seccion publica;
+- captura de una conversacion valida con el chatbot;
+- captura de la seccion de descargas;
+- captura de politicas enlazadas;
+- registro de verificacion de enlaces;
+- QR de acceso usado en presentaciones;
+- commit o version donde se actualizo el contenido.
+
+## 17. Relacion con otros documentos
+
+Este documento se complementa con:
+
+- `01-resumen-ejecutivo.md`, para la vision general del producto y empresa.
+- `04-manual-calidad.md`, para politicas institucionales de calidad.
+- `06-aspectos-legales.md`, para obligaciones de empresa de software en Bolivia.
+- `07-infraestructura-produccion.md`, para despliegue, ambientes, seguridad y CI/CD.
+- `11-marketing.md`, para canales de promocion y posicionamiento.
+- `12-puesta-marcha.md`, para operacion del producto desplegado.
+- `13-software-producto.md`, para ficha tecnica de Wireless HeatMapper.
 
 
 # Estudio de mercado
@@ -987,88 +1623,224 @@ Se propone un agente de ayuda integrado que observe contexto de pantalla, rol y 
 **Nombre:** Wireless HeatMapper  
 **Proveedor:** Team 24 Software  
 **Cliente inicial:** Bulldog Tech.  
-**Modalidad:** SaaS en linea con app movil, backend y web.  
+**Modalidad:** SaaS 100 % en linea con app movil Android, backend REST y plataforma web.
+**Fuente de verdad:** PostgreSQL central, sin base de datos local de dominio en el dispositivo movil.
+**Version movil base:** 1.0.0+1.
+
+Wireless HeatMapper se entrega como un producto integrado para relevamiento, analisis y publicacion de cobertura WiFi. La aplicacion movil funciona como cliente delgado para tecnicos de campo; el backend concentra autenticacion, reglas de negocio, persistencia, generacion de mapas de calor e inteligencia artificial; y la plataforma web permite administracion organizacional, revision tecnica y acceso controlado del cliente final.
 
 ## URLs y artefactos publicos
 
-| Recurso | URL |
-| ------- | --- |
-| Repositorio | <https://github.com/borysinho/wireless-heatmapper> |
-| Frontend publicado | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/> |
-| Releases moviles | <https://github.com/borysinho/wireless-heatmapper/releases> |
+| Recurso | URL | Uso |
+| ------- | --- | --- |
+| Repositorio GitHub | <https://github.com/borysinho/wireless-heatmapper> | Codigo fuente, documentacion, historial, workflows y trazabilidad tecnica. |
+| Frontend publicado | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/> | Entrada publica al panel web y portal de cliente. |
+| Panel administrador | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/admin/login> | Acceso para administradores y usuarios autorizados. |
+| Portal cliente | `https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/portal/{token}` | Acceso por enlace unico generado desde el panel web. |
+| API REST | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/api/> | Base publica de endpoints consumidos por web y movil. |
+| Swagger / OpenAPI | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/api/docs> | Documentacion interactiva de endpoints. |
+| Esquema OpenAPI | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/api/openapi.json> | Contrato tecnico consumible por herramientas. |
+| Manual de usuario | <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/manual/> | Guia publica de operacion funcional. |
+| Releases moviles | <https://github.com/borysinho/wireless-heatmapper/releases> | APK Android generado por GitHub Actions. |
+
+Estas URLs son las referencias publicas para entrega academica, demostracion y continuidad. En anexos se incorporan codigos QR hacia repositorio, frontend publicado, manual de usuario y releases moviles.
 
 ## Componentes entregables
 
 | Componente | Descripcion |
 | ---------- | ----------- |
-| Backend REST | API FastAPI, autenticacion, servicios, IA, almacenamiento y reglas de negocio. |
-| Base de datos | PostgreSQL con migraciones y entidades de dominio. |
-| Web admin | Gestion de usuarios, clientes, proyectos, propuestas y publicacion. |
-| Portal cliente | Acceso por enlace unico a resultados publicados. |
-| App movil | Cliente Android Flutter para tecnicos de campo. |
-| Infraestructura | Docker Compose, Nginx, CI/CD y despliegue cloud. |
-| Documentacion | Manuales, modelos, pruebas, calidad y puesta en marcha. |
+| Backend REST + IA | API FastAPI con autenticacion, roles, servicios de dominio, almacenamiento, mapas de calor, propuestas IA y publicacion para cliente. |
+| Base de datos | PostgreSQL con migraciones y entidades para usuarios, clientes, proyectos, planos, mediciones, conjuntos AP, mapas de calor y enlaces. |
+| Web admin | Plataforma React/TypeScript para gestionar usuarios, clientes, proyectos RF, datos de campo, escenarios IA y publicacion. |
+| Portal cliente | Vista web por token para consultar resultados publicados sin cuenta interna. |
+| App movil Android | Cliente Flutter para tecnicos de campo: login, proyectos, planos, captura WiFi y consulta de heatmaps. |
+| Infraestructura | Docker Compose, Nginx, TLS, GitHub Actions, despliegue cloud y publicacion de APK. |
+| Manual y documentacion | Manual de usuario, modelos, pruebas, puesta en marcha, bibliografia y anexos con evidencias. |
 
-## Funcionalidades principales
+## Componentes backend
 
-- Inicio de sesion y control de roles.
-- Administracion de usuarios tecnicos.
-- Administracion de clientes.
-- Creacion y gestion de proyectos.
-- Importacion y calibracion de planos.
-- Captura de mediciones WiFi.
-- Clasificacion de niveles de senal.
-- Generacion de mapas de calor.
-- Gestion de conjuntos de AP.
-- Propuesta IA como conjunto derivado.
-- Comparacion entre configuracion actual y propuesta.
-- Generacion de enlace cliente.
-- Visualizacion web del resultado publicado.
+| Area | Entrega |
+| ---- | ------- |
+| API | Servicio REST documentado con OpenAPI y healthcheck operativo. |
+| Autenticacion | Login, JWT, refresh token, roles y control de acceso por usuario. |
+| Administracion | Gestion de usuarios tecnicos, clientes y proyectos organizacionales. |
+| Proyectos | CRUD de proyectos, asociacion con cliente y control de ownership. |
+| Planos | Carga, almacenamiento, URLs firmadas, consulta y calibracion. |
+| Captura WiFi | Persistencia de puntos de medicion y lecturas RSSI enviadas desde Android. |
+| Heatmaps | Generacion de mapas de calor desde datos persistidos. |
+| Conjuntos AP | Gestion de conjuntos tecnicos, AP disponibles y mapas asociados. |
+| IA | Propuestas de optimizacion como conjuntos derivados y trazables. |
+| Portal | Generacion y validacion de enlaces unicos para cliente. |
+| Notificaciones | Base tecnica para dispositivos push y notificaciones operativas. |
+
+## Componentes web
+
+| Modulo | Entrega |
+| ------ | ------- |
+| Login administrador | Autenticacion web y carga de sesion. |
+| Dashboard | Vista inicial de administracion. |
+| Usuarios | Alta, edicion, consulta y administracion de tecnicos. |
+| Clientes | Alta, edicion y consulta de clientes organizacionales. |
+| Proyectos RF | Listado organizacional y navegacion al detalle tecnico. |
+| Datos de campo | Visualizacion de conjuntos AP, mapas e informacion capturada. |
+| Escenarios IA | Consulta de propuestas IA y comparacion con datos de campo. |
+| Publicacion | Generacion y administracion del enlace unico para cliente. |
+| Portal cliente | Visualizacion publica por token de resultados autorizados. |
+
+## Componentes moviles
+
+| Modulo | Entrega |
+| ------ | ------- |
+| Autenticacion | Login de tecnico contra backend y manejo seguro de sesion. |
+| Proyectos | Listado, creacion, edicion, archivo y eliminacion logica segun permisos. |
+| Clientes | Consulta remota de clientes para asociar proyectos. |
+| Planos | Listado, carga, visualizacion, calibracion y renovacion de URL firmada. |
+| Captura WiFi | Escaneo WiFi Android, seleccion de punto sobre plano y envio de mediciones. |
+| Heatmap | Consulta de AP disponibles, conjuntos AP, escala y mapas generados en backend. |
+| Conectividad | Avisos cuando la operacion en linea no esta disponible. |
+| Notificaciones | Integracion base con Firebase Messaging y notificaciones locales. |
+| Configuracion productiva | APK release apuntando a `https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/api`. |
+
+La app movil conserva solamente credenciales de sesion y preferencias minimas necesarias. No almacena datos de dominio entre sesiones ni implementa sincronizacion diferida.
+
+## Funcionalidades principales por actor
+
+| Actor | Funcionalidades entregadas |
+| ----- | -------------------------- |
+| Administrador | Iniciar sesion, gestionar usuarios, gestionar clientes, consultar proyectos organizacionales, revisar datos RF, consultar escenarios IA y publicar resultados por enlace. |
+| Tecnico de campo | Iniciar sesion en Android, gestionar sus proyectos, cargar y calibrar planos, capturar mediciones WiFi, consultar heatmaps y operar siempre contra el backend. |
+| Cliente final | Abrir enlace unico, visualizar proyecto publicado, revisar datos de campo, heatmaps y resultados seleccionados por el administrador. |
+| Sistema backend | Persistir dominio, aplicar reglas de acceso, generar heatmaps, gestionar conjuntos AP, producir propuestas IA trazables y servir contratos API. |
+| Operacion DevOps | Validar cambios por CI, desplegar contenedores, publicar APK, mantener variables productivas y verificar salud de servicios. |
+
+## Flujo de valor extremo a extremo
+
+1. El administrador crea clientes, tecnicos y revisa proyectos desde la web.
+2. El tecnico ingresa a la app movil y crea o selecciona un proyecto asignado.
+3. El tecnico sube el plano al backend y calibra la escala del plano.
+4. El tecnico captura lecturas WiFi sobre puntos del plano desde Android.
+5. El backend persiste puntos, lecturas y datos de APs en PostgreSQL.
+6. El tecnico o administrador genera conjuntos AP y mapas de calor.
+7. El backend genera propuestas IA como conjuntos derivados y comparables.
+8. El administrador selecciona resultados publicables y genera un enlace de cliente.
+9. El cliente abre el portal por token y consulta los resultados publicados.
+
+Este flujo demuestra la modalidad 100 % en linea: todas las operaciones de dominio dependen del backend y de la base central.
+
+## Releases moviles
+
+El release movil Android se administra con GitHub Actions.
+
+| Elemento | Definicion |
+| -------- | ---------- |
+| Disparador automatico | Push de tags `mobile-v*`. |
+| Disparador manual | Ejecucion manual con tag opcional y bandera de pre-release. |
+| Validaciones previas | Instalacion de dependencias, analisis estatico y pruebas Flutter. |
+| Build | APK Android en modo release con variables productivas. |
+| Nombre de APK | `WirelessHeatMapper-{TAG}.apk`. |
+| Destino | GitHub Releases del repositorio. |
+| Retencion adicional | Artefacto temporal de GitHub Actions por 14 dias. |
+| Backend configurado | `https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/api`. |
+
+Cada release movil debe quedar asociado a un tag, un commit de origen, notas de release y APK descargable. El patron recomendado de tag conserva el formato `mobile-v{version}` o `mobile-v{version}-{run}` cuando se genera desde ejecucion manual.
+
+## Repositorio y trazabilidad tecnica
+
+| Recurso | Criterio de control |
+| ------- | ------------------- |
+| Rama productiva | `main` representa la version desplegable. |
+| Rama de integracion | `develop` concentra integracion antes de promocion. |
+| Ramas de trabajo | Ramas cortas por historia, correccion, infraestructura o documentacion. |
+| Commits | Mensajes claros, preferentemente Conventional Commits en espanol. |
+| Pull requests | Cambios funcionales pasan por validaciones aplicables antes de integrarse. |
+| Workflows | CI, despliegue cloud y release movil quedan versionados en GitHub. |
+| Evidencia historica | Git, GitHub Actions, GitHub Releases, OpenAPI y capturas de demostracion. |
 
 ## Criterios de producto terminado
 
 | Criterio | Condicion |
 | -------- | --------- |
-| Funcional | Flujos principales operan de extremo a extremo. |
-| Tecnico | Backend, web, movil y base de datos integrados. |
-| Calidad | Pruebas obligatorias ejecutadas sin defectos criticos. |
-| Seguridad | Roles, ownership y tokens aplicados. |
-| Operacion | Producto accesible en linea y releases moviles disponibles. |
-| Documentacion | PAPS, modelos, pruebas, manual de calidad y puesta en marcha completos. |
-
-## Versionado y releases
-
-Cada release debe incluir:
-
-- Numero de version.
-- Fecha.
-- Cambios principales.
-- Correcciones.
-- Riesgos conocidos.
-- Artefactos moviles.
-- Hash o referencia del repositorio.
+| Funcional | Flujos principales de administracion, captura, heatmap, IA y portal cliente operan de extremo a extremo. |
+| Modalidad online | La app movil no reintroduce base local de dominio ni sincronizacion diferida. |
+| Integracion | Backend, web, movil, PostgreSQL, Nginx y workflows estan integrados segun la arquitectura documentada. |
+| Seguridad | Roles, ownership, JWT, refresh token, URLs firmadas y tokens de portal se aplican en puntos criticos. |
+| Calidad | Pruebas razonables del release ejecutadas sin defectos criticos abiertos. |
+| Operacion | Plataforma web publica, API documentada, manual publicado y APK disponible en releases. |
+| Documentacion | PAPS, modelos, pruebas, manual, puesta en marcha, bibliografia y anexos se encuentran completos. |
+| Evidencia | Existen capturas, video o demostracion guiada de los flujos principales y enlaces publicos. |
 
 ## Soporte inicial
 
-El soporte se organiza en tres niveles:
+El soporte se organiza por niveles para separar dudas de uso, incidentes reproducibles y cambios estructurales.
 
-| Nivel | Responsable | Alcance |
-| ----- | ----------- | ------- |
-| N1 | Soporte funcional | Dudas de uso, acceso y flujo basico. |
-| N2 | Equipo tecnico | Incidentes reproducibles, errores y configuracion. |
-| N3 | Arquitectura/desarrollo | Defectos complejos, seguridad y cambios estructurales. |
+| Nivel | Responsable | Alcance | Tiempo objetivo inicial |
+| ----- | ----------- | ------- | ----------------------- |
+| N1 | Product Owner / soporte funcional | Accesos, dudas de uso, navegacion, datos de demo y acompanamiento al cliente. | 1 dia habil |
+| N2 | Equipo tecnico | Errores reproducibles, fallas de integracion, problemas de configuracion y revision de logs. | 2 dias habiles |
+| N3 | Arquitectura / desarrollo | Defectos complejos, seguridad, migraciones, infraestructura, IA y cambios de diseno. | 3 a 5 dias habiles |
 
-## Evidencia de entrega
+Canales minimos recomendados:
 
-La entrega final debe presentar:
+- Correo de soporte institucional.
+- Registro de incidencias en GitHub Issues o tablero equivalente.
+- Evidencia obligatoria por incidencia: usuario afectado, fecha, pasos, captura, URL o proyecto relacionado.
+- Clasificacion por severidad: critica, alta, media o baja.
 
-- Demostracion del frontend publico.
-- APK o release movil descargable.
-- Repositorio accesible.
-- Pruebas ejecutadas.
-- Capturas o video de flujos principales.
-- Documento consolidado en Word con diagramas y QR.
+## Versionado
 
+| Artefacto | Regla de versionado |
+| --------- | ------------------- |
+| Codigo fuente | Historial Git con commits atomicos y tags para releases relevantes. |
+| Backend | Version expuesta por healthcheck y metadatos de la API. |
+| Web | Version asociada al commit desplegado y a la imagen Docker publicada. |
+| Movil | Version declarada en Flutter y tag `mobile-v*`. |
+| Imagenes Docker | Tags `latest` y `COMMIT_SHA` en el registro de contenedores. |
+| Documentacion | Control por Git y actualizacion junto al release. |
+| Base de datos | Migraciones versionadas junto al cambio de modelo. |
+
+Cada release debe incluir:
+
+- Numero o tag de version.
+- Fecha de publicacion.
+- Commit o hash de referencia.
+- Cambios principales.
+- Correcciones incluidas.
+- Riesgos conocidos o limitaciones.
+- Artefactos publicados: APK, imagenes Docker, URL productiva o documentacion.
+- Evidencias de pruebas ejecutadas.
+
+## Evidencias de funcionamiento
+
+| Evidencia | Forma esperada |
+| --------- | -------------- |
+| Repositorio accesible | URL publica de GitHub y hash del commit entregado. |
+| Pipeline CI | Ejecucion de GitHub Actions sin fallos criticos en backend, web y manual. |
+| Despliegue productivo | Plataforma web abierta en el dominio Azure y healthcheck backend operativo. |
+| OpenAPI | Swagger disponible en `/api/docs` y esquema en `/api/openapi.json`. |
+| APK Android | Archivo publicado en GitHub Releases con notas de release. |
+| Login administrador | Captura o video del acceso a `/admin/login`. |
+| Gestion de usuarios/clientes | Captura o video de alta, edicion o consulta. |
+| Proyecto y plano | Captura o video de creacion de proyecto, carga y calibracion de plano. |
+| Captura WiFi movil | Captura o video de punto medido y lectura enviada al backend. |
+| Heatmap | Captura o video del mapa de calor generado desde datos persistidos. |
+| Escenario IA | Captura o video de propuesta IA como conjunto derivado. |
+| Portal cliente | URL con token de demo y captura de resultados publicados. |
+| Manual de usuario | Sitio `/manual/` accesible con guia funcional. |
+| Consolidado final | Documento academico en Word con diagramas y codigos QR. |
+
+Para la entrega final, las evidencias deben vincularse al mismo commit o release que se presenta. Si una evidencia corresponde a un ambiente de demo, se registra la fecha, usuario de prueba, proyecto usado y limitaciones conocidas.
+
+## Cierre de producto
+
+Wireless HeatMapper queda definido como un producto integrado compuesto por:
+
+- Backend FastAPI con persistencia PostgreSQL, reglas de negocio, generacion de heatmaps e IA.
+- Plataforma web React/Vite para administracion, revision RF, escenarios IA y portal cliente.
+- App Android Flutter para tecnicos de campo, operando como cliente delgado en linea.
+- Infraestructura productiva reproducible con Docker Compose, Nginx, TLS y GitHub Actions.
+- Repositorio, releases moviles, documentacion, manual y evidencias suficientes para demostracion y continuidad.
+
+El producto final cumple la orientacion del proyecto: captura, analisis y entrega de resultados WiFi sin persistencia local de dominio en el dispositivo movil y con PostgreSQL como fuente central de verdad.
 
 
 # Bibliografia
@@ -1113,6 +1885,7 @@ The Institute of Electrical and Electronics Engineers. (2014). *IEEE Standard fo
 | ------- | --- |
 | Repositorio GitHub | https://github.com/borysinho/wireless-heatmapper |
 | Frontend publicado | https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/ |
+| Manual de usuario | https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/manual/ |
 | Releases moviles | https://github.com/borysinho/wireless-heatmapper/releases |
 
 ## Anexo B: glosario
@@ -1222,6 +1995,12 @@ El documento Word se genera mediante el script de consolidacion incluido con est
 <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/>
 
 ![QR frontend](/home/bquiroga/Documentos/dev/taller/proyecto-final/docs/SW2/assets/qr-frontend.png)
+
+## Manual de usuario
+
+<https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/manual/>
+
+![QR manual](/home/bquiroga/Documentos/dev/taller/proyecto-final/docs/SW2/assets/qr-manual.png)
 
 ## Releases moviles
 

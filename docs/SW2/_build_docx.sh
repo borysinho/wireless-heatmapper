@@ -70,6 +70,7 @@ append_document() {
 
 generate_qr "https://github.com/borysinho/wireless-heatmapper" "$ASSET_DIR/qr-repositorio.png"
 generate_qr "https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/" "$ASSET_DIR/qr-frontend.png"
+generate_qr "https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/manual/" "$ASSET_DIR/qr-manual.png"
 generate_qr "https://github.com/borysinho/wireless-heatmapper/releases" "$ASSET_DIR/qr-releases.png"
 
 render_diagrams
@@ -119,6 +120,12 @@ $(if [[ -f "$ASSET_DIR/qr-repositorio.png" ]]; then echo "![QR repositorio]($ASS
 <https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/>
 
 $(if [[ -f "$ASSET_DIR/qr-frontend.png" ]]; then echo "![QR frontend]($ASSET_DIR/qr-frontend.png)"; fi)
+
+## Manual de usuario
+
+<https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/manual/>
+
+$(if [[ -f "$ASSET_DIR/qr-manual.png" ]]; then echo "![QR manual]($ASSET_DIR/qr-manual.png)"; fi)
 
 ## Releases moviles
 

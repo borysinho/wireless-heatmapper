@@ -6,6 +6,7 @@
 | ------- | --- |
 | Repositorio GitHub | https://github.com/borysinho/wireless-heatmapper |
 | Frontend publicado | https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/ |
+| Manual de usuario | https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/manual/ |
 | Releases moviles | https://github.com/borysinho/wireless-heatmapper/releases |
 
 ## Anexo B: glosario
