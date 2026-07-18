@@ -13,6 +13,7 @@ import ConjuntosAPProyecto from "@/features/admin/pages/ConjuntosAPProyecto";
 import ProyectoRFLayout from "@/features/admin/pages/ProyectoRFLayout";
 import PublicacionClienteProyecto from "@/features/admin/pages/PublicacionClienteProyecto";
 import PortalCliente from "@/features/portal/pages/PortalCliente";
+import SitioEmpresa from "@/features/empresa/pages/SitioEmpresa";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,8 +33,9 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* Redirigir raíz a login */}
-      <Route path="/" element={<Navigate to="/admin/login" replace />} />
+      {/* Sitio público empresarial */}
+      <Route path="/" element={<SitioEmpresa />} />
+      <Route path="/empresa" element={<SitioEmpresa />} />
 
       {/* Auth */}
       <Route path="/admin/login" element={<LoginAdmin />} />

@@ -170,3 +170,9 @@ jobs:
             echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u "$GHCR_USUARIO" --password-stdin
             sudo chmod +x /opt/wireless-heatmapper/scripts/deploy/actualizar-produccion.sh
             sudo APP_DIR=/opt/wireless-heatmapper /opt/wireless-heatmapper/scripts/deploy/actualizar-produccion.sh
+
+      - name: Verificar sitio publico desplegado
+        run: |
+          curl --fail --silent --show-error --location \
+            https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/ \
+            | grep -q "Team 24 Software"

@@ -1,6 +1,6 @@
 # Wireless HeatMapper — Panel Web (React + TypeScript)
 
-Panel de administración y portal de cliente para el sistema de cobertura WiFi.  
+Sitio empresarial público, panel de administración y portal de cliente para el sistema de cobertura WiFi.  
 Stack: React 19 + TypeScript + Vite + TanStack Query + Axios + Zustand.
 
 ## Requisitos
@@ -55,6 +55,35 @@ VITE_API_BASE_URL=http://localhost/api
 ```
 
 En producción el Nginx reverse proxy enruta `/api` al backend automáticamente.
+
+## Sitio público empresarial
+
+Rutas principales:
+
+- `/` y `/empresa`: sitio institucional de Team 24 Software.
+- `/admin/login`: acceso al panel administrativo.
+- `/portal/:token`: portal de cliente publicado por enlace.
+- `/manual/`: manual de usuario servido por Nginx.
+- `/api/docs`: documentación OpenAPI del backend.
+
+El contenido público implementa las secciones definidas en
+`docs/SW2/DOCUMENTACION/08-sitio-web-empresa.md`: empresa, servicios, producto,
+descargas, soporte, chatbot, contacto, redes sociales pendientes y políticas.
+
+## CI/CD Azure
+
+El pipeline `.github/workflows/deploy-azure-vm.yml` valida lint, build y tests de
+la web, construye la imagen `wireless-heatmapper-web`, la publica en GHCR y
+actualiza la VM Azure mediante Docker Compose. Al finalizar ejecuta una
+verificación HTTPS sobre:
+
+```text
+https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/
+```
+
+La verificación comprueba que el HTML publicado conserve la marca
+`Team 24 Software`, por lo que un despliegue incompleto o una ruta pública rota
+falla el workflow.
 
 ## React Compiler
 
