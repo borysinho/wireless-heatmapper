@@ -114,33 +114,18 @@ interfaz de usuario orientada a la gestión de redes inalámbricas. Es el
 proyecto de mayor madurez de los tres analizados, con 4 700 estrellas y
 728 bifurcaciones en GitHub.
 
----
-
-             **Atributo**                                 **Valor**
-
----
-
-              Repositorio              github.com/VREMSoftwareDevelopment/WiFiAnalyzer
-
-              Plataforma                       Android (Google Play / F-Droid)
-
-          Lenguaje principal                      Kotlin 97.4 %, Java 2.6 %
-
-               Licencia                                    GPL-3.0
-
-           Estrellas GitHub                                 4 700
-
-             Bifurcaciones                                   728
-
-       Confirmaciones (commits)                             2 013
-
-     Incidencias abiertas (issues)                            6
-
-             KLDC estimado                                  25.0
-
-           Esfuerzo estimado                           71 personas-mes
-
----
+| Atributo | Valor |
+| --- | --- |
+| Repositorio | github.com/VREMSoftwareDevelopment/WiFiAnalyzer |
+| Plataforma | Android (Google Play / F-Droid) |
+| Lenguaje principal | Kotlin 97.4 %, Java 2.6 % |
+| Licencia | GPL-3.0 |
+| Estrellas GitHub | 4 700 |
+| Bifurcaciones | 728 |
+| Confirmaciones (commits) | 2 013 |
+| Incidencias abiertas (issues) | 6 |
+| KLDC estimado | 25.0 |
+| Esfuerzo estimado | 71 personas-mes |
 
 #### WiFiSurveyor
 
@@ -160,34 +145,18 @@ coordenadas y valores de señal, y generar un mapa de calor de cobertura.
 Su integración con SonarCloud para análisis de calidad de código también
 lo convierte en una referencia metodológica relevante.
 
----
-
-             **Atributo**                          **Valor**
-
----
-
-              Repositorio               github.com/ecoAPM/WiFiSurveyor
-
-              Plataforma              Windows / macOS / Linux (web local)
-
-          Lenguaje principal             TypeScript 51.7 %, C# 30.9 %,
-                                                 Vue.js 15.5 %
-
-               Licencia                             GPL-3.0
-
-           Estrellas GitHub                           68
-
-             Bifurcaciones                            10
-
-       Confirmaciones (commits)                       273
-
-     Incidencias abiertas (issues)                     8
-
-             KLDC estimado                            8.0
-
-           Esfuerzo estimado                    23 personas-mes
-
----
+| Atributo | Valor |
+| --- | --- |
+| Repositorio | github.com/ecoAPM/WiFiSurveyor |
+| Plataforma | Windows / macOS / Linux (web local) |
+| Lenguaje principal | TypeScript 51.7 %, C# 30.9 %, Vue.js 15.5 % |
+| Licencia | GPL-3.0 |
+| Estrellas GitHub | 68 |
+| Bifurcaciones | 10 |
+| Confirmaciones (commits) | 273 |
+| Incidencias abiertas (issues) | 8 |
+| KLDC estimado | 8.0 |
+| Esfuerzo estimado | 23 personas-mes |
 
 #### python-wifi-survey-heatmap
 
@@ -207,33 +176,18 @@ flujo central del Wireless HeatMapper: captura de datos por punto de
 medición, almacenamiento en JSON y generación de mapa de calor continuo
 sobre el plano del edificio.
 
----
-
-             **Atributo**                                **Valor**
-
----
-
-              Repositorio              github.com/jantman/python-wifi-survey-heatmap
-
-              Plataforma                            Linux (escritorio)
-
-          Lenguaje principal                           Python 98.3 %
-
-               Licencia                      No especificada (código abierto)
-
-           Estrellas GitHub                                 467
-
-             Bifurcaciones                                  92
-
-       Confirmaciones (commits)                             141
-
-     Incidencias abiertas (issues)                           9
-
-             KLDC estimado                                  2.5
-
-           Esfuerzo estimado                          7 personas-mes
-
----
+| Atributo | Valor |
+| --- | --- |
+| Repositorio | github.com/jantman/python-wifi-survey-heatmap |
+| Plataforma | Linux (escritorio) |
+| Lenguaje principal | Python 98.3 % |
+| Licencia | No especificada (código abierto) |
+| Estrellas GitHub | 467 |
+| Bifurcaciones | 92 |
+| Confirmaciones (commits) | 141 |
+| Incidencias abiertas (issues) | 9 |
+| KLDC estimado | 2.5 |
+| Esfuerzo estimado | 7 personas-mes |
 
 ### Métricas Orientadas al Tamaño (MoT)
 

@@ -12,6 +12,12 @@ BUILD_DIR="$ROOT_DIR/build"
 DIAGRAM_ASSET_DIR="$ASSET_DIR/diagramas"
 MERGED="$BUILD_DIR/WirelessHeatMapper-SW2-Consolidado.md"
 OUTPUT="$BUILD_DIR/WirelessHeatMapper-SW2-Consolidado.docx"
+NORMALIZED_PAPS="$(mktemp "${TMPDIR:-/tmp}/wireless-paps-normalizado.XXXXXX.md")"
+
+cleanup() {
+  rm -f "$NORMALIZED_PAPS"
+}
+trap cleanup EXIT
 
 mkdir -p "$ASSET_DIR" "$BUILD_DIR" "$DIAGRAM_ASSET_DIR"
 
@@ -63,6 +69,81 @@ render_diagrams() {
   else
     echo "ADVERTENCIA: no se encontro plantuml; el Word se generara sin imagenes UML renderizadas." >&2
   fi
+}
+
+normalize_paps_tables() {
+  local input="$1"
+  local output="$2"
+
+  awk '
+    function trim(s) {
+      gsub(/^[[:space:]]+/, "", s)
+      gsub(/[[:space:]]+$/, "", s)
+      return s
+    }
+
+    function emit_attr_table(block, count, j, line, label, value) {
+      print "| Atributo | Valor |"
+      print "| --- | --- |"
+      pending_label = ""
+      pending_value = ""
+      for (j = 1; j <= count; j++) {
+        line = trim(block[j])
+        if (line == "") {
+          continue
+        }
+        if (line ~ /\*\*Atributo\*\*/ && line ~ /\*\*Valor\*\*/) {
+          continue
+        }
+        if (match(line, /[[:space:]][[:space:]]+/)) {
+          if (pending_label != "") {
+            print "| " pending_label " | " pending_value " |"
+          }
+          label = trim(substr(line, 1, RSTART - 1))
+          value = trim(substr(line, RSTART + RLENGTH))
+          pending_label = label
+          pending_value = value
+        } else if (pending_label != "") {
+          pending_value = pending_value " " line
+        }
+      }
+      if (pending_label != "") {
+        print "| " pending_label " | " pending_value " |"
+      }
+    }
+
+    { lines[++n] = $0 }
+
+    END {
+      for (i = 1; i <= n; i++) {
+        if (lines[i] ~ /^---[[:space:]]*$/) {
+          header = i + 1
+          while (header <= n && trim(lines[header]) == "") {
+            header++
+          }
+          separator = header + 1
+          while (separator <= n && trim(lines[separator]) == "") {
+            separator++
+          }
+          if (lines[header] ~ /\*\*Atributo\*\*/ && lines[header] ~ /\*\*Valor\*\*/ && lines[separator] ~ /^---[[:space:]]*$/) {
+            delete block
+            count = 0
+            end = separator + 1
+            while (end <= n && !(lines[end] ~ /^---[[:space:]]*$/)) {
+              block[++count] = lines[end]
+              end++
+            }
+            if (end <= n) {
+              emit_attr_table(block, count)
+              i = end
+              continue
+            }
+          }
+        }
+        print lines[i]
+      }
+    }
+  ' "$input" > "$output"
 }
 
 append_shifted_markdown() {
@@ -168,6 +249,7 @@ generate_qr "https://wireless-heatmapper-g24.eastus2.cloudapp.azure.com/manual/"
 generate_qr "https://github.com/borysinho/wireless-heatmapper/releases" "$ASSET_DIR/qr-releases.png"
 
 render_diagrams
+normalize_paps_tables "$PAPS_SOURCE" "$NORMALIZED_PAPS"
 
 : > "$MERGED"
 cat >> "$MERGED" <<'EOF'
@@ -215,7 +297,7 @@ La estructura principal sigue exactamente los doce puntos solicitados en la clas
 | 12 | Software como Producto |
 EOF
 
-append_point "1. PAPS" "$PAPS_SOURCE"
+append_point "1. PAPS" "$NORMALIZED_PAPS"
 append_point "2. Modelos de Desarrollo" "$DOC_DIR/03-modelos-desarrollo.md"
 append_diagram_section "Evidencias de los cuatro modelos obligatorios" \
   "$DIAGRAM_DIR/01-modelo-contexto.puml" \
