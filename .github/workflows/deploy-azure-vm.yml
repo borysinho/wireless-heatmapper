@@ -149,11 +149,15 @@ jobs:
           IMAGE_TAG: ${{ env.IMAGE_TAG_DESPLIEGUE }}
           GHCR_USUARIO: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_CHATBOT_DEPLOYMENT: ${{ vars.AZURE_OPENAI_CHATBOT_DEPLOYMENT }}
+          AZURE_OPENAI_CHATBOT_TIMEOUT_SECONDS: ${{ vars.AZURE_OPENAI_CHATBOT_TIMEOUT_SECONDS || '20' }}
         with:
           host: ${{ secrets.AZURE_VM_HOST }}
           username: ${{ secrets.AZURE_VM_USER }}
           key: ${{ secrets.AZURE_VM_SSH_KEY }}
-          envs: GHCR_OWNER,IMAGE_TAG,GHCR_USUARIO,GHCR_TOKEN
+          envs: GHCR_OWNER,IMAGE_TAG,GHCR_USUARIO,GHCR_TOKEN,AZURE_OPENAI_API_KEY,AZURE_OPENAI_ENDPOINT,AZURE_OPENAI_CHATBOT_DEPLOYMENT,AZURE_OPENAI_CHATBOT_TIMEOUT_SECONDS
           script: |
             set -euo pipefail
             sudo mkdir -p /opt/wireless-heatmapper/nginx /opt/wireless-heatmapper/scripts/deploy /opt/wireless-heatmapper/.secrets
@@ -169,7 +173,13 @@ jobs:
             sudo sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${IMAGE_TAG}/" /opt/wireless-heatmapper/.env
             echo "$GHCR_TOKEN" | sudo docker login ghcr.io -u "$GHCR_USUARIO" --password-stdin
             sudo chmod +x /opt/wireless-heatmapper/scripts/deploy/actualizar-produccion.sh
-            sudo APP_DIR=/opt/wireless-heatmapper /opt/wireless-heatmapper/scripts/deploy/actualizar-produccion.sh
+            sudo env \
+              APP_DIR=/opt/wireless-heatmapper \
+              AZURE_OPENAI_API_KEY="$AZURE_OPENAI_API_KEY" \
+              AZURE_OPENAI_ENDPOINT="$AZURE_OPENAI_ENDPOINT" \
+              AZURE_OPENAI_CHATBOT_DEPLOYMENT="$AZURE_OPENAI_CHATBOT_DEPLOYMENT" \
+              AZURE_OPENAI_CHATBOT_TIMEOUT_SECONDS="$AZURE_OPENAI_CHATBOT_TIMEOUT_SECONDS" \
+              /opt/wireless-heatmapper/scripts/deploy/actualizar-produccion.sh
 
       - name: Verificar sitio publico desplegado
         run: |
